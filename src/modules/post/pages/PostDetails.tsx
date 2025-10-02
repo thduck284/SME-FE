@@ -1,15 +1,15 @@
 import { useParams, Link, useNavigate } from "react-router-dom";
 
 import { Button } from "@/components/ui";
-import { Loader } from "@/components/shared";
-import { GridPostList, PostStats } from "@/components/shared";
+import { Loader } from "@/components";
+import { GridPostList, PostStats } from "@/components";
 
 import {
   useGetPostById,
   useGetUserPosts,
   useDeletePost,
 } from "@/lib/react-query/queries";
-import { multiFormatDateString } from "@/lib/utils";
+import { multiFormatDateString } from "@/utils/utils";
 import { useUserContext } from "@/context/AuthContext";
 
 const PostDetails = () => {

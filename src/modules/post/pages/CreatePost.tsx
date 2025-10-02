@@ -1,4 +1,4 @@
-import PostForm from "@/components/forms/PostForm";
+import PostForm from "@/modules/post/components/PostForm";
 
 const CreatePost = () => {
   return (

@@ -11,10 +11,10 @@ import {
   UpdateProfile,
   AllUsers,
 } from "@/_root/pages";
-import AuthLayout from "./_auth/AuthLayout";
-import RootLayout from "./_root/RootLayout";
-import SignupForm from "@/_auth/forms/SignupForm";
-import SigninForm from "@/_auth/forms/SigninForm";
+import AuthLayout from "../modules/auth/AuthLayout";
+import RootLayout from "../_root/RootLayout";
+import SignupForm from "@/modules/auth/forms/SignupForm";
+import SigninForm from "@/modules/auth/forms/SigninForm";
 import { Toaster } from "@/components/ui/toaster";
 
 import "./globals.css";
