@@ -1,9 +1,9 @@
 import { Models } from "appwrite";
 import { Link } from "react-router-dom";
 
-import { PostStats } from "@/components";
-import { multiFormatDateString } from "@/utils/utils";
-import { useUserContext } from "@/modules/auth/AuthContext";
+import { default as PostStats } from "./PostStats";
+import { multiFormatDateString } from "@/shared/utils/utils";
+import { useUserContext } from "@/modules/auth/contexts/AuthContext";
 
 type PostCardProps = {
   post: Models.Document;

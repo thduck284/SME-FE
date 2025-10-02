@@ -10,13 +10,13 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
-} from "@/components/ui/form";
-import { useToast } from "@/components/ui/use-toast";
-import { Textarea, Input, Button } from "@/components/ui";
+} from "@/shared/components/ui/form";
+import { useToast } from "@/shared/components/ui/use-toast";
+import { Textarea, Input, Button } from "@/shared/components/ui";
 import { ProfileUploader, Loader } from "@/components";
 
 import { ProfileValidation } from "@/lib/validation";
-import { useUserContext } from "@/modules/auth/AuthContext";
+import { useUserContext } from "@/modules/auth/contexts/AuthContext";
 import { useGetUserById, useUpdateUser } from "@/lib/react-query/queries";
 
 const UpdateProfile = () => {

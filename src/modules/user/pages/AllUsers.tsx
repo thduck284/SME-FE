@@ -1,4 +1,4 @@
-import { useToast } from "@/components/ui/use-toast";
+import { useToast } from "@/shared/components/ui/use-toast";
 import { Loader, UserCard } from "@/components";
 import { useGetUsers } from "@/lib/react-query/queries";
 

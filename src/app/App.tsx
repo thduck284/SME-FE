@@ -1,6 +1,6 @@
 import { useRoutes } from "react-router-dom";
-import { Toaster } from "@/components/ui/toaster";
-import { authRoutes } from "@/modules/auth/routes";
+import { Toaster } from "@/shared/components/ui/toaster";
+import { authRoutes } from "@/modules/auth/routes/router";
 
 import "./globals.css";
 

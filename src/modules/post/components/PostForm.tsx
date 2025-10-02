@@ -14,11 +14,11 @@ import {
   Button,
   Input,
   Textarea,
-} from "@/components/ui";
+} from "@/shared/components/ui";
 import { PostValidation } from "@/lib/validation";
-import { useToast } from "@/components/ui/use-toast";
-import { useUserContext } from "@/modules/auth/AuthContext";
-import { FileUploader, Loader } from "@/components";
+import { useToast } from "@/shared/components/ui/use-toast";
+import { useUserContext } from "@/modules/auth/contexts/AuthContext";
+import { FileUploader, Loader } from "@/shared/components";
 import { useCreatePost, useUpdatePost } from "@/lib/react-query/queries";
 
 type PostFormProps = {

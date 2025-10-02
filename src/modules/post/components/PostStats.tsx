@@ -2,7 +2,7 @@ import { Models } from "appwrite";
 import { useState, useEffect } from "react";
 import { useLocation } from "react-router-dom";
 
-import { checkIsLiked } from "@/utils/utils";
+import { checkIsLiked } from "@/shared/utils/utils";
 import {
   useLikePost,
   useSavePost,

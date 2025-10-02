@@ -1,8 +1,8 @@
 import { useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 
-import { Button } from "../ui/button";
-import { useUserContext } from "@/modules/auth/AuthContext";
+import { Button } from "@/shared/components/ui";
+import { useUserContext } from "@/modules/auth/contexts/AuthContext";
 import { useSignOutAccount } from "@/lib/react-query/queries";
 
 const Topbar = () => {

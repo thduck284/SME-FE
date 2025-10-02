@@ -1,7 +1,7 @@
 import { useCallback, useState } from "react";
 import { FileWithPath, useDropzone } from "react-dropzone";
 
-import { convertFileToUrl } from "@/utils/utils";
+import { convertFileToUrl } from "@/shared/utils/utils";
 
 type ProfileUploaderProps = {
   fieldChange: (files: File[]) => void;

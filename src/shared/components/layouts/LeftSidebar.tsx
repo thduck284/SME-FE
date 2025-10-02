@@ -1,11 +1,11 @@
 import { Link, NavLink, useLocation, useNavigate } from "react-router-dom";
 
-import { INavLink } from "@/types";
-import { sidebarLinks } from "@/constants";
-import { Loader } from "@/components";
-import { Button } from "@/components/ui/button";
+import { INavLink } from "@/shared/types";
+import { sidebarLinks } from "@/shared/constants";
+import { Loader } from "@/shared/components";
+import { Button } from "@/shared/components/ui/button";
 import { useSignOutAccount } from "@/lib/react-query/queries";
-import { useUserContext, INITIAL_USER } from "@/modules/auth/AuthContext";
+import { useUserContext, INITIAL_USER } from "@/modules/auth/contexts/AuthContext";
 
 const LeftSidebar = () => {
   const navigate = useNavigate();

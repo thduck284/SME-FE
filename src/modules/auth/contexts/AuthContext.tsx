@@ -1,7 +1,7 @@
 import { useNavigate } from "react-router-dom";
 import { createContext, useContext, useEffect, useState } from "react";
 
-import { IUser } from "@/types";
+import { IUser } from "@/shared/types";
 import { getCurrentUser } from "@/lib/appwrite/api";
 
 export const INITIAL_USER = {

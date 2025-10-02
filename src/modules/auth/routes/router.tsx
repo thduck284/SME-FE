@@ -1,6 +1,6 @@
-import AuthLayout from "./AuthLayout";
-import SigninForm from "./forms/SigninForm";
-import SignupForm from "./forms/SignupForm";
+import AuthLayout from "@/modules/auth/components/layout/AuthLayout";
+import SigninForm from "@/modules/auth/pages/SigninForm";
+import SignupForm from "@/modules/auth/pages/SignupForm";
 
 export const authRoutes = [
   {
