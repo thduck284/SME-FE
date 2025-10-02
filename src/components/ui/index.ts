@@ -1,6 +1,2 @@
-export * from './button';
-export * from './form';
-export * from './input';
-export * from './label';
-export * from './textarea';
-export * from './use-toast';
+export { default as Button } from "./Button";
+export { default as Input } from "./Input";
