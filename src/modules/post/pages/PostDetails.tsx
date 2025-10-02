@@ -10,7 +10,7 @@ import {
   useDeletePost,
 } from "@/lib/react-query/queries";
 import { multiFormatDateString } from "@/utils/utils";
-import { useUserContext } from "@/context/AuthContext";
+import { useUserContext } from "@/modules/auth/AuthContext";
 
 const PostDetails = () => {
   const navigate = useNavigate();

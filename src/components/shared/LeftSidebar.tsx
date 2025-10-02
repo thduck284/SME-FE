@@ -5,7 +5,7 @@ import { sidebarLinks } from "@/constants";
 import { Loader } from "@/components";
 import { Button } from "@/components/ui/button";
 import { useSignOutAccount } from "@/lib/react-query/queries";
-import { useUserContext, INITIAL_USER } from "@/context/AuthContext";
+import { useUserContext, INITIAL_USER } from "@/modules/auth/AuthContext";
 
 const LeftSidebar = () => {
   const navigate = useNavigate();

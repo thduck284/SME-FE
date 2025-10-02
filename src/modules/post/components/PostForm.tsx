@@ -17,7 +17,7 @@ import {
 } from "@/components/ui";
 import { PostValidation } from "@/lib/validation";
 import { useToast } from "@/components/ui/use-toast";
-import { useUserContext } from "@/context/AuthContext";
+import { useUserContext } from "@/modules/auth/AuthContext";
 import { FileUploader, Loader } from "@/components";
 import { useCreatePost, useUpdatePost } from "@/lib/react-query/queries";
 

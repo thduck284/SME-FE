@@ -2,7 +2,7 @@ import { Models } from "appwrite";
 import { Link } from "react-router-dom";
 
 import { PostStats } from "@/components";
-import { useUserContext } from "@/context/AuthContext";
+import { useUserContext } from "@/modules/auth/AuthContext";
 
 type GridPostListProps = {
   posts: Models.Document[];

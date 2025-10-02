@@ -1,6 +1,6 @@
 import { Models } from "appwrite";
 
-// import { useToast } from "@/components/ui/use-toast";
+//import { useToast } from "@/components/ui/use-toast";
 import { Loader, PostCard, UserCard } from "@/components";
 import { useGetRecentPosts, useGetUsers } from "@/lib/react-query/queries";
 

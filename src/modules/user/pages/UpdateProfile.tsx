@@ -16,7 +16,7 @@ import { Textarea, Input, Button } from "@/components/ui";
 import { ProfileUploader, Loader } from "@/components";
 
 import { ProfileValidation } from "@/lib/validation";
-import { useUserContext } from "@/context/AuthContext";
+import { useUserContext } from "@/modules/auth/AuthContext";
 import { useGetUserById, useUpdateUser } from "@/lib/react-query/queries";
 
 const UpdateProfile = () => {
