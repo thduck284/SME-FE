@@ -1,0 +1,121 @@
+"use client"
+
+import type React from "react"
+import { useState } from "react"
+import { Input, Button } from "@/components/ui"
+import { Mail } from "lucide-react"
+import { Link } from "react-router-dom"
+
+export function ForgotPasswordPage() {
+  const [email, setEmail] = useState("")
+  const [loading, setLoading] = useState(false)
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    setLoading(true)
+
+    setTimeout(() => {
+      console.log("Reset password request for:", email)
+      setLoading(false)
+      alert("If this email exists, a reset link has been sent.")
+    }, 1000)
+  }
+
+  return (
+    <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden bg-gradient-to-tr from-blue-100 via-purple-100 to-pink-100">
+
+      {/* Background Blur Shapes */}
+      <div className="absolute inset-0 -z-10">
+        <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-purple-300/30 rounded-full blur-3xl animate-pulse" />
+        <div className="absolute bottom-0 left-0 w-[500px] h-[500px] bg-pink-200/20 rounded-full blur-2xl animate-pulse" />
+      </div>
+
+      <div className="w-full max-w-[480px]">
+        {/* Forgot Password Card with Logo */}
+        <div className="bg-card border border-border rounded-2xl p-8 md:p-10 shadow-sm backdrop-blur-sm">
+
+          {/* Logo */}
+          <div className="flex justify-center mb-6">
+            <img
+              src="/assets/images/logo.svg"
+              alt="Streamora Logo"
+              className="w-60 h-auto"
+            />
+          </div>
+
+          {/* Header */}
+          <div className="text-center mb-6">
+            <h1 className="text-2xl md:text-3xl font-semibold text-foreground mb-2">
+              Forgot Password
+            </h1>
+            <p className="text-sm text-muted-foreground">
+              Enter your email to receive a password reset link.
+            </p>
+          </div>
+
+          {/* Form */}
+          <form onSubmit={handleSubmit} className="space-y-6">
+            <div className="space-y-2">
+              <label htmlFor="email" className="block text-sm font-medium text-foreground">
+                Email
+              </label>
+              <div className="relative group">
+                <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground w-[18px] h-[18px]" />
+                <Input
+                  id="email"
+                  type="email"
+                  placeholder="your_email@email.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="pl-11 h-11 text-base"
+                  required
+                />
+              </div>
+            </div>
+
+            <Button
+              type="submit"
+              disabled={loading}
+              className="w-full h-11 text-base font-medium"
+            >
+              {loading ? "Sending..." : "Send Reset Link"}
+            </Button>
+          </form>
+
+          {/* Back to Login */}
+          <div className="text-center mt-6">
+            <p className="text-sm text-muted-foreground">
+              Remember your password?{" "}
+              <Link
+                to="/login"
+                className="font-semibold text-foreground hover:text-primary transition-colors underline-offset-4 hover:underline"
+              >
+                Log In
+              </Link>
+            </p>
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="mt-8 text-center">
+          <p className="text-xs text-muted-foreground">
+            By using this service, you agree to our{" "}
+            <Link
+              to="/terms"
+              className="underline underline-offset-4 hover:text-foreground transition-colors"
+            >
+              Terms of Service
+            </Link>{" "}
+            and{" "}
+            <Link
+              to="/privacy"
+              className="underline underline-offset-4 hover:text-foreground transition-colors"
+            >
+              Privacy Policy
+            </Link>
+          </p>
+        </div>
+      </div>
+    </div>
+  )
+}

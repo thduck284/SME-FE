@@ -1,0 +1,80 @@
+"use client"
+import { Home, Search, Compass, Film, MessageCircle, Bell, PlusSquare, User, MoreHorizontal } from "lucide-react"
+
+export function LeftBar() {
+  return (
+    <aside className="w-64 bg-gradient-to-b from-orange-50 via-white to-orange-50/30 border-r border-orange-200/50 p-6 hidden md:flex flex-col shadow-sm">
+      <div className="flex items-center justify-center mb-8 pb-6 border-b border-orange-200/50">
+        <h1 className="text-3xl font-bold bg-gradient-to-r from-orange-500 via-orange-600 to-orange-700 text-transparent bg-clip-text tracking-tight">
+          Streamora
+        </h1>
+      </div>
+
+      <nav className="flex-1 space-y-1">
+        <a
+          href="#"
+          className="flex items-center gap-4 px-4 py-3.5 text-orange-700 bg-orange-100 rounded-xl transition-all duration-300 shadow-sm font-medium group"
+        >
+          <Home className="w-6 h-6 group-hover:scale-110 transition-transform" />
+          <span>Home</span>
+        </a>
+        <a
+          href="#"
+          className="flex items-center gap-4 px-4 py-3.5 text-gray-700 hover:text-orange-700 hover:bg-orange-50 rounded-xl transition-all duration-300 font-medium group"
+        >
+          <Search className="w-6 h-6 group-hover:scale-110 transition-transform" />
+          <span>Search</span>
+        </a>
+        <a
+          href="#"
+          className="flex items-center gap-4 px-4 py-3.5 text-gray-700 hover:text-orange-700 hover:bg-orange-50 rounded-xl transition-all duration-300 font-medium group"
+        >
+          <Compass className="w-6 h-6 group-hover:scale-110 transition-transform" />
+          <span>Explore</span>
+        </a>
+        <a
+          href="#"
+          className="flex items-center gap-4 px-4 py-3.5 text-gray-700 hover:text-orange-700 hover:bg-orange-50 rounded-xl transition-all duration-300 font-medium group"
+        >
+          <Film className="w-6 h-6 group-hover:scale-110 transition-transform" />
+          <span>Reels</span>
+        </a>
+        <a
+          href="#"
+          className="flex items-center gap-4 px-4 py-3.5 text-gray-700 hover:text-orange-700 hover:bg-orange-50 rounded-xl transition-all duration-300 font-medium group"
+        >
+          <MessageCircle className="w-6 h-6 group-hover:scale-110 transition-transform" />
+          <span>Messages</span>
+        </a>
+        <a
+          href="#"
+          className="flex items-center gap-4 px-4 py-3.5 text-gray-700 hover:text-orange-700 hover:bg-orange-50 rounded-xl transition-all duration-300 font-medium group"
+        >
+          <Bell className="w-6 h-6 group-hover:scale-110 transition-transform" />
+          <span>Notifications</span>
+        </a>
+        <a
+          href="#"
+          className="flex items-center gap-4 px-4 py-3.5 text-gray-700 hover:text-orange-700 hover:bg-orange-50 rounded-xl transition-all duration-300 font-medium group"
+        >
+          <PlusSquare className="w-6 h-6 group-hover:scale-110 transition-transform" />
+          <span>Create</span>
+        </a>
+        <a
+          href="#"
+          className="flex items-center gap-4 px-4 py-3.5 text-gray-700 hover:text-orange-700 hover:bg-orange-50 rounded-xl transition-all duration-300 font-medium group"
+        >
+          <User className="w-6 h-6 group-hover:scale-110 transition-transform" />
+          <span>Profile</span>
+        </a>
+        <a
+          href="#"
+          className="flex items-center gap-4 px-4 py-3.5 text-gray-700 hover:text-orange-700 hover:bg-orange-50 rounded-xl transition-all duration-300 font-medium group"
+        >
+          <MoreHorizontal className="w-6 h-6 group-hover:scale-110 transition-transform" />
+          <span>More</span>
+        </a>
+      </nav>
+    </aside>
+  )
+}
