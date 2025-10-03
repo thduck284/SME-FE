@@ -23,7 +23,6 @@ export function LoginPage() {
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden bg-gradient-to-tr from-blue-100 via-purple-100 to-pink-100">
-      
       {/* Background Blur Shapes */}
       <div className="absolute inset-0 -z-10">
         <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-purple-300/30 rounded-full blur-3xl animate-pulse" />
@@ -91,13 +90,15 @@ export function LoginPage() {
               </div>
             </div>
 
-            {/* Button */}
+            {/* Custom Button */}
             <Button
               type="submit"
-              disabled={loading}
+              loading={loading}
+              variant="primary"
+              size="md"
               className="w-full h-11 text-base font-medium"
             >
-              {loading ? "Logging in..." : "Login"}
+              Login
             </Button>
           </form>
 
