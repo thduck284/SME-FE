@@ -1,8 +1,9 @@
 "use client"
 
 import { useState } from "react"
-import { Home, Search, Compass, Film, MessageCircle, Bell, PlusSquare, User, MoreHorizontal } from "lucide-react"
+import { Home, Search, Compass, Film, MessageCircle, Bell, PlusSquare, User, MoreHorizontal, UserPlus } from "lucide-react"
 import { CreatePostModal } from "@/components/posts/CreatePostModal"
+import { Link } from "react-router-dom"
 
 export function LeftBar() {
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -17,13 +18,13 @@ export function LeftBar() {
         </div>
 
         <nav className="flex-1 space-y-1">
-          <a
-            href="#"
+          <Link
+            to="/home"
             className="flex items-center gap-4 px-4 py-3.5 text-orange-700 bg-orange-100 rounded-xl transition-all duration-300 shadow-sm font-medium group"
           >
             <Home className="w-6 h-6 group-hover:scale-110 transition-transform" />
             <span>Home</span>
-          </a>
+          </Link>
 
           <a
             href="#"
@@ -73,6 +74,14 @@ export function LeftBar() {
             <PlusSquare className="w-6 h-6 group-hover:scale-110 transition-transform" />
             <span>Create</span>
           </button>
+
+          <Link
+            to="/suggested"
+            className="flex items-center gap-4 px-4 py-3.5 text-gray-700 hover:text-orange-700 hover:bg-orange-50 rounded-xl transition-all duration-300 font-medium group"
+          >
+            <UserPlus className="w-6 h-6 group-hover:scale-110 transition-transform" />
+            <span>Gợi ý kết bạn</span>
+          </Link>
 
           <a
             href="#"
