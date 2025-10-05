@@ -6,8 +6,10 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* ======================
+   Root Variables
+====================== */
 :root {
-  /* Updated to elegant beige/cream color scheme inspired by design */
   --background: oklch(0.97 0.01 85);
   --foreground: oklch(0.2 0.02 85);
   --card: oklch(0.99 0.005 85);
@@ -43,8 +45,10 @@
   --sidebar-ring: oklch(0.708 0 0);
 }
 
+/* ======================
+   Dark Mode Overrides
+====================== */
 .dark {
-  /* Updated dark mode with sophisticated dark palette */
   --background: oklch(0.15 0.01 85);
   --foreground: oklch(0.95 0.01 85);
   --card: oklch(0.18 0.01 85);
@@ -79,6 +83,9 @@
   --sidebar-ring: oklch(0.439 0 0);
 }
 
+/* ======================
+   Theme Inline
+====================== */
 @theme inline {
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
@@ -120,6 +127,9 @@
   --color-sidebar-ring: var(--sidebar-ring);
 }
 
+/* ======================
+   Base Styles
+====================== */
 @layer base {
   * {
     @apply border-border outline-ring/50;

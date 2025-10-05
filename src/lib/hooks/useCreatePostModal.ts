@@ -1,6 +1,6 @@
 import { useState, useRef, useCallback } from "react"
-import { CreatePost } from "@/lib/api/posts/CreatePost"
-import type { CreatePostDto } from "@/lib/types/Post"
+import { createPost } from "@/lib/api/posts/CreatePost"
+import type { CreatePostDto } from "@/lib/types/posts/CreatePostDto"
 
 export function useCreatePostModal(onClose: () => void, onPostCreated?: () => void) {
   const [content, setContent] = useState("")
@@ -62,7 +62,7 @@ export function useCreatePostModal(onClose: () => void, onPostCreated?: () => vo
   const handleSubmit = useCallback(async () => {
     setLoading(true)
     try {
-      await CreatePost({ content, type, visibility, files })
+      await createPost({ content, type, visibility, files })
       setContent("")
       setFiles([])
       onPostCreated?.()
