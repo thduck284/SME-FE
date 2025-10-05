@@ -14,3 +14,8 @@ export interface CreatePostDto {
   visibility?: Visibility
   mentions?: PostMentionDto[]
 }
+
+export interface CreateSharePostDto extends CreatePostDto {
+  rootPostId: string
+  mediaFiles?: File[]
+}

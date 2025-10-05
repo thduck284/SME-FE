@@ -10,11 +10,11 @@ export function LeftBar() {
 
   return (
     <>
-      <aside className="w-64 h-screen bg-gradient-to-b from-orange-50 via-white to-orange-50/30 border-r border-orange-200/50 flex flex-col shadow-sm">
+      <aside className="w-64 h-screen bg-gray-200 border-r border-gray-300 flex flex-col shadow-sm">
         {/* Header */}
-        <div className="p-6 border-b border-orange-200/50">
+        <div className="p-6 border-b border-gray-300">
           <div className="flex items-center justify-center">
-            <h1 className="text-3xl font-bold bg-gradient-to-r from-orange-500 via-orange-600 to-orange-700 text-transparent bg-clip-text tracking-tight">
+            <h1 className="text-3xl font-bold text-black tracking-tight">
               Streamora
             </h1>
           </div>
@@ -25,7 +25,7 @@ export function LeftBar() {
           <nav className="space-y-1">
             <a
               href="#"
-              className="flex items-center gap-4 px-4 py-3.5 text-orange-700 bg-orange-100 rounded-xl transition-all duration-300 shadow-sm font-medium group"
+              className="flex items-center gap-4 px-4 py-3.5 text-black bg-gray-300 rounded-xl transition-all duration-300 shadow-sm font-medium group"
             >
               <Home className="w-6 h-6 group-hover:scale-110 transition-transform" />
               <span>Home</span>
@@ -33,7 +33,7 @@ export function LeftBar() {
 
             <a
               href="#"
-              className="flex items-center gap-4 px-4 py-3.5 text-gray-700 hover:text-orange-700 hover:bg-orange-50 rounded-xl transition-all duration-300 font-medium group"
+              className="flex items-center gap-4 px-4 py-3.5 text-black hover:bg-gray-300 rounded-xl transition-all duration-300 font-medium group"
             >
               <Search className="w-6 h-6 group-hover:scale-110 transition-transform" />
               <span>Search</span>
@@ -41,7 +41,7 @@ export function LeftBar() {
 
             <a
               href="#"
-              className="flex items-center gap-4 px-4 py-3.5 text-gray-700 hover:text-orange-700 hover:bg-orange-50 rounded-xl transition-all duration-300 font-medium group"
+              className="flex items-center gap-4 px-4 py-3.5 text-black hover:bg-gray-300 rounded-xl transition-all duration-300 font-medium group"
             >
               <Compass className="w-6 h-6 group-hover:scale-110 transition-transform" />
               <span>Explore</span>
@@ -49,7 +49,7 @@ export function LeftBar() {
 
             <a
               href="#"
-              className="flex items-center gap-4 px-4 py-3.5 text-gray-700 hover:text-orange-700 hover:bg-orange-50 rounded-xl transition-all duration-300 font-medium group"
+              className="flex items-center gap-4 px-4 py-3.5 text-black hover:bg-gray-300 rounded-xl transition-all duration-300 font-medium group"
             >
               <Film className="w-6 h-6 group-hover:scale-110 transition-transform" />
               <span>Reels</span>
@@ -57,7 +57,7 @@ export function LeftBar() {
 
             <a
               href="#"
-              className="flex items-center gap-4 px-4 py-3.5 text-gray-700 hover:text-orange-700 hover:bg-orange-50 rounded-xl transition-all duration-300 font-medium group"
+              className="flex items-center gap-4 px-4 py-3.5 text-black hover:bg-gray-300 rounded-xl transition-all duration-300 font-medium group"
             >
               <MessageCircle className="w-6 h-6 group-hover:scale-110 transition-transform" />
               <span>Messages</span>
@@ -65,7 +65,7 @@ export function LeftBar() {
 
             <a
               href="#"
-              className="flex items-center gap-4 px-4 py-3.5 text-gray-700 hover:text-orange-700 hover:bg-orange-50 rounded-xl transition-all duration-300 font-medium group"
+              className="flex items-center gap-4 px-4 py-3.5 text-black hover:bg-gray-300 rounded-xl transition-all duration-300 font-medium group"
             >
               <Bell className="w-6 h-6 group-hover:scale-110 transition-transform" />
               <span>Notifications</span>
@@ -74,7 +74,7 @@ export function LeftBar() {
             {/* Create Button */}
             <button
               onClick={() => setIsModalOpen(true)}
-              className="flex items-center gap-4 px-4 py-3.5 text-gray-700 hover:text-orange-700 hover:bg-orange-50 rounded-xl transition-all duration-300 font-medium group w-full"
+              className="flex items-center gap-4 px-4 py-3.5 text-black hover:bg-gray-300 rounded-xl transition-all duration-300 font-medium group w-full"
             >
               <PlusSquare className="w-6 h-6 group-hover:scale-110 transition-transform" />
               <span>Create</span>
@@ -82,7 +82,7 @@ export function LeftBar() {
 
             <Link 
               to="/profile" 
-              className="flex items-center gap-4 px-4 py-3.5 text-gray-700 hover:text-orange-700 hover:bg-orange-50 rounded-xl transition-all duration-300 font-medium group"
+              className="flex items-center gap-4 px-4 py-3.5 text-black hover:bg-gray-300 rounded-xl transition-all duration-300 font-medium group"
             >
               <User className="w-6 h-6" />
               <span>Profile</span>
@@ -90,7 +90,7 @@ export function LeftBar() {
 
             <a
               href="#"
-              className="flex items-center gap-4 px-4 py-3.5 text-gray-700 hover:text-orange-700 hover:bg-orange-50 rounded-xl transition-all duration-300 font-medium group"
+              className="flex items-center gap-4 px-4 py-3.5 text-black hover:bg-gray-300 rounded-xl transition-all duration-300 font-medium group"
             >
               <MoreHorizontal className="w-6 h-6 group-hover:scale-110 transition-transform" />
               <span>More</span>

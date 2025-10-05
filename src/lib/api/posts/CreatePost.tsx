@@ -1,3 +1,5 @@
+import apiClient from "@/lib/services/ApiClient"
+
 interface CreatePostPayload {
   content?: string
   type?: string
@@ -5,7 +7,7 @@ interface CreatePostPayload {
   files?: File[]
 }
 
-export async function CreatePost(payload: CreatePostPayload) {
+export async function createPost(payload: CreatePostPayload) {
   const { content, type, visibility, files } = payload
 
   if (!content?.trim() && (!files || files.length === 0)) {
@@ -13,28 +15,21 @@ export async function CreatePost(payload: CreatePostPayload) {
   }
 
   const formData = new FormData()
-
   if (content) formData.append("content", content)
   if (type) formData.append("type", type)
   if (visibility) formData.append("visibility", visibility)
   files?.forEach((file) => formData.append("mediaFiles", file))
 
-  const res = await fetch("http://localhost:3003/posts", {
-    method: "POST",
-    body: formData,
-    credentials: "include",
-  })
+  try {
+    const res = await apiClient.post("/posts", formData, {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+    })
 
-  const contentType = res.headers.get("content-type")
-  let data
-
-  if (contentType && contentType.includes("application/json")) {
-    data = await res.json()
-  } else {
-    data = await res.text()
+    return res.data
+  } catch (error: any) {
+    const message = error.response?.data?.message || "Failed to create post"
+    throw new Error(message)
   }
-
-  if (!res.ok) throw new Error(data?.message || "Failed to create post")
-
-  return data
 }

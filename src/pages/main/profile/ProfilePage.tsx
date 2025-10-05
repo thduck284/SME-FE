@@ -4,10 +4,12 @@ import { useState, useRef, useEffect } from "react"
 import { Badge, Button, Card, Avatar } from "@/components/ui" 
 import { User, FileText, ImageIcon, MapPin, LinkIcon, Calendar, Mail, Camera } from "lucide-react"
 import { LeftBar, RightBar } from "@/components/layouts"
+import { PostsTab } from "@/components/profile/PostsTab"
+import { ImagesTab } from "@/components/profile/ImagesTab"
 
 export function ProfilePage() {
   const [activeTab, setActiveTab] = useState<"profile" | "posts" | "images">("profile")
-  const [avatarUrl, setAvatarUrl] = useState("/placeholder.svg?height=128&width=128")
+  const [avatarUrl, setAvatarUrl] = useState("/image.png?height=128&width=128")
   const [isHoveringAvatar, setIsHoveringAvatar] = useState(false)
   const [isScrolled, setIsScrolled] = useState(false)
 
@@ -63,7 +65,7 @@ export function ProfilePage() {
   }
 
   return (
-    <div className="min-h-screen flex bg-background relative">
+    <div className="min-h-screen flex bg-gray-100 text-gray-900 relative">
       {/* Left Sidebar - Fixed với full height */}
       <div className="fixed left-0 top-0 bottom-0 w-64 z-30">
         <div className="h-full overflow-y-auto">
@@ -74,7 +76,7 @@ export function ProfilePage() {
       {/* Main Content */}
       <main
         ref={mainContentRef}
-        className="flex-1 overflow-y-auto h-screen p-8 ml-64 mr-64"
+        className="flex-1 overflow-y-auto h-screen p-8 ml-64 mr-64 bg-gray-100 text-gray-900"
       >
         {/* Profile Header */}
         <div className="flex flex-col gap-10 md:flex-row md:items-start">
@@ -120,8 +122,8 @@ export function ProfilePage() {
           <div className="flex-1 space-y-8">
             <div className="flex flex-col gap-6 md:flex-row md:items-start md:justify-between">
               <div className="space-y-3">
-                <h1 className="text-4xl font-bold tracking-tight text-foreground">Sarah Anderson</h1>
-                <p className="text-lg text-muted-foreground">Creative Designer & Developer</p>
+                <h1 className="text-4xl font-bold tracking-tight text-gray-900">Sarah Anderson</h1>
+                <p className="text-lg text-gray-600">Creative Designer & Developer</p>
               </div>
               <Button className="w-full md:w-auto">Edit Profile</Button>
             </div>
@@ -130,19 +132,19 @@ export function ProfilePage() {
             <div className="flex gap-10">
               {stats.map((stat) => (
                 <div key={stat.label} className="space-y-2">
-                  <div className="text-2xl font-bold text-foreground">{stat.value}</div>
-                  <div className="text-sm text-muted-foreground">{stat.label}</div>
+                  <div className="text-2xl font-bold text-gray-900">{stat.value}</div>
+                  <div className="text-sm text-gray-600">{stat.label}</div>
                 </div>
               ))}
             </div>
 
             {/* Bio & Interests */}
             <div className="space-y-6">
-              <p className="text-pretty leading-relaxed text-foreground">
+              <p className="text-pretty leading-relaxed text-gray-900">
                 Passionate about creating beautiful and functional digital experiences.
               </p>
 
-              <div className="flex flex-wrap gap-6 text-sm text-muted-foreground">
+              <div className="flex flex-wrap gap-6 text-sm text-gray-600">
                 <div className="flex items-center gap-2"><MapPin className="h-4 w-4" />San Francisco, CA</div>
                 <div className="flex items-center gap-2"><LinkIcon className="h-4 w-4" /><a href="#" className="text-primary hover:underline">portfolio.com</a></div>
                 <div className="flex items-center gap-2"><Calendar className="h-4 w-4" />Joined March 2023</div>
@@ -150,7 +152,9 @@ export function ProfilePage() {
 
               <div className="flex flex-wrap gap-3">
                 {interests.map((interest) => (
-                  <Badge key={interest} variant="secondary" className="rounded-full">{interest}</Badge>
+                  <Badge key={interest} variant="secondary" className="rounded-full bg-gray-200 text-gray-800 border-gray-300">
+                    {interest}
+                  </Badge>
                 ))}
               </div>
             </div>
@@ -158,7 +162,7 @@ export function ProfilePage() {
         </div>
 
         {/* Tabs Navigation */}
-        <div className="mt-16 mb-12 border-b border-border">
+        <div className="mt-16 mb-12 border-b border-gray-300">
           <nav className="flex gap-12 ml-4">
             {tabs.map(({ key, label, icon: Icon }) => {
               const isActive = activeTab === key
@@ -168,8 +172,8 @@ export function ProfilePage() {
                   onClick={() => setActiveTab(key)}
                   className={`group flex items-center gap-4 border-b-2 pb-5 text-base font-semibold transition-colors ${
                     isActive 
-                      ? "border-primary text-foreground" 
-                      : "border-transparent text-muted-foreground hover:text-foreground hover:border-muted-foreground"
+                      ? "border-primary text-gray-900" 
+                      : "border-transparent text-gray-600 hover:text-gray-900 hover:border-gray-400"
                   }`}
                 >
                   <Icon className="h-5 w-5" />
@@ -180,33 +184,33 @@ export function ProfilePage() {
           </nav>
         </div>
 
-        {/* Tab Content */}
+        {/* Tab Content - SỬ DỤNG COMPONENTS TÁCH RIÊNG */}
         <div className="space-y-8 ml-4">
           {activeTab === "profile" && (
             <div className="grid gap-8 md:grid-cols-2">
-              <Card className="p-6">
+              <Card className="p-6 bg-white border-gray-200">
                 <div className="space-y-4">
                   <div className="flex items-center gap-3">
                     <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10">
                       <Mail className="h-6 w-6 text-primary" />
                     </div>
                     <div>
-                      <div className="text-base text-muted-foreground">Email</div>
-                      <div className="text-lg font-medium text-foreground">sarah.anderson@email.com</div>
+                      <div className="text-base text-gray-600">Email</div>
+                      <div className="text-lg font-medium text-gray-900">sarah.anderson@email.com</div>
                     </div>
                   </div>
                 </div>
               </Card>
 
-              <Card className="p-6">
+              <Card className="p-6 bg-white border-gray-200">
                 <div className="space-y-4">
                   <div className="flex items-center gap-3">
                     <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10">
                       <User className="h-6 w-6 text-primary" />
                     </div>
                     <div>
-                      <div className="text-base text-muted-foreground">Member Since</div>
-                      <div className="text-lg font-medium text-foreground">March 15, 2023</div>
+                      <div className="text-base text-gray-600">Member Since</div>
+                      <div className="text-lg font-medium text-gray-900">March 15, 2023</div>
                     </div>
                   </div>
                 </div>
@@ -215,39 +219,11 @@ export function ProfilePage() {
           )}
 
           {activeTab === "posts" && (
-            <div className="space-y-8">
-              {[1, 2, 3].map((i) => (
-                <Card key={i} className="p-6">
-                  <div className="space-y-4">
-                    <h3 className="text-xl font-semibold text-foreground">Sample Post Title {i}</h3>
-                    <p className="text-base leading-relaxed text-muted-foreground">
-                      This is a sample post description. In a real application, this would contain the actual post content and metadata.
-                    </p>
-                    <div className="flex items-center gap-4 text-base text-muted-foreground">
-                      <span>2 days ago</span>
-                      <span>•</span>
-                      <span>5 min read</span>
-                    </div>
-                  </div>
-                </Card>
-              ))}
-            </div>
+            <PostsTab  />
           )}
 
           {activeTab === "images" && (
-            <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-              {[1, 2, 3, 4, 5, 6].map((i) => (
-                <Card key={i} className="overflow-hidden">
-                  <div className="aspect-square bg-muted">
-                    <img
-                      src={`/image.png?height=400&width=400&query=abstract-${i}`}
-                      alt={`Gallery image ${i}`}
-                      className="h-full w-full object-cover transition-transform hover:scale-105"
-                    />
-                  </div>
-                </Card>
-              ))}
-            </div>
+            <ImagesTab  />
           )}
         </div>
       </main>
