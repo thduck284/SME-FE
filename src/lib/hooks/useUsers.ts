@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react'
-import { userApi } from "@/lib/api/users/user"
+import { userApi } from "@/lib/api/users/User"
 import type { User, SearchUsersParams } from "@/lib/types/users/UserDTO"
 
 export function useUsers() {

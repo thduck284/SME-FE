@@ -1,129 +1,111 @@
 "use client"
 
-import React from "react"
+import React, { useState, useRef, useEffect } from "react"
 import { Card, Avatar, Badge, Button } from "@/components/ui"
-import type { PostFullDto } from "@/lib/types/posts/PostFullDto"
-import type { CreateSharePostDto } from "@/lib/types/posts/CreatePostDto"
+import { PostFullDto } from "@/lib/types/posts/PostFullDto"
+import { CreateSharePostDto } from "@/lib/types/posts/CreatePostDto"
 import { ReactionType, reactionIcons } from "@/lib/constants/reactions"
-import { formatTimeAgo, getTypeIcon, getVisibilityIcon } from "@/lib/utils/PostUtils"
+import { formatTimeAgo, getVisibilityIcon } from "@/lib/utils/PostUtils"
 import { CommentsSection } from "./CommentsSection"
-import { ShareModal } from "./ShareModal" 
-import { MoreHorizontal, MessageCircle, Share, Repeat2 } from "lucide-react"
-import { useState, useRef, useEffect } from "react"
+import { ShareModal } from "./ShareModal"
+import { PostOptionsMenu } from "./PostOptionsMenu"
+import { MessageCircle, Share, Repeat2 } from "lucide-react"
 
 interface PostItemProps {
   post: PostFullDto
   onOpenImage: (imageUrl: string, post: PostFullDto) => void
-  reaction?: {
-    userReaction: string | null
-    counters: Record<string, number>
-  }
+  reaction?: { userReaction: string | null; counters: Record<string, number> }
   loading?: boolean
   onReact?: (reactionType: string) => Promise<void>
   onShareSuccess?: () => void
+  isOwnPost?: boolean
+  onEdit?: (postId: string) => void
+  onDelete?: (postId: string) => void
+  onSave?: (postId: string) => void
+  onPin?: (postId: string) => void
+  onHide?: (postId: string) => void
+  onReport?: (postId: string) => void
 }
 
-export function PostItem({ post, onOpenImage, reaction, loading = false, onReact, onShareSuccess }: PostItemProps) {
+export function PostItem({ 
+  post, 
+  onOpenImage, 
+  reaction, 
+  loading, 
+  onReact, 
+  onShareSuccess,
+  isOwnPost = true,
+  onEdit = () => {},
+  onDelete,
+  onSave = () => {},
+  onPin = () => {},
+  onHide = () => {},
+  onReport = () => {}
+}: PostItemProps) {
   const [showComments, setShowComments] = useState(false)
   const [isReacting, setIsReacting] = useState(false)
   const [showReactionPicker, setShowReactionPicker] = useState(false)
   const [showShareModal, setShowShareModal] = useState(false)
-  const [isHoveringReaction, setIsHoveringReaction] = useState(false)
   
-  const reactionContainerRef = useRef<HTMLDivElement>(null)
   const hideTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
-  useEffect(() => () => {
-    hideTimeoutRef.current && clearTimeout(hideTimeoutRef.current)
+  useEffect(() => {
+    return () => {
+      if (hideTimeoutRef.current) clearTimeout(hideTimeoutRef.current)
+    }
   }, [])
 
-  const handleReactionInteraction = {
-    show: () => {
-      hideTimeoutRef.current && clearTimeout(hideTimeoutRef.current)
-      setShowReactionPicker(true)
-    },
-    hide: () => {
-      hideTimeoutRef.current = setTimeout(() => setShowReactionPicker(false), 200)
-    }
+  const handleReactionShow = () => {
+    if (hideTimeoutRef.current) clearTimeout(hideTimeoutRef.current)
+    setShowReactionPicker(true)
   }
 
-  const getVisibilityBadge = (visibility: string) => 
-    React.cloneElement(getVisibilityIcon(visibility as CreateSharePostDto["visibility"]), {
-      className: "h-4 w-4 text-muted-foreground"
-    })
+  const handleReactionHide = () => {
+    hideTimeoutRef.current = setTimeout(() => setShowReactionPicker(false), 200)
+  }
 
   const handleReaction = async (reactionType: ReactionType) => {
     if (isReacting || !onReact) return
-    
     setIsReacting(true)
     setShowReactionPicker(false)
-    hideTimeoutRef.current && clearTimeout(hideTimeoutRef.current)
-    
+    if (hideTimeoutRef.current) clearTimeout(hideTimeoutRef.current)
     try {
       await onReact(reactionType)
-    } catch (error) {
-      console.error('Failed to react:', error)
     } finally {
       setIsReacting(false)
     }
   }
 
   const totalReactions = reaction?.counters 
-    ? Object.values(reaction.counters).reduce((sum, count) => sum + count, 0)
-    : 0
-
+    ? Object.values(reaction.counters).reduce((sum, count) => sum + count, 0) : 0
   const currentReaction = reaction?.userReaction as ReactionType || null
-
   const topReactions = reaction?.counters
-    ? Object.entries(reaction.counters)
-        .filter(([_, count]) => count > 0)
-        .sort(([, a], [, b]) => b - a)
-        .slice(0, 3)
-    : []
+    ? Object.entries(reaction.counters).filter(([_, count]) => count > 0).sort(([, a], [, b]) => b - a).slice(0, 3) : []
 
-  const renderMediaGrid = (medias: { mediaId: string; mediaUrl: string }[]) => {
+  const MediaGrid = ({ medias }: { medias: { mediaId: string; mediaUrl: string }[] }) => {
     if (!medias.length) return null
-
     const displayMedias = medias.slice(0, 4)
     const remainingCount = medias.length - 4
 
-    // Single image - full width
     if (medias.length === 1) {
       return (
         <div className="w-full bg-black">
-          <div
-            className="relative group cursor-pointer w-full max-h-[500px] flex items-center justify-center overflow-hidden"
-            onClick={() => onOpenImage(medias[0].mediaUrl, post)}
-          >
-            <img
-              src={medias[0].mediaUrl}
-              alt="Post media"
-              className="w-full h-auto object-contain transition-transform duration-300 group-hover:scale-105"
-            />
+          <div className="relative group cursor-pointer w-full max-h-[500px] flex items-center justify-center overflow-hidden"
+            onClick={() => onOpenImage(medias[0].mediaUrl, post)}>
+            <img src={medias[0].mediaUrl} alt="Post media" className="w-full h-auto object-contain transition-transform duration-300 group-hover:scale-105" />
           </div>
         </div>
       )
     }
 
-    // Multiple images - grid layout
     return (
-      <div className={`grid gap-0.5 ${
-        medias.length === 2 ? 'grid-cols-2' : 'grid-cols-2'
-      }`}>
-        {displayMedias.map((media, index) => (
-          <div
-            key={media.mediaId}
-            className={`relative group cursor-pointer bg-gray-100 dark:bg-gray-800 overflow-hidden ${
-              medias.length === 3 && index === 0 ? "row-span-2 col-span-2" : "aspect-square"
-            }`}
-            onClick={() => onOpenImage(media.mediaUrl, post)}
-          >
-            <img
-              src={media.mediaUrl}
-              alt={`Post media ${index + 1}`}
-              className="w-full h-full object-cover transition-all duration-300 group-hover:brightness-95"
-            />
-            {index === 3 && remainingCount > 0 && (
+      <div className={`grid gap-0.5 ${medias.length === 2 ? 'grid-cols-2' : 'grid-cols-2'}`}>
+        {displayMedias.map((media, idx) => (
+          <div key={media.mediaId} className={`relative group cursor-pointer bg-gray-100 dark:bg-gray-800 overflow-hidden ${
+            medias.length === 3 && idx === 0 ? "row-span-2 col-span-2" : "aspect-square"}`}
+            onClick={() => onOpenImage(media.mediaUrl, post)}>
+            <img src={media.mediaUrl} alt={`Media ${idx + 1}`} className="w-full h-full object-cover transition-all duration-300 group-hover:brightness-95" />
+            {idx === 3 && remainingCount > 0 && (
               <div className="absolute inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center">
                 <span className="text-white text-4xl font-bold">+{remainingCount}</span>
               </div>
@@ -135,51 +117,26 @@ export function PostItem({ post, onOpenImage, reaction, loading = false, onReact
   }
 
   const ReactionButton = () => (
-    <div 
-      ref={reactionContainerRef}
-      className="relative flex-1"
-      onMouseEnter={handleReactionInteraction.show}
-      onMouseLeave={handleReactionInteraction.hide}
-    >
-      <Button 
-        variant="ghost" 
-        size="sm" 
+    <div className="relative flex-1" onMouseEnter={handleReactionShow} onMouseLeave={handleReactionHide}>
+      <Button variant="ghost" size="sm" disabled={loading || isReacting}
         className={`flex items-center justify-center gap-1.5 rounded-md h-9 w-full transition-all ${
-          currentReaction 
-            ? `${reactionIcons[currentReaction].color} bg-blue-50 dark:bg-blue-950/30 hover:bg-blue-100 dark:hover:bg-blue-950/50` 
-            : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'
-        }`}
-        disabled={loading || isReacting}
-      >
+          currentReaction ? `${reactionIcons[currentReaction].color} bg-blue-50 dark:bg-blue-950/30 hover:bg-blue-100 dark:hover:bg-blue-950/50` 
+          : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'}`}>
         {isReacting ? (
           <div className="animate-spin h-4 w-4 border-2 border-current border-t-transparent rounded-full" />
         ) : (
           <>
-            <span className="text-lg leading-none">
-              {currentReaction ? reactionIcons[currentReaction].icon : "👍"}
-            </span>
-            <span className="text-[15px] font-semibold">
-              {currentReaction ? reactionIcons[currentReaction].label : "Like"}
-            </span>
+            <span className="text-lg leading-none">{currentReaction ? reactionIcons[currentReaction].icon : "👍"}</span>
+            <span className="text-[15px] font-semibold">{currentReaction ? reactionIcons[currentReaction].label : "Like"}</span>
           </>
         )}
       </Button>
 
       {showReactionPicker && !isReacting && (
-        <div 
-          className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-full shadow-xl px-2 py-2 flex items-center gap-1 z-50"
-          onMouseEnter={() => setIsHoveringReaction(true)}
-          onMouseLeave={() => setIsHoveringReaction(false)}
-        >
+        <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-full shadow-xl px-2 py-2 flex items-center gap-1 z-50">
           {Object.entries(reactionIcons).map(([type, { label, icon }]) => (
-            <button
-              key={type}
-              className={`relative p-1 hover:scale-150 transition-all duration-200 text-2xl rounded-full ${
-                currentReaction === type ? 'scale-125' : ''
-              }`}
-              onClick={() => handleReaction(type as ReactionType)}
-              title={label}
-            >
+            <button key={type} title={label} onClick={() => handleReaction(type as ReactionType)}
+              className={`relative p-1 hover:scale-150 transition-all duration-200 text-2xl rounded-full ${currentReaction === type ? 'scale-125' : ''}`}>
               <span className="block transform hover:-translate-y-1 transition-transform">{icon}</span>
             </button>
           ))}
@@ -188,18 +145,9 @@ export function PostItem({ post, onOpenImage, reaction, loading = false, onReact
     </div>
   )
 
-  const ActionButton = ({ icon: Icon, label, color, onClick }: {
-    icon: React.ComponentType<any>
-    label: string
-    color: string
-    onClick?: () => void
-  }) => (
-    <Button 
-      variant="ghost" 
-      size="sm" 
-      className={`flex items-center justify-center gap-1.5 text-gray-600 dark:text-gray-400 ${color} rounded-md h-9 transition-all hover:bg-gray-100 dark:hover:bg-gray-800 flex-1`}
-      onClick={onClick}
-    >
+  const ActionBtn = ({ icon: Icon, label, onClick }: { icon: any; label: string; onClick?: () => void }) => (
+    <Button variant="ghost" size="sm" onClick={onClick}
+      className="flex items-center justify-center gap-1.5 text-gray-600 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 rounded-md h-9 transition-all hover:bg-gray-100 dark:hover:bg-gray-800 flex-1">
       <Icon className="h-[18px] w-[18px]" />
       <span className="text-[15px] font-semibold">{label}</span>
     </Button>
@@ -221,28 +169,28 @@ export function PostItem({ post, onOpenImage, reaction, loading = false, onReact
 
         <div className="flex items-start justify-between px-4 pt-3 pb-2">
           <div className="flex items-start gap-3 flex-1">
-            <Avatar
-              src="/placeholder.svg?height=40&width=40"
-              alt="User avatar"
-              className="h-10 w-10 cursor-pointer hover:opacity-90 transition-opacity"
-            />
+            <Avatar src="/image.png?height=40&width=40" alt="User avatar" className="h-10 w-10 cursor-pointer hover:opacity-90 transition-opacity" />
             <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 mb-0.5">
-                <h4 className="font-semibold text-[15px] text-gray-900 dark:text-gray-100 hover:underline cursor-pointer">
-                  Sarah Anderson
-                </h4>
-              </div>
+              <h4 className="font-semibold text-[15px] text-gray-900 dark:text-gray-100 hover:underline cursor-pointer">Sarah Anderson</h4>
               <div className="flex items-center gap-1 text-[13px] text-gray-500 dark:text-gray-400">
                 <span className="hover:underline cursor-pointer">{formatTimeAgo(post.createdAt)}</span>
                 <span>·</span>
-                {getVisibilityBadge(post.visibility)}
+                {React.cloneElement(getVisibilityIcon(post.visibility as CreateSharePostDto["visibility"]), { className: "h-4 w-4 text-muted-foreground" })}
               </div>
             </div>
           </div>
-
-          <Button variant="ghost" size="sm" className="h-9 w-9 p-0 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 dark:text-gray-400">
-            <MoreHorizontal className="h-5 w-5" />
-          </Button>
+          <div className="relative">
+            <PostOptionsMenu
+              postId={post.postId}
+              isOwnPost={isOwnPost}
+              onEdit={onEdit}
+              onDelete={onDelete}
+              onSave={onSave}
+              onPin={onPin}
+              onHide={onHide}
+              onReport={onReport}
+            />
+          </div>
         </div>
 
         {isSharedPost && post.content && (
@@ -252,59 +200,33 @@ export function PostItem({ post, onOpenImage, reaction, loading = false, onReact
         )}
 
         {isSharedPost && post.medias && post.medias.length > 0 && (
-          <div className={`${post.content ? 'mt-3' : ''}`}>
-            {renderMediaGrid(post.medias)}
-          </div>
+          <div className={post.content ? 'mt-3' : ''}><MediaGrid medias={post.medias} /></div>
         )}
 
         {isSharedPost && post.rootPost ? (
           <div className="mx-4 my-3 border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden bg-gray-50 dark:bg-gray-800/50 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors cursor-pointer">
             <div className="flex items-center gap-2.5 px-3 py-2.5 border-b border-gray-200 dark:border-gray-700">
-              <Avatar
-                src="/placeholder.svg?height=32&width=32"
-                alt="Original author"
-                className="h-8 w-8"
-              />
+              <Avatar src="/image.png?height=32&width=32" alt="Original author" className="h-8 w-8" />
               <div className="flex-1 min-w-0">
-                <p className="font-semibold text-[15px] text-gray-900 dark:text-gray-100 hover:underline">
-                  Original Author
-                </p>
-                <p className="text-[13px] text-gray-500 dark:text-gray-400">
-                  {formatTimeAgo(post.rootPost?.createdAt || post.createdAt)}
-                </p>
+                <p className="font-semibold text-[15px] text-gray-900 dark:text-gray-100 hover:underline">Original Author</p>
+                <p className="text-[13px] text-gray-500 dark:text-gray-400">{formatTimeAgo(post.rootPost?.createdAt || post.createdAt)}</p>
               </div>
             </div>
-
             {post.rootPost?.content && (
               <div className="px-3 py-2.5">
-                <p className="text-[15px] text-gray-900 dark:text-gray-100 leading-[1.3333] line-clamp-4">
-                  {post.rootPost.content}
-                </p>
+                <p className="text-[15px] text-gray-900 dark:text-gray-100 leading-[1.3333] line-clamp-4">{post.rootPost.content}</p>
               </div>
             )}
-
             {post.rootPost?.medias && post.rootPost.medias.length > 0 && (
               <div className="pb-0">
                 <div className="grid grid-cols-2 gap-0.5 overflow-hidden">
-                  {post.rootPost.medias.slice(0, 4).map((media, index) => (
-                    <div 
-                      key={media.mediaId} 
-                      className="relative aspect-square bg-gray-200 dark:bg-gray-700 group cursor-pointer"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        onOpenImage(media.mediaUrl, post)
-                      }}
-                    >
-                      <img
-                        src={media.mediaUrl}
-                        alt={`Root post media ${index + 1}`}
-                        className="w-full h-full object-cover group-hover:brightness-95 transition-all"
-                      />
-                      {index === 3 && post.rootPost?.medias && post.rootPost.medias.length > 4 && (
+                  {post.rootPost.medias.slice(0, 4).map((media, idx) => (
+                    <div key={media.mediaId} className="relative aspect-square bg-gray-200 dark:bg-gray-700 group cursor-pointer"
+                      onClick={(e) => { e.stopPropagation(); onOpenImage(media.mediaUrl, post) }}>
+                      <img src={media.mediaUrl} alt={`Root media ${idx + 1}`} className="w-full h-full object-cover group-hover:brightness-95 transition-all" />
+                      {idx === 3 && post.rootPost?.medias && post.rootPost.medias.length > 4 && (
                         <div className="absolute inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center">
-                          <span className="text-white text-2xl font-bold">
-                            +{post.rootPost.medias.length - 4}
-                          </span>
+                          <span className="text-white text-2xl font-bold">+{post.rootPost.medias.length - 4}</span>
                         </div>
                       )}
                     </div>
@@ -320,11 +242,8 @@ export function PostItem({ post, onOpenImage, reaction, loading = false, onReact
                 <p className="text-[15px] text-gray-900 dark:text-gray-100 leading-[1.3333] whitespace-pre-wrap break-words">{post.content}</p>
               </div>
             )}
-
             {post.medias && post.medias.length > 0 && (
-              <div className={`${post.content ? 'mt-3' : ''}`}>
-                {renderMediaGrid(post.medias)}
-              </div>
+              <div className={post.content ? 'mt-3' : ''}><MediaGrid medias={post.medias} /></div>
             )}
           </>
         )}
@@ -332,8 +251,8 @@ export function PostItem({ post, onOpenImage, reaction, loading = false, onReact
         {post.mentions && post.mentions.length > 0 && (
           <div className="px-4 py-3">
             <div className="flex flex-wrap gap-1.5">
-              {post.mentions.map((mention, index) => (
-                <Badge key={index} variant="secondary" className="text-xs px-2 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 border-0 hover:bg-blue-200 dark:hover:bg-blue-900/50 cursor-pointer transition-colors">
+              {post.mentions.map((mention, idx) => (
+                <Badge key={idx} variant="secondary" className="text-xs px-2 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 border-0 hover:bg-blue-200 dark:hover:bg-blue-900/50 cursor-pointer transition-colors">
                   @user{mention.userId.slice(0, 8)}
                 </Badge>
               ))}
@@ -341,40 +260,26 @@ export function PostItem({ post, onOpenImage, reaction, loading = false, onReact
           </div>
         )}
 
-        {/* Stats Row - Chỉ hiển thị khi có ít nhất 1 stat */}
-        {(totalReactions > 0) && (
+        {totalReactions > 0 && (
           <div className="px-4 py-2 flex items-center justify-between text-[15px] text-gray-500 dark:text-gray-400 border-t border-gray-200 dark:border-gray-700 mt-3">
             <div className="flex items-center gap-1">
-              {loading ? (
-                <span className="text-sm">Loading...</span>
-              ) : totalReactions > 0 ? (
-                <div className="flex items-center gap-1.5 hover:underline cursor-pointer"> 
+              {loading ? <span className="text-sm">Loading...</span> : (
+                <div className="flex items-center gap-1.5 hover:underline cursor-pointer">
                   <div className="flex items-center -space-x-1">
-                    {topReactions.map(([type], index) => (
-                      <div
-                        key={type}
-                        className="w-[18px] h-[18px] rounded-full bg-white dark:bg-gray-900 border border-white dark:border-gray-900 flex items-center justify-center"
-                        style={{ zIndex: topReactions.length - index }}
-                      >
-                        <span className="text-sm leading-none">
-                          {reactionIcons[type as ReactionType]?.icon}
-                        </span>
+                    {topReactions.map(([type], idx) => (
+                      <div key={type} style={{ zIndex: topReactions.length - idx }}
+                        className="w-[18px] h-[18px] rounded-full bg-white dark:bg-gray-900 border border-white dark:border-gray-900 flex items-center justify-center">
+                        <span className="text-sm leading-none">{reactionIcons[type as ReactionType]?.icon}</span>
                       </div>
                     ))}
                   </div>
                   <span className="text-[15px]">{totalReactions}</span>
                 </div>
-              ) : null}
+              )}
             </div>
-            
             <div className="flex items-center gap-3">
-                <span className="hover:underline cursor-pointer">
-                  9999 comments
-                </span>
-              
-                <span className="hover:underline cursor-pointer">
-                  1233 shares
-                </span>
+              <span className="hover:underline cursor-pointer">9999 comments</span>
+              <span className="hover:underline cursor-pointer">1233 shares</span>
             </div>
           </div>
         )}
@@ -382,43 +287,17 @@ export function PostItem({ post, onOpenImage, reaction, loading = false, onReact
         <div className="px-2 py-1 border-t border-gray-200 dark:border-gray-700">
           <div className="flex items-center gap-1">
             <ReactionButton />
-            <ActionButton 
-              icon={MessageCircle} 
-              label="Comment" 
-              color="hover:text-gray-700 dark:hover:text-gray-200"
-              onClick={() => setShowComments(!showComments)}
-            />
-            <ActionButton 
-              icon={Share} 
-              label="Share" 
-              color="hover:text-gray-700 dark:hover:text-gray-200"
-              onClick={() => setShowShareModal(true)}
-            />
+            <ActionBtn icon={MessageCircle} label="Comment" onClick={() => setShowComments(!showComments)} />
+            <ActionBtn icon={Share} label="Share" onClick={() => setShowShareModal(true)} />
           </div>
         </div>
 
-        <CommentsSection 
-          postId={post.postId}
-          isOpen={showComments} 
-          onClose={() => setShowComments(false)} 
-        />
+        <CommentsSection postId={post.postId} isOpen={showComments} onClose={() => setShowComments(false)} />
       </Card>
 
-      <ShareModal
-        isOpen={showShareModal}
-        onClose={() => setShowShareModal(false)}
-        post={{
-          postId: post.postId,
-          content: post.content,
-          medias: post.medias || [],
-          authorName: "Sarah Anderson", 
-          authorAvatar: "/placeholder.svg?height=40&width=40" 
-        }}
-        onSuccess={() => {
-          onShareSuccess?.()
-          console.log('Post shared successfully!')
-        }}
-      />
+      <ShareModal isOpen={showShareModal} onClose={() => setShowShareModal(false)}
+        post={{ postId: post.postId, content: post.content, medias: post.medias || [], authorName: "Sarah Anderson", authorAvatar: "/image.png?height=40&width=40" }}
+        onSuccess={() => { onShareSuccess?.() }} />
     </>
   )
 }

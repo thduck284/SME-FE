@@ -5,7 +5,7 @@ import { Card } from "@/components/ui"
 import { getPostsByUser } from "@/lib/api/posts/GetPostsByUser"
 import { PostFullDto } from "@/lib/types/posts/PostFullDto"
 import { ImageModal } from "./ImageModal"
-import { usePostsReactions } from "@/lib/hooks/usePostsReactions"
+import { usePostsReactions } from "@/lib/hooks/usePostReaction"
 
 export function ImagesTab() {
   const [posts, setPosts] = useState<PostFullDto[]>([])

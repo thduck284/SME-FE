@@ -3,7 +3,8 @@
 import { usePostsReactions } from '@/lib/hooks/usePostReaction'
 import { PostItem } from './PostItem'
 import type { PostFullDto } from "@/lib/types/posts/PostFullDto"
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
+import { deleteApi } from '@/lib/api/posts/DeletePost'
 
 interface PostListProps {
   posts: PostFullDto[]
@@ -11,8 +12,22 @@ interface PostListProps {
 }
 
 export function PostList({ posts, onOpenImage }: PostListProps) {
-  const postIds = useMemo(() => posts.map(post => post.postId), [posts])
+  const [postsState, setPostsState] = useState<PostFullDto[]>(posts)
+  const postIds = useMemo(() => postsState.map(post => post.postId), [postsState])
   const { reactions, loading, react, removeReaction } = usePostsReactions(postIds)
+
+  const handleDeletePost = async (postId: string) => {
+    try {
+      await deleteApi.deletePost(postId)
+      
+      setPostsState(prevPosts => prevPosts.filter(post => post.postId !== postId))
+      
+      console.log('Post deleted successfully')
+    } catch (error) {
+      console.error('Failed to delete post:', error)
+      throw error 
+    }
+  }
 
   const handleReact = async (postId: string, reactionType: string) => {
     try {
@@ -29,7 +44,7 @@ export function PostList({ posts, onOpenImage }: PostListProps) {
 
   return (
     <div className="space-y-6">
-      {posts.map(post => (
+      {postsState.map(post => (
         <PostItem
           key={post.postId}
           post={post}
@@ -37,6 +52,8 @@ export function PostList({ posts, onOpenImage }: PostListProps) {
           reaction={reactions[post.postId]}
           loading={loading}
           onReact={(reactionType) => handleReact(post.postId, reactionType)}
+          onDelete={handleDeletePost} 
+          isOwnPost={true} 
         />
       ))}
     </div>
