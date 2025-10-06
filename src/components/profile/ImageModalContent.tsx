@@ -1,18 +1,37 @@
 "use client"
 
 import { Button, Avatar } from "@/components/ui"
-import { Heart, MessageCircle, Share, MoreHorizontal, Smile } from "lucide-react"
+import { MessageCircle, Share, MoreHorizontal } from "lucide-react"
 import { PostFullDto } from "@/lib/types/posts/PostFullDto"
-import { useState } from "react"
+import { useState, useRef, useEffect } from "react"
+import { ReactionType, reactionIcons } from "@/lib/constants/reactions"
+import { CommentsSection } from "@/components/posts/CommentsSection"
+import { ShareModal } from "@/components/posts/ShareModal"
 
 interface ImageModalContentProps {
   post: PostFullDto
+  reactions?: {
+    userReaction: string | null
+    counters: Record<string, number>
+  }
+  onReact?: (reactionType: string) => Promise<void>
+  onShareSuccess?: () => void
 }
 
-export function ImageModalContent({ post }: ImageModalContentProps) {
-  const [comment, setComment] = useState("")
+export function ImageModalContent({ post, reactions, onReact, onShareSuccess }: ImageModalContentProps) {
+  const [showReactionPicker, setShowReactionPicker] = useState(false)
+  const [isReacting, setIsReacting] = useState(false)
+  const [showShareModal, setShowShareModal] = useState(false)
+  const [showComments, setShowComments] = useState(true)
+  
+  const hideTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
-  // Hàm format thời gian
+  useEffect(() => {
+    return () => {
+      if (hideTimeoutRef.current) clearTimeout(hideTimeoutRef.current)
+    }
+  }, [])
+
   const formatTimeAgo = (dateString: string) => {
     const date = new Date(dateString)
     const now = new Date()
@@ -24,25 +43,45 @@ export function ImageModalContent({ post }: ImageModalContentProps) {
     return date.toLocaleDateString()
   }
 
-  const handleCommentSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    if (comment.trim()) {
-      console.log("Comment submitted:", comment)
-      setComment("")
+  const handleReactionShow = () => {
+    if (hideTimeoutRef.current) clearTimeout(hideTimeoutRef.current)
+    setShowReactionPicker(true)
+  }
+
+  const handleReactionHide = () => {
+    hideTimeoutRef.current = setTimeout(() => setShowReactionPicker(false), 200)
+  }
+
+  const handleReaction = async (reactionType: ReactionType) => {
+    if (isReacting || !onReact) return
+    setIsReacting(true)
+    setShowReactionPicker(false)
+    if (hideTimeoutRef.current) clearTimeout(hideTimeoutRef.current)
+    try {
+      await onReact(reactionType)
+    } finally {
+      setIsReacting(false)
     }
   }
 
-  // Mock comments data
-  const comments = [
-    { id: 1, user: "John Doe", text: "Amazing photo! 😍", time: "2h ago" },
-    { id: 2, user: "Jane Smith", text: "Love this! Where was this taken?", time: "1h ago" },
-    { id: 3, user: "Mike Johnson", text: "Beautiful composition! 👏", time: "45m ago" }
-  ]
+  const totalReactions = reactions?.counters 
+    ? Object.values(reactions.counters).reduce((sum, count) => sum + count, 0) : 0
+  const currentReaction = reactions?.userReaction as ReactionType || null
+  const topReactions = reactions?.counters
+    ? Object.entries(reactions.counters)
+        .filter(([_, count]) => count > 0)
+        .sort(([, a], [, b]) => b - a)
+        .slice(0, 3) 
+    : []
+
+    
+  const totalComments = 9999
+  const totalShares = 1233
 
   return (
-    <div className="w-96 flex flex-col h-full bg-gray-50">
+    <div className="w-96 flex flex-col h-full bg-gray-50 dark:bg-gray-900">
       {/* User Info & Post Content */}
-      <div className="p-4 border-b border-gray-200 bg-white">
+      <div className="p-4 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
         <div className="flex items-start gap-3 mb-3">
           <Avatar 
             src="/image.png?height=40&width=40"
@@ -50,104 +89,160 @@ export function ImageModalContent({ post }: ImageModalContentProps) {
             className="h-10 w-10 border-2 border-primary/10"
           />
           <div className="flex-1 min-w-0">
-            <h4 className="font-semibold text-foreground">Sarah Anderson</h4>
-            <div className="text-sm text-muted-foreground">
+            <h4 className="font-semibold text-gray-900 dark:text-gray-100">Sarah Anderson</h4>
+            <div className="text-sm text-gray-500 dark:text-gray-400">
               {formatTimeAgo(post.createdAt)}
             </div>
           </div>
-          <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+          <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-gray-500 dark:text-gray-400">
             <MoreHorizontal className="h-4 w-4" />
           </Button>
         </div>
 
         {post.content && (
-          <p className="text-foreground leading-relaxed whitespace-pre-wrap text-sm">
+          <p className="text-gray-900 dark:text-gray-100 leading-relaxed whitespace-pre-wrap text-sm">
             {post.content}
           </p>
         )}
       </div>
 
-      {/* Stats & Actions */}
-      <div className="p-4 border-b border-gray-200 bg-white">
-        <div className="flex items-center justify-between text-sm text-muted-foreground mb-3">
-          <div className="flex items-center gap-4">
-            <span>24 likes</span>
-            <span>8 comments</span>
-            <span>2 shares</span>
-          </div>
-        </div>
-
-        {/* Action Buttons */}
-        <div className="flex items-center justify-between border-t border-b border-gray-100 py-1">
-          <Button variant="ghost" size="sm" className="flex-1 flex items-center gap-2 text-muted-foreground hover:text-red-500 hover:bg-gray-50">
-            <Heart className="h-5 w-5" />
-            <span className="text-sm">Like</span>
-          </Button>
-          
-          <Button variant="ghost" size="sm" className="flex-1 flex items-center gap-2 text-muted-foreground hover:text-blue-500 hover:bg-gray-50">
-            <MessageCircle className="h-5 w-5" />
-            <span className="text-sm">Comment</span>
-          </Button>
-          
-          <Button variant="ghost" size="sm" className="flex-1 flex items-center gap-2 text-muted-foreground hover:text-green-500 hover:bg-gray-50">
-            <Share className="h-5 w-5" />
-            <span className="text-sm">Share</span>
-          </Button>
-        </div>
-      </div>
-
-      {/* Comments Section - Chiếm toàn bộ không gian còn lại */}
-      <div className="flex-1 overflow-y-auto" style={{ backgroundColor: '#f8fafc' }}>
-        <div className="p-4 space-y-4">
-          {comments.map((comment) => (
-            <div key={comment.id} className="flex gap-3">
-              <Avatar 
-                src="/image.png?height=32&width=32"
-                alt="User avatar"
-                className="h-8 w-8"
-              />
-              <div className="flex-1">
-                <div className="bg-white rounded-2xl px-3 py-2 border border-gray-200">
-                  <div className="font-semibold text-sm">{comment.user}</div>
-                  <p className="text-sm">{comment.text}</p>
+      {/* Reactions Summary - TEST VỚI EMOJI CỨNG */}
+      <div className="px-4 py-2 flex items-center justify-between text-[15px] text-gray-500 dark:text-gray-400 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+        {totalReactions > 0 ? (
+          <div className="flex items-center gap-1.5 hover:underline cursor-pointer">
+            <div className="flex items-center -space-x-1">
+              {/* Test với emoji cứng trước */}
+              {topReactions.length > 0 ? (
+                topReactions.map(([type], idx) => (
+                  <div 
+                    key={type} 
+                    style={{ zIndex: topReactions.length - idx }}
+                    className="w-[18px] h-[18px] rounded-full bg-white dark:bg-gray-800 border border-white dark:border-gray-800 flex items-center justify-center"
+                  >
+                    <span className="text-sm leading-none" style={{ fontSize: '14px' }}>
+                      {reactionIcons[type as ReactionType]?.icon || "👍"}
+                    </span>
+                  </div>
+                ))
+              ) : (
+                // Fallback nếu không có reactions
+                <div className="w-[18px] h-[18px] rounded-full bg-white dark:bg-gray-800 border border-white dark:border-gray-800 flex items-center justify-center">
+                  <span className="text-sm leading-none" style={{ fontSize: '14px' }}>👍</span>
                 </div>
-                <div className="flex items-center gap-4 text-xs text-muted-foreground mt-1 px-2">
-                  <span>Like</span>
-                  <span>Reply</span>
-                  <span>{comment.time}</span>
-                </div>
-              </div>
+              )}
             </div>
-          ))}
+            <span className="text-[15px]">{totalReactions}</span>
+          </div>
+        ) : (
+          <div></div>
+        )}
+        <div className="flex items-center gap-3">
+          <span className="hover:underline cursor-pointer">{totalComments} comments</span>
+          <span className="hover:underline cursor-pointer">{totalShares} shares</span>
         </div>
       </div>
 
-      {/* Comment Input */}
-      <div className="p-4 border-t border-gray-200 bg-white">
-        <form onSubmit={handleCommentSubmit} className="flex gap-2">
-          <div className="flex-1 flex items-center gap-2 bg-white rounded-2xl px-3 py-2 border border-gray-200">
-            <input
-              type="text"
-              value={comment}
-              onChange={(e) => setComment(e.target.value)}
-              placeholder="Write a comment..."
-              className="flex-1 bg-transparent border-0 focus:outline-none text-sm"
-            />
-            <Button type="button" variant="ghost" size="sm" className="h-8 w-8 p-0">
-              <Smile className="h-4 w-4" />
+      {/* Action Buttons */}
+      <div className="px-2 py-1 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
+        <div className="flex items-center gap-1">
+          {/* Reaction Button */}
+          <div className="relative flex-1" onMouseEnter={handleReactionShow} onMouseLeave={handleReactionHide}>
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              disabled={isReacting}
+              className={`flex items-center justify-center gap-1.5 rounded-md h-9 w-full transition-all ${
+                currentReaction 
+                  ? `${reactionIcons[currentReaction]?.color || 'text-blue-600'} bg-blue-50 dark:bg-blue-950/30 hover:bg-blue-100 dark:hover:bg-blue-950/50` 
+                  : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'
+              }`}
+            >
+              {isReacting ? (
+                <div className="animate-spin h-4 w-4 border-2 border-current border-t-transparent rounded-full" />
+              ) : (
+                <>
+                  <span className="text-lg leading-none" style={{ fontSize: '16px' }}>
+                    {currentReaction ? reactionIcons[currentReaction]?.icon : "👍"}
+                  </span>
+                  <span className="text-sm font-semibold">
+                    {currentReaction ? reactionIcons[currentReaction]?.label : "Like"}
+                  </span>
+                </>
+              )}
             </Button>
+
+            {/* Reaction Picker */}
+            {showReactionPicker && !isReacting && (
+              <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-full shadow-xl px-2 py-2 flex items-center gap-1 z-50">
+                {Object.entries(reactionIcons).map(([type, { label, icon }]) => (
+                  <button
+                    key={type}
+                    title={label}
+                    onClick={() => handleReaction(type as ReactionType)}
+                    className={`relative p-1 hover:scale-150 transition-all duration-200 rounded-full ${
+                      currentReaction === type ? 'scale-125' : ''
+                    }`}
+                  >
+                    <span className="block transform hover:-translate-y-1 transition-transform" style={{ fontSize: '20px' }}>
+                      {icon}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
+
+          {/* Comment Button */}
           <Button 
-            type="submit" 
             variant="ghost" 
             size="sm"
-            disabled={!comment.trim()}
-            className="text-blue-500 hover:text-blue-600 disabled:text-gray-400"
+            onClick={() => setShowComments(!showComments)}
+            className="flex items-center justify-center gap-1.5 text-gray-600 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 rounded-md h-9 transition-all hover:bg-gray-100 dark:hover:bg-gray-800 flex-1"
           >
-            Post
+            <MessageCircle className="h-[18px] w-[18px]" />
+            <span className="text-sm font-semibold">Comment</span>
           </Button>
-        </form>
+
+          {/* Share Button */}
+          <Button 
+            variant="ghost" 
+            size="sm"
+            onClick={() => setShowShareModal(true)}
+            className="flex items-center justify-center gap-1.5 text-gray-600 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 rounded-md h-9 transition-all hover:bg-gray-100 dark:hover:bg-gray-800 flex-1"
+          >
+            <Share className="h-[18px] w-[18px]" />
+            <span className="text-sm font-semibold">Share</span>
+          </Button>
+        </div>
       </div>
+
+      {/* Comments Section */}
+      <div className="flex-1 overflow-hidden bg-gray-50 dark:bg-gray-900">
+        <CommentsSection 
+          postId={post.postId} 
+          isOpen={showComments} 
+          onClose={() => setShowComments(false)} 
+        />
+      </div>
+
+      {/* Share Modal */}
+      {showShareModal && (
+        <ShareModal 
+          isOpen={showShareModal} 
+          onClose={() => setShowShareModal(false)}
+          post={{ 
+            postId: post.postId, 
+            content: post.content, 
+            medias: post.medias || [], 
+            authorName: "Sarah Anderson", 
+            authorAvatar: "/image.png?height=40&width=40" 
+          }}
+          onSuccess={() => { 
+            onShareSuccess?.();
+            setShowShareModal(false);
+          }} 
+        />
+      )}
     </div>
   )
 }

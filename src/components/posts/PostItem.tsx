@@ -9,7 +9,7 @@ import { formatTimeAgo, getVisibilityIcon } from "@/lib/utils/PostUtils"
 import { CommentsSection } from "./CommentsSection"
 import { ShareModal } from "./ShareModal"
 import { PostOptionsMenu } from "./PostOptionsMenu"
-import { MessageCircle, Share, Repeat2 } from "lucide-react"
+import { MessageCircle, Share, Repeat2, Lock } from "lucide-react"
 
 interface PostItemProps {
   post: PostFullDto
@@ -153,12 +153,15 @@ export function PostItem({
     </Button>
   )
 
-  const isSharedPost = post.type === 'SHARE' && post.rootPost
+  // Kiểm tra các trường hợp
+  const isSharePost = post.type === 'SHARE'
+  const hasRootPost = post.rootPost !== undefined
 
   return (
     <>
       <Card className="rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 overflow-hidden">
-        {isSharedPost && (
+        {/* Header với thông tin người share (nếu là bài share) */}
+        {isSharePost && (
           <div className="px-4 pt-3 pb-0">
             <div className="flex items-center gap-2 text-[13px] text-gray-500 dark:text-gray-400">
               <Repeat2 className="h-3.5 w-3.5" />
@@ -167,6 +170,7 @@ export function PostItem({
           </div>
         )}
 
+        {/* Thông tin tác giả */}
         <div className="flex items-start justify-between px-4 pt-3 pb-2">
           <div className="flex items-start gap-3 flex-1">
             <Avatar src="/image.png?height=40&width=40" alt="User avatar" className="h-10 w-10 cursor-pointer hover:opacity-90 transition-opacity" />
@@ -193,49 +197,20 @@ export function PostItem({
           </div>
         </div>
 
-        {isSharedPost && post.content && (
+        {/* Nội dung của người share (nếu có) */}
+        {isSharePost && post.content && (
           <div className="px-4 pt-0.5 pb-0">
             <p className="text-[15px] text-gray-900 dark:text-gray-100 leading-[1.3333] whitespace-pre-wrap break-words">{post.content}</p>
           </div>
         )}
 
-        {isSharedPost && post.medias && post.medias.length > 0 && (
+        {/* Media của người share (nếu có) */}
+        {isSharePost && post.medias && post.medias.length > 0 && (
           <div className={post.content ? 'mt-3' : ''}><MediaGrid medias={post.medias} /></div>
         )}
 
-        {isSharedPost && post.rootPost ? (
-          <div className="mx-4 my-3 border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden bg-gray-50 dark:bg-gray-800/50 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors cursor-pointer">
-            <div className="flex items-center gap-2.5 px-3 py-2.5 border-b border-gray-200 dark:border-gray-700">
-              <Avatar src="/image.png?height=32&width=32" alt="Original author" className="h-8 w-8" />
-              <div className="flex-1 min-w-0">
-                <p className="font-semibold text-[15px] text-gray-900 dark:text-gray-100 hover:underline">Original Author</p>
-                <p className="text-[13px] text-gray-500 dark:text-gray-400">{formatTimeAgo(post.rootPost?.createdAt || post.createdAt)}</p>
-              </div>
-            </div>
-            {post.rootPost?.content && (
-              <div className="px-3 py-2.5">
-                <p className="text-[15px] text-gray-900 dark:text-gray-100 leading-[1.3333] line-clamp-4">{post.rootPost.content}</p>
-              </div>
-            )}
-            {post.rootPost?.medias && post.rootPost.medias.length > 0 && (
-              <div className="pb-0">
-                <div className="grid grid-cols-2 gap-0.5 overflow-hidden">
-                  {post.rootPost.medias.slice(0, 4).map((media, idx) => (
-                    <div key={media.mediaId} className="relative aspect-square bg-gray-200 dark:bg-gray-700 group cursor-pointer"
-                      onClick={(e) => { e.stopPropagation(); onOpenImage(media.mediaUrl, post) }}>
-                      <img src={media.mediaUrl} alt={`Root media ${idx + 1}`} className="w-full h-full object-cover group-hover:brightness-95 transition-all" />
-                      {idx === 3 && post.rootPost?.medias && post.rootPost.medias.length > 4 && (
-                        <div className="absolute inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center">
-                          <span className="text-white text-2xl font-bold">+{post.rootPost.medias.length - 4}</span>
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-        ) : (
+        {/* TRƯỜNG HỢP 1: Bài viết ORIGINAL */}
+        {!isSharePost && (
           <>
             {post.content && (
               <div className="px-4 pt-0.5 pb-0">
@@ -248,6 +223,65 @@ export function PostItem({
           </>
         )}
 
+        {/* TRƯỜNG HỢP 2: Bài viết SHARE có rootPost */}
+        {isSharePost && hasRootPost && post.rootPost && (
+          <div className="mx-4 my-3 border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden bg-gray-50 dark:bg-gray-800/50 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors cursor-pointer">
+            <div className="flex items-center gap-2.5 px-3 py-2.5 border-b border-gray-200 dark:border-gray-700">
+              <Avatar src="/image.png?height=32&width=32" alt="Original author" className="h-8 w-8" />
+              <div className="flex-1 min-w-0">
+                <p className="font-semibold text-[15px] text-gray-900 dark:text-gray-100 hover:underline">Original Author</p>
+                <p className="text-[13px] text-gray-500 dark:text-gray-400">{formatTimeAgo(post.rootPost.createdAt)}</p>
+              </div>
+            </div>
+            {post.rootPost.content && (
+              <div className="px-3 py-2.5">
+                <p className="text-[15px] text-gray-900 dark:text-gray-100 leading-[1.3333] line-clamp-4">{post.rootPost.content}</p>
+              </div>
+            )}
+            {post.rootPost.medias && post.rootPost.medias.length > 0 && (
+              <div className="pb-0">
+                <div className="grid grid-cols-2 gap-0.5 overflow-hidden">
+                  {post.rootPost.medias.slice(0, 4).map((media, idx) => (
+                    <div key={media.mediaId} className="relative aspect-square bg-gray-200 dark:bg-gray-700 group cursor-pointer"
+                      onClick={(e) => { e.stopPropagation(); onOpenImage(media.mediaUrl, post) }}>
+                      <img src={media.mediaUrl} alt={`Root media ${idx + 1}`} className="w-full h-full object-cover group-hover:brightness-95 transition-all" />
+                      {idx === 3 && post.rootPost!.medias && post.rootPost!.medias.length > 4 && (
+                        <div className="absolute inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center">
+                          <span className="text-white text-2xl font-bold">+{post.rootPost!.medias.length - 4}</span>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* TRƯỜNG HỢP 3: Bài viết SHARE KHÔNG có rootPost (bị xóa) */}
+        {isSharePost && !hasRootPost && (
+          <div className="mx-4 my-3 border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden bg-gray-50 dark:bg-gray-800/50">
+            <div className="px-4 py-6">
+              <div className="flex items-start gap-3">
+                <div className="flex-shrink-0 mt-0.5">
+                  <div className="w-10 h-10 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center">
+                    <Lock className="w-5 h-5 text-gray-400 dark:text-gray-500" />
+                  </div>
+                </div>
+                <div className="flex-1">
+                  <p className="font-semibold text-[15px] text-gray-900 dark:text-gray-100 mb-1">
+                    This content is currently unavailable
+                  </p>
+                  <p className="text-[13px] text-gray-500 dark:text-gray-400 leading-relaxed">
+                    This error is usually because the owner only shared the content with a small group, changed who can see it, or deleted the content.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Mentions */}
         {post.mentions && post.mentions.length > 0 && (
           <div className="px-4 py-3">
             <div className="flex flex-wrap gap-1.5">
@@ -260,6 +294,7 @@ export function PostItem({
           </div>
         )}
 
+        {/* Reactions summary */}
         {totalReactions > 0 && (
           <div className="px-4 py-2 flex items-center justify-between text-[15px] text-gray-500 dark:text-gray-400 border-t border-gray-200 dark:border-gray-700 mt-3">
             <div className="flex items-center gap-1">
@@ -284,6 +319,7 @@ export function PostItem({
           </div>
         )}
 
+        {/* Action buttons */}
         <div className="px-2 py-1 border-t border-gray-200 dark:border-gray-700">
           <div className="flex items-center gap-1">
             <ReactionButton />
