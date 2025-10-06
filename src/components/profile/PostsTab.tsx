@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback, useRef } from "react"
 import { Card, Button } from "@/components/ui"
 import { getPostsByUser } from "@/lib/api/posts/GetPostsByUser"
+import { deleteApi } from "@/lib/api/posts/DeletePost"
 import type { PostFullDto } from "@/lib/types/posts/PostFullDto"
 import { MessageCircle } from "lucide-react"
 import { ImageModal } from "./ImageModal"
@@ -96,6 +97,18 @@ export function PostsTab() {
     }
   }, [hasMore, loadingMore, loadMorePosts])
 
+  // Handle delete post
+  const handleDeletePost = async (postId: string) => {
+    try {
+      await deleteApi.deletePost(postId)
+      setPosts(prev => prev.filter(post => post.postId !== postId))
+      console.log('Post deleted successfully')
+    } catch (error) {
+      console.error('Failed to delete post:', error)
+      throw error
+    }
+  }
+
   const getAllMedias = () => {
     const allMedias: { url: string; post: PostFullDto }[] = []
     posts.forEach((post) => {
@@ -163,6 +176,16 @@ export function PostsTab() {
     })
   }
 
+  const handleReact = (reactionType: string) => {
+    if (!selectedImage) return
+    console.log('React to post:', selectedImage.post.postId, reactionType)
+  }
+
+  const handleRemoveReaction = () => {
+    if (!selectedImage) return
+    console.log('Remove reaction from post:', selectedImage.post.postId)
+  }
+
   if (loading) return <PostsTabLoading />
   if (error) return <PostsTabError error={error} />
   if (posts.length === 0) return <PostsTabEmpty />
@@ -171,8 +194,11 @@ export function PostsTab() {
 
   return (
     <>
-      {/* Sử dụng PostList thay vì map PostItem trực tiếp */}
-      <PostList posts={posts} onOpenImage={handleOpenImage} />
+      <PostList 
+        posts={posts} 
+        onOpenImage={handleOpenImage}
+        onDeletePost={handleDeletePost}
+      />
 
       {hasMore && (
         <div 
@@ -202,6 +228,9 @@ export function PostsTab() {
             hasNext={allMedias.length > 1 || hasMore}
             hasPrev={allMedias.length > 1}
             isLoading={loadingMore}
+            onReact={handleReact}
+            onRemoveReaction={handleRemoveReaction}
+            reactionsLoading={false}
           />
         </div>
       )}
