@@ -8,6 +8,7 @@ import type { PostFullDto } from "@/lib/types/posts/PostFullDto"
 import { MessageCircle } from "lucide-react"
 import { ImageModal } from "./ImageModal"
 import { PostList } from "@/components/posts/PostList" 
+import { usePostsReactions } from "@/lib/hooks/usePostReaction" // 👈 THÊM HOOK NÀY
 
 export function PostsTab() {
   const [posts, setPosts] = useState<PostFullDto[]>([])
@@ -22,6 +23,10 @@ export function PostsTab() {
 
   const loadMoreRef = useRef<HTMLDivElement>(null)
   const observerRef = useRef<IntersectionObserver | null>(null)
+
+  // 👈 THÊM HOOK REACTIONS GIỐNG IMAGESTAB
+  const postIds = posts.map(post => post.postId)
+  const { reactions, react, removeReaction, loading: reactionsLoading } = usePostsReactions(postIds)
 
   useEffect(() => {
     const fetchPosts = async () => {
@@ -113,10 +118,14 @@ export function PostsTab() {
     const allMedias: { url: string; post: PostFullDto }[] = []
     posts.forEach((post) => {
       post.medias?.forEach((media) => {
-        allMedias.push({
-          url: media.mediaUrl,
-          post: post,
-        })
+        // 👈 THÊM FILTER GIỐNG IMAGESTAB
+        if (media.mediaUrl && (media.mediaUrl.includes('.jpg') || media.mediaUrl.includes('.jpeg') || 
+            media.mediaUrl.includes('.png') || media.mediaUrl.includes('.webp'))) {
+          allMedias.push({
+            url: media.mediaUrl,
+            post: post,
+          })
+        }
       })
     })
     return allMedias
@@ -176,14 +185,25 @@ export function PostsTab() {
     })
   }
 
-  const handleReact = (reactionType: string) => {
+  // 👈 SỬA LẠI HANDLE REACT ĐỂ DÙNG HOOK
+  const handleReact = async (reactionType: string) => {
     if (!selectedImage) return
     console.log('React to post:', selectedImage.post.postId, reactionType)
+    try {
+      await react(selectedImage.post.postId, reactionType)
+    } catch (error) {
+      console.error('Failed to react:', error)
+    }
   }
 
-  const handleRemoveReaction = () => {
+  const handleRemoveReaction = async () => {
     if (!selectedImage) return
     console.log('Remove reaction from post:', selectedImage.post.postId)
+    try {
+      await removeReaction(selectedImage.post.postId)
+    } catch (error) {
+      console.error('Failed to remove reaction:', error)
+    }
   }
 
   if (loading) return <PostsTabLoading />
@@ -228,9 +248,11 @@ export function PostsTab() {
             hasNext={allMedias.length > 1 || hasMore}
             hasPrev={allMedias.length > 1}
             isLoading={loadingMore}
+            // 👈 TRUYỀN REACTIONS DATA GIỐNG IMAGESTAB
+            reactions={reactions[selectedImage.post.postId]}
             onReact={handleReact}
             onRemoveReaction={handleRemoveReaction}
-            reactionsLoading={false}
+            reactionsLoading={reactionsLoading}
           />
         </div>
       )}

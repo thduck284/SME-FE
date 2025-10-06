@@ -42,7 +42,6 @@ export function PostItem({
   onHide = () => {},
   onReport = () => {}
 }: PostItemProps) {
-  console.log("Rendering PostItem for postId:", post)
   const [showComments, setShowComments] = useState(false)
   const [isReacting, setIsReacting] = useState(false)
   const [showReactionPicker, setShowReactionPicker] = useState(false)

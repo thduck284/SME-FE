@@ -170,7 +170,17 @@ export function ImageModal({
       </div>
 
       {/* Panel thông tin bên phải */}
-      <ImageModalContent post={post} />
+      <ImageModalContent 
+        post={post} 
+        reactions={reactions}
+        onReact={async (reactionType) => {
+          await onReact(reactionType)
+        }}
+        onShareSuccess={() => {
+          // Handle share success if needed
+          console.log('Share success')
+        }}
+      />
     </div>
   )
 }
