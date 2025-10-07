@@ -6,15 +6,44 @@ import { User, FileText, ImageIcon, MapPin, LinkIcon, Calendar, Mail, Camera } f
 import { LeftBar, RightBar } from "@/components/layouts"
 import { PostsTab } from "@/components/profile/PostsTab"
 import { ImagesTab } from "@/components/profile/ImagesTab"
+import { useUserRelationship } from "@/lib/hooks/useRelationship"
+import { getPostsCount } from "@/lib/api/posts/GetPostsByUser" 
 
 export function ProfilePage() {
   const [activeTab, setActiveTab] = useState<"profile" | "posts" | "images">("profile")
   const [avatarUrl, setAvatarUrl] = useState("/image.png?height=128&width=128")
   const [isHoveringAvatar, setIsHoveringAvatar] = useState(false)
   const [isScrolled, setIsScrolled] = useState(false)
+  const [postsCount, setPostsCount] = useState(0) 
+  const [loadingPostsCount, setLoadingPostsCount] = useState(true) 
 
   const fileInputRef = useRef<HTMLInputElement>(null)
   const mainContentRef = useRef<HTMLDivElement>(null)
+
+  // Sử dụng hook để lấy dữ liệu followers và following
+  const { 
+    followers, 
+    following, 
+    loading: loadingRelationships, 
+    error, 
+    refetch 
+  } = useUserRelationship()
+
+  useEffect(() => {
+    const fetchPostsCount = async () => {
+      try {
+        setLoadingPostsCount(true)
+        const response = await getPostsCount()
+        setPostsCount(response.data.count)
+      } catch (error) {
+        console.error("Error fetching posts count:", error)
+      } finally {
+        setLoadingPostsCount(false)
+      }
+    }
+
+    fetchPostsCount()
+  }, [])
 
   const tabs = [
     { key: "profile" as const, label: "Profile", icon: User },
@@ -22,10 +51,20 @@ export function ProfilePage() {
     { key: "images" as const, label: "Images", icon: ImageIcon },
   ]
 
+  // Tính toán stats từ API thực tế - sử dụng postsCount
   const stats = [
-    { label: "Posts", value: "24" },
-    { label: "Followers", value: "1.2K" },
-    { label: "Following", value: "180" },
+    { 
+      label: "Posts", 
+      value: loadingPostsCount ? "..." : postsCount.toString() 
+    },
+    { 
+      label: "Followers", 
+      value: loadingRelationships ? "..." : (followers?.total.toString() || "0"),
+    },
+    { 
+      label: "Following", 
+      value: loadingRelationships ? "..." : (following?.total.toString() || "0"),
+    },
   ]
 
   const interests = ["Photography", "Design", "Travel", "Technology", "Art"]
@@ -184,7 +223,7 @@ export function ProfilePage() {
           </nav>
         </div>
 
-        {/* Tab Content - SỬ DỤNG COMPONENTS TÁCH RIÊNG */}
+        {/* Tab Content */}
         <div className="space-y-8 ml-4">
           {activeTab === "profile" && (
             <div className="grid gap-8 md:grid-cols-2">
@@ -219,11 +258,11 @@ export function ProfilePage() {
           )}
 
           {activeTab === "posts" && (
-            <PostsTab  />
+            <PostsTab />
           )}
 
           {activeTab === "images" && (
-            <ImagesTab  />
+            <ImagesTab />
           )}
         </div>
       </main>
