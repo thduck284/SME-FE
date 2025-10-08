@@ -4,10 +4,10 @@ import { useState, useEffect, useCallback } from "react"
 import { Button } from "@/components/ui"
 import { Send, Heart, Trash2, Loader2, AlertCircle } from "lucide-react"
 import { useComments } from "@/lib/hooks/useComments"
-import { useUsers } from "@/lib/hooks/useUsers"
+import { UserService } from "@/lib/api/users/UserService"
 import { formatTimeAgo } from "@/lib/utils/PostUtils"
 import type { Comment as CommentType } from "@/lib/types/posts/CommentsDTO"
-import type { User } from "@/lib/types/users/UserDTO"
+import type { UserMetadata } from "@/lib/types/User"
 
 interface CommentsSectionProps {
   postId: string
@@ -19,7 +19,7 @@ export function CommentsSection({ postId, isOpen, onClose }: CommentsSectionProp
   const [comment, setComment] = useState("")
   const [error, setError] = useState<string | null>(null)
   const [optimisticComments, setOptimisticComments] = useState<CommentType[]>([])
-  const [userCache, setUserCache] = useState<Map<string, User>>(new Map())
+  const [userCache, setUserCache] = useState<Map<string, UserMetadata>>(new Map())
   
   const {
     comments,
@@ -32,10 +32,17 @@ export function CommentsSection({ postId, isOpen, onClose }: CommentsSectionProp
     deleteComment
   } = useComments(postId)
 
-  const { getUserById } = useUsers()
+  // Sử dụng UserService.getUserMetadata thay vì useUsers hook
 
-  // Combine comments from API and optimistic updates
-  const displayComments = [...optimisticComments, ...comments].filter(Boolean)
+  // Combine comments from API and optimistic updates, ensuring unique IDs
+  const displayComments = [...optimisticComments, ...comments]
+    .filter(Boolean)
+    .reduce((acc, comment) => {
+      if (!acc.find(c => c.id === comment.id)) {
+        acc.push(comment)
+      }
+      return acc
+    }, [] as CommentType[])
 
   // Fetch comments when section opens
   useEffect(() => {
@@ -46,19 +53,19 @@ export function CommentsSection({ postId, isOpen, onClose }: CommentsSectionProp
     }
   }, [isOpen, postId, fetchComments])
 
-  // Fetch user data for comments
+  // Fetch user metadata for comments
   useEffect(() => {
-    const fetchUserData = async () => {
+    const fetchUserMetadata = async () => {
       const commentsToFetch = displayComments
         .filter(comment => comment && !userCache.has(comment.authorId))
         .slice(0, 10) // Limit concurrent requests
 
       const userPromises = commentsToFetch.map(async (comment) => {
         try {
-          const user = await getUserById(comment.authorId)
-          return { authorId: comment.authorId, user }
+          const userMetadata = await UserService.getUserMetadata(comment.authorId)
+          return { authorId: comment.authorId, userMetadata }
         } catch (error) {
-          console.error(`Failed to fetch user ${comment.authorId}:`, error)
+          console.error(`Failed to fetch user metadata ${comment.authorId}:`, error)
           return null
         }
       })
@@ -67,8 +74,8 @@ export function CommentsSection({ postId, isOpen, onClose }: CommentsSectionProp
       const newCache = new Map(userCache)
       
       results.forEach(result => {
-        if (result?.user) {
-          newCache.set(result.authorId, result.user)
+        if (result?.userMetadata) {
+          newCache.set(result.authorId, result.userMetadata)
         }
       })
       
@@ -76,24 +83,24 @@ export function CommentsSection({ postId, isOpen, onClose }: CommentsSectionProp
     }
 
     if (displayComments.length > 0) {
-      fetchUserData()
+      fetchUserMetadata()
     }
-  }, [displayComments, getUserById, userCache])
+  }, [displayComments, userCache])
 
   // Helper functions
-  const getUserFromCache = useCallback((authorId: string): User | undefined => 
+  const getUserFromCache = useCallback((authorId: string): UserMetadata | undefined => 
     userCache.get(authorId), [userCache])
 
   const isTempComment = useCallback((comment: CommentType): boolean => 
     comment?.id?.startsWith?.('temp-') || false, [])
 
   const getDisplayInfo = useCallback((comment: CommentType) => {
-    const user = getUserFromCache(comment.authorId)
+    const userMetadata = getUserFromCache(comment.authorId)
     const displayName = comment.authorName === 'You' ? 'You' : 
-                       user?.displayName || user?.username || comment.authorName || 'Unknown User'
-    const avatarUrl = user?.avtUrl || comment.authorAvatar
-    const fullName = user?.fullName || 
-                    (user?.firstName && user?.lastName ? `${user.firstName} ${user.lastName}` : undefined)
+                       (userMetadata ? `${userMetadata.firstName} ${userMetadata.lastName}`.trim() : comment.authorName || 'Unknown User')
+    const avatarUrl = userMetadata?.avtUrl || comment.authorAvatar
+    const fullName = userMetadata ? `${userMetadata.firstName} ${userMetadata.lastName}`.trim() : 
+                    comment.authorName || 'Unknown User'
 
     return { displayName, avatarUrl, fullName }
   }, [getUserFromCache])
@@ -128,13 +135,13 @@ export function CommentsSection({ postId, isOpen, onClose }: CommentsSectionProp
     try {
       const newComment = await addComment(currentComment)
       
-      // Cache user data for new comment
+      // Cache user metadata for new comment
       if (newComment.authorId) {
         try {
-          const user = await getUserById(newComment.authorId)
-          setUserCache(prev => new Map(prev).set(newComment.authorId, user))
+          const userMetadata = await UserService.getUserMetadata(newComment.authorId)
+          setUserCache(prev => new Map(prev).set(newComment.authorId, userMetadata))
         } catch (error) {
-          console.error('Failed to fetch user for new comment:', error)
+          console.error('Failed to fetch user metadata for new comment:', error)
         }
       }
       
@@ -206,7 +213,7 @@ export function CommentsSection({ postId, isOpen, onClose }: CommentsSectionProp
             No comments yet. Be the first to comment!
           </div>
         ) : (
-          displayComments.map((comment) => {
+          displayComments.map((comment, index) => {
             if (!comment) return null
             
             const tempComment = isTempComment(comment)
@@ -214,7 +221,7 @@ export function CommentsSection({ postId, isOpen, onClose }: CommentsSectionProp
             
             return (
               <CommentItem
-                key={comment.id}
+                key={comment.id || `comment-${index}-${comment.authorId}`}
                 comment={comment}
                 isTemp={tempComment}
                 displayName={displayName}
