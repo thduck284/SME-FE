@@ -1,32 +1,17 @@
 "use client"
 
+import React, { useState } from "react"
 import { Button } from "@/components/ui"
-import { Heart, MessageCircle, Share, Laugh, Frown, Zap } from "lucide-react"
+import { MessageCircle, Share, ThumbsUp } from "lucide-react"
 import { usePostReactions } from "@/lib/hooks/usePostReaction"
-import { useState } from "react"
+import { ReactionType, reactionIcons } from "@/lib/constants/reactions"
 
 interface PostReactionsProps {
   postId: string
   onCommentClick: () => void
 }
 
-export enum ReactionType {
-  LIKE = 'LIKE',
-  LOVE = 'LOVE',
-  HAHA = 'HAHA',
-  WOW = 'WOW',
-  SAD = 'SAD',
-  ANGRY = 'ANGRY'
-}
-
-const reactionIcons = {
-  [ReactionType.LIKE]: { icon: Heart, label: "Like", color: "text-blue-500", emoji: "👍" },
-  [ReactionType.LOVE]: { icon: Heart, label: "Love", color: "text-red-500", emoji: "❤️" },
-  [ReactionType.HAHA]: { icon: Laugh, label: "Haha", color: "text-yellow-500", emoji: "😄" },
-  [ReactionType.WOW]: { icon: Zap, label: "Wow", color: "text-yellow-500", emoji: "😮" },
-  [ReactionType.SAD]: { icon: Frown, label: "Sad", color: "text-blue-400", emoji: "😢" },
-  [ReactionType.ANGRY]: { icon: Zap, label: "Angry", color: "text-orange-500", emoji: "😠" },
-}
+// Dùng mapping icon lucide từ constants
 
 export function PostReactions({ postId, onCommentClick }: PostReactionsProps) {
   const { reaction, loading, react, removeReaction } = usePostReactions(postId)
@@ -63,10 +48,10 @@ export function PostReactions({ postId, onCommentClick }: PostReactionsProps) {
     return baseTotal
   }
 
-  // Lấy icon hiện tại của user
+  // Lấy icon hiện tại của user (chuẩn hóa viết hoa)
   const getCurrentUserReaction = () => {
     if (!reaction?.userReaction) return null
-    return reaction.userReaction as ReactionType
+    return (reaction.userReaction.toUpperCase() as ReactionType)
   }
 
   const totalReactions = getTotalReactions()
@@ -82,8 +67,8 @@ export function PostReactions({ postId, onCommentClick }: PostReactionsProps) {
             size="sm" 
             className={`flex items-center gap-2 transition-all duration-200 group ${
               currentReaction 
-                ? `${reactionIcons[currentReaction].color} scale-105` 
-                : 'text-muted-foreground hover:text-red-500'
+                ? `${reactionIcons[currentReaction].color} ${reactionIcons[currentReaction].bg} ${reactionIcons[currentReaction].darkBg}`
+                : 'bg-white text-gray-700 border border-gray-200 hover:bg-gray-50 dark:bg-gray-900 dark:text-gray-300 dark:border-gray-700 dark:hover:bg-gray-800'
             }`}
             onMouseEnter={() => setShowReactionPicker(true)}
             onMouseLeave={() => setShowReactionPicker(false)}
@@ -93,14 +78,10 @@ export function PostReactions({ postId, onCommentClick }: PostReactionsProps) {
               <div className="animate-spin h-4 w-4 border-2 border-current border-t-transparent rounded-full" />
             ) : (
               <>
-                {currentReaction ? (
-                  // Hiển thị emoji của reaction đã chọn
-                  <span className="text-base">{reactionIcons[currentReaction].emoji}</span>
-                ) : (
-                  // Hiển thị emoji like mặc định
-                  <span className="text-base">👍</span>
-                )}
-                <span className={`transition-all ${currentReaction ? 'font-semibold' : ''}`}>
+              {currentReaction 
+                ? React.createElement(reactionIcons[currentReaction].icon, { className: `h-4 w-4 ${reactionIcons[currentReaction].color}` })
+                : <ThumbsUp className="h-4 w-4 text-gray-600 dark:text-gray-400" />}
+                <span className={`transition-all ${currentReaction ? `font-semibold ${reactionIcons[currentReaction].color}` : ''}`}>
                   {totalReactions}
                 </span>
               </>
@@ -114,7 +95,7 @@ export function PostReactions({ postId, onCommentClick }: PostReactionsProps) {
               onMouseEnter={() => setShowReactionPicker(true)}
               onMouseLeave={() => setShowReactionPicker(false)}
             >
-              {Object.entries(reactionIcons).map(([type, { label, emoji }]) => (
+              {Object.entries(reactionIcons).map(([type, { label, icon }]) => (
                 <button
                   key={type}
                   className={`p-2 hover:scale-125 transition-all duration-200 text-lg rounded-full hover:bg-muted ${
@@ -123,7 +104,7 @@ export function PostReactions({ postId, onCommentClick }: PostReactionsProps) {
                   onClick={() => handleReaction(type as ReactionType)}
                   title={label}
                 >
-                  {emoji}
+                  {React.createElement(icon, { className: "h-4 w-4" })}
                 </button>
               ))}
             </div>
@@ -161,7 +142,7 @@ export function PostReactions({ postId, onCommentClick }: PostReactionsProps) {
               const reactionConfig = reactionIcons[type as ReactionType]
               return (
                 <div key={type} className="flex items-center gap-1">
-                  <span className="text-sm">{reactionConfig?.emoji}</span>
+                  {reactionConfig?.icon ? React.createElement(reactionConfig.icon, { className: "h-3.5 w-3.5" }) : null}
                   <span>{count}</span>
                 </div>
               )

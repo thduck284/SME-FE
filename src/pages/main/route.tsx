@@ -13,7 +13,7 @@ export const feedRoutes: RouteObject[] = [
     element: <SuggestedUsersPage />
   },
   {
-    path: "/profile", 
+    path: "/profile/:userId", 
     element: <ProfilePage />
   }
 ];

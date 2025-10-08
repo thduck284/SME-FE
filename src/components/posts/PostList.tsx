@@ -14,6 +14,7 @@ interface PostListProps {
 export function PostList({ posts, onOpenImage, onDeletePost }: PostListProps) {
   const postIds = useMemo(() => posts.map(post => post.postId), [posts])
   const { reactions, loading, react, removeReaction } = usePostsReactions(postIds)
+  
 
   const handleReact = async (postId: string, reactionType: string) => {
     try {
