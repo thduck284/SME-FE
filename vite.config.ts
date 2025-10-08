@@ -15,6 +15,7 @@ export default defineConfig({
       '/reaction': 'http://localhost:3004',
       '/users': 'http://localhost:3001',
       '/relationships': 'http://localhost:3002',
+      '/auth': 'http://localhost:3010',
     }
   }
 });
