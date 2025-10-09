@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useRef, useEffect } from "react"
+import { useParams } from "react-router-dom"
 import { Badge, Button, Card, Avatar } from "@/components/ui" 
 import { User, FileText, ImageIcon, MapPin, LinkIcon, Calendar, Mail, Camera } from "lucide-react"
 import { LeftBar, RightBar } from "@/components/layouts"
@@ -10,12 +11,25 @@ import { useUserRelationship } from "@/lib/hooks/useRelationship"
 import { getPostsCount } from "@/lib/api/posts/GetPostsByUser" 
 
 export function ProfilePage() {
+  const { userId } = useParams()
   const [activeTab, setActiveTab] = useState<"profile" | "posts" | "images">("profile")
   const [avatarUrl, setAvatarUrl] = useState("/image.png?height=128&width=128")
   const [isHoveringAvatar, setIsHoveringAvatar] = useState(false)
-  const [isScrolled, setIsScrolled] = useState(false)
   const [postsCount, setPostsCount] = useState(0) 
   const [loadingPostsCount, setLoadingPostsCount] = useState(true) 
+  const [profile, setProfile] = useState<{
+    userId: string
+    username: string
+    firstName: string
+    lastName: string
+    email: string
+    phone: string | null
+    avtUrl: string | null
+    createdAt: string
+    updatedAt: string
+  } | null>(null)
+  const [loadingProfile, setLoadingProfile] = useState<boolean>(true)
+  const [errorProfile, setErrorProfile] = useState<string | null>(null)
 
   const fileInputRef = useRef<HTMLInputElement>(null)
   const mainContentRef = useRef<HTMLDivElement>(null)
@@ -24,9 +38,7 @@ export function ProfilePage() {
   const { 
     followers, 
     following, 
-    loading: loadingRelationships, 
-    error, 
-    refetch 
+    loading: loadingRelationships
   } = useUserRelationship()
 
   useEffect(() => {
@@ -44,6 +56,46 @@ export function ProfilePage() {
 
     fetchPostsCount()
   }, [])
+
+  useEffect(() => {
+    const controller = new AbortController()
+    const fetchProfile = async () => {
+      if (!userId) return
+      try {
+        setLoadingProfile(true)
+        setErrorProfile(null)
+        const res = await fetch(`/users/${userId}/`, {
+          method: 'GET',
+          headers: { 'Content-Type': 'application/json' },
+          signal: controller.signal,
+        })
+        if (!res.ok) {
+          const text = await res.text()
+          throw new Error(`Failed to load profile: ${res.status} ${text}`)
+        }
+        const json = await res.json()
+        setProfile(json.data)
+        if (json.data?.avtUrl) {
+          setAvatarUrl(json.data.avtUrl)
+        }
+      } catch (e: any) {
+        if (e.name !== 'AbortError') {
+          setErrorProfile(e.message || 'Failed to load profile')
+        }
+      } finally {
+        setLoadingProfile(false)
+      }
+    }
+
+    fetchProfile()
+    return () => controller.abort()
+  }, [userId])
+
+  const displayName = profile ? `${profile.firstName} ${profile.lastName}`.trim() : '—'
+  const displayUsername = profile ? `@${profile.username}` : ''
+  const displayEmail = profile?.email || '—'
+  const displayPhone = profile?.phone || '—'
+  const joinedDate = profile ? new Date(profile.createdAt).toLocaleDateString() : '—'
 
   const tabs = [
     { key: "profile" as const, label: "Profile", icon: User },
@@ -69,26 +121,7 @@ export function ProfilePage() {
 
   const interests = ["Photography", "Design", "Travel", "Technology", "Art"]
 
-  // Handle scroll để sidebars trượt theo
-  useEffect(() => {
-    const handleScroll = () => {
-      if (mainContentRef.current) {
-        const scrollTop = mainContentRef.current.scrollTop
-        setIsScrolled(scrollTop > 0)
-      }
-    }
-
-    const mainElement = mainContentRef.current
-    if (mainElement) {
-      mainElement.addEventListener('scroll', handleScroll)
-    }
-
-    return () => {
-      if (mainElement) {
-        mainElement.removeEventListener('scroll', handleScroll)
-      }
-    }
-  }, [])
+  // (đã bỏ theo dõi scroll do không dùng đến isScrolled)
 
   const handleAvatarClick = () => {
     fileInputRef.current?.click()
@@ -161,8 +194,10 @@ export function ProfilePage() {
           <div className="flex-1 space-y-8">
             <div className="flex flex-col gap-6 md:flex-row md:items-start md:justify-between">
               <div className="space-y-3">
-                <h1 className="text-4xl font-bold tracking-tight text-gray-900">Sarah Anderson</h1>
-                <p className="text-lg text-gray-600">Creative Designer & Developer</p>
+                <h1 className="text-4xl font-bold tracking-tight text-gray-900">
+                  {loadingProfile ? 'Đang tải...' : errorProfile ? 'Lỗi tải hồ sơ' : displayName}
+                </h1>
+                <p className="text-lg text-gray-600">{loadingProfile ? '' : displayUsername}</p>
               </div>
               <Button className="w-full md:w-auto">Edit Profile</Button>
             </div>
@@ -180,13 +215,13 @@ export function ProfilePage() {
             {/* Bio & Interests */}
             <div className="space-y-6">
               <p className="text-pretty leading-relaxed text-gray-900">
-                Passionate about creating beautiful and functional digital experiences.
+                {loadingProfile ? ' ' : ''}
               </p>
 
               <div className="flex flex-wrap gap-6 text-sm text-gray-600">
                 <div className="flex items-center gap-2"><MapPin className="h-4 w-4" />San Francisco, CA</div>
                 <div className="flex items-center gap-2"><LinkIcon className="h-4 w-4" /><a href="#" className="text-primary hover:underline">portfolio.com</a></div>
-                <div className="flex items-center gap-2"><Calendar className="h-4 w-4" />Joined March 2023</div>
+                <div className="flex items-center gap-2"><Calendar className="h-4 w-4" />Joined {joinedDate}</div>
               </div>
 
               <div className="flex flex-wrap gap-3">
@@ -235,7 +270,7 @@ export function ProfilePage() {
                     </div>
                     <div>
                       <div className="text-base text-gray-600">Email</div>
-                      <div className="text-lg font-medium text-gray-900">sarah.anderson@email.com</div>
+                      <div className="text-lg font-medium text-gray-900">{displayEmail}</div>
                     </div>
                   </div>
                 </div>
@@ -248,8 +283,8 @@ export function ProfilePage() {
                       <User className="h-6 w-6 text-primary" />
                     </div>
                     <div>
-                      <div className="text-base text-gray-600">Member Since</div>
-                      <div className="text-lg font-medium text-gray-900">March 15, 2023</div>
+                      <div className="text-base text-gray-600">Phone</div>
+                      <div className="text-lg font-medium text-gray-900">{displayPhone}</div>
                     </div>
                   </div>
                 </div>

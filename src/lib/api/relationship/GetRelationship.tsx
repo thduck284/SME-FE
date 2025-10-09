@@ -1,6 +1,6 @@
 import { UserRelationshipsResponseDto } from '@/lib/types/Relationship'
 
-const userId = "e564d666-c21c-4dee-a5b0-ab2029dae1f2";
+const userId = "572a51cc-38a3-4225-a7f2-203a514293f5";
 
 export const relationshipService = {
   async getFollowers(): Promise<UserRelationshipsResponseDto> {
