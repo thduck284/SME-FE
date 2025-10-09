@@ -1,11 +1,9 @@
 import { 
   RegisterDto, 
   LoginDto, 
-  TokenActionRequestDto, 
-  TokenVerifyDto, 
+  TokenActionRequestDto,  
   AddRoleDto, 
   AuthResponseDto, 
-  TokenVerifyResponseDto 
 } from '@/lib/types/auth/Auth';
 import { injectToken } from './Interceptor';
 
@@ -76,27 +74,6 @@ export const authService = {
       const errorText = await res.text();
       throw new Error(`Logout failed: ${res.statusText} - ${errorText}`);
     }
-  },
-
-  async verifyToken(body: TokenVerifyDto): Promise<TokenVerifyResponseDto> {
-    const config = injectToken({
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    });
-
-    const res = await fetch(`/auth/verify-token`, {
-      ...config,
-      body: JSON.stringify(body),
-    });
-    
-    if (!res.ok) {
-      const errorText = await res.text();
-      throw new Error(`Token verification failed: ${res.statusText} - ${errorText}`);
-    }
-    
-    return await res.json();
   },
 
   async assignRole(body: AddRoleDto): Promise<void> {
