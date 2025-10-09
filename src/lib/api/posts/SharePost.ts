@@ -1,4 +1,4 @@
-import apiClient from "@/lib/services/ApiClient"
+import { injectToken } from "@/lib/api/auth/Interceptor"
 import type { PostFullDto } from "@/lib/types/posts/PostFullDto"
 import type { CreatePostDto } from "@/lib/types/posts/CreatePostDto"
 
@@ -12,7 +12,6 @@ export const shareApi = {
     
     formData.append('type', 'SHARE')
     
-    // Gửi visibility, mặc định là PUBLIC nếu không có
     formData.append('visibility', data.visibility || 'PUBLIC')
     
     // Add media files if any
@@ -27,12 +26,20 @@ export const shareApi = {
       formData.append('mentions', JSON.stringify(data.mentions))
     }
 
-    const res = await apiClient.post(`/posts/${rootPostId}/share`, formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
+    // Sử dụng injectToken - KHÔNG set Content-Type header
+    const config = injectToken({
+      method: 'POST',
+      body: formData,
     })
+
+    const res = await fetch(`/posts/${rootPostId}/share`, config)
     
-    return res.data.data
+    if (!res.ok) {
+      const errorText = await res.text()
+      throw new Error(`Share post failed: ${res.statusText} - ${errorText}`)
+    }
+    
+    const response = await res.json()
+    return response.data
   },
 }

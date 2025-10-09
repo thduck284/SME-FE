@@ -4,21 +4,51 @@ import type React from "react"
 import { useState } from "react"
 import { Input, Button } from "@/components/ui"
 import { Mail, Lock } from "lucide-react"
-import { Link } from "react-router-dom"
+import { Link, useNavigate } from "react-router-dom"
+import { useAuth } from '@/lib/hooks/useAuth'
 
 export function LoginPage() {
-  const [email, setEmail] = useState("")
-  const [password, setPassword] = useState("")
-  const [loading, setLoading] = useState(false)
+  const navigate = useNavigate();
+  const { loading, error, login, clearError } = useAuth();
+  
+  const [formData, setFormData] = useState({
+    email: "",
+    password: ""
+  });
 
-  const handleLogin = (e: React.FormEvent) => {
-    e.preventDefault()
-    setLoading(true)
+  const [successMessage, setSuccessMessage] = useState("");
+  const [loginAttempts, setLoginAttempts] = useState(0); 
 
-    setTimeout(() => {
-      console.log("Login:", { email, password })
-      setLoading(false)
-    }, 1000)
+  const handleChange = (field: string) => (e: React.ChangeEvent<HTMLInputElement>) => {
+    setFormData(prev => ({ ...prev, [field]: e.target.value }));
+    if (error) clearError();
+    if (successMessage) setSuccessMessage("");
+  };
+
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    const loginData = {
+      email: formData.email,
+      password: formData.password,
+    };
+
+    const result = await login(loginData);
+    
+    if (result.success) {
+      setSuccessMessage("Login successful! Redirecting to home page...");
+      setLoginAttempts(0); // Reset số lần thất bại khi đăng nhập thành công
+      setTimeout(() => {
+        navigate('/home');
+      }, 500);
+    } else {
+      setLoginAttempts(prev => prev + 1);
+      if (loginAttempts >= 2) {
+        setTimeout(() => {
+          alert("Multiple login failures. Please check your credentials or reset your password.");
+        }, 100);
+      }
+    }
   }
 
   return (
@@ -42,6 +72,30 @@ export function LoginPage() {
             />
           </div>
 
+          {/* Error Message */}
+          {error && (
+            <div className="mb-4 p-3 bg-destructive/10 border border-destructive/20 rounded-lg">
+              <p className="text-destructive text-sm flex items-center gap-2 text-red">
+                {error}
+              </p>
+              {loginAttempts > 0 && (
+                <p className="text-destructive/80 text-xs mt-1 text-red">
+                  Failed attempts: {loginAttempts}
+                </p>
+              )}
+            </div>
+          )}
+
+          {/* Success Message */}
+          {successMessage && (
+            <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+              <p className="text-green-700 text-sm font-medium flex items-center gap-2">
+                <span>✅</span>
+                {successMessage}
+              </p>
+            </div>
+          )}
+
           {/* Form */}
           <form onSubmit={handleLogin} className="space-y-6">
             {/* Email */}
@@ -55,8 +109,8 @@ export function LoginPage() {
                   id="email"
                   type="email"
                   placeholder="your_email@email.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  value={formData.email}
+                  onChange={handleChange('email')}
                   className="pl-11 h-11 text-base"
                   required
                 />
@@ -74,32 +128,55 @@ export function LoginPage() {
                   id="password"
                   type="password"
                   placeholder="••••••••"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
+                  value={formData.password}
+                  onChange={handleChange('password')}
                   className="pl-11 h-11 text-base"
                   required
                 />
               </div>
-              <div className="text-right">
+              <div className="flex justify-between items-center">
                 <Link
                   to="/forgot-password"
                   className="text-sm text-primary hover:underline underline-offset-4 transition-colors"
                 >
                   Forgot Password?
                 </Link>
+                {loginAttempts > 1 && (
+                  <span className="text-xs text-destructive">
+                    {3 - loginAttempts > 0 
+                      ? `${3 - loginAttempts} attempts remaining` 
+                      : 'Account temporarily locked'
+                    }
+                  </span>
+                )}
               </div>
             </div>
 
-            {/* Custom Button */}
+            {/* Login Button */}
             <Button
               type="submit"
-              loading={loading}
-              variant="primary"
-              size="md"
-              className="w-full h-11 text-base font-medium"
+              disabled={loading || loginAttempts >= 3} // Vô hiệu hóa sau 3 lần thất bại
+              className="w-full h-11 text-base font-medium bg-primary hover:bg-primary/90"
             >
-              Login
+              {loading ? "Logging in..." : 
+               loginAttempts >= 3 ? "Account Locked" : "Login"}
             </Button>
+
+            {/* Thông báo khóa tài khoản tạm thời */}
+            {loginAttempts >= 3 && (
+              <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                <p className="text-yellow-700 text-sm">
+                  ⚠️ Your account has been temporarily locked due to multiple failed attempts. 
+                  Please try again in 15 minutes or{' '}
+                  <Link
+                    to="/forgot-password"
+                    className="font-semibold underline underline-offset-2"
+                  >
+                    reset your password
+                  </Link>.
+                </p>
+              </div>
+            )}
           </form>
 
           {/* Divider */}
@@ -114,7 +191,7 @@ export function LoginPage() {
           {/* Sign up */}
           <div className="text-center">
             <p className="text-sm text-muted-foreground">
-              Don’t have an account?{" "}
+              Don't have an account?{" "}
               <Link
                 to="/register"
                 className="font-semibold text-foreground hover:text-primary transition-colors underline-offset-4 hover:underline"

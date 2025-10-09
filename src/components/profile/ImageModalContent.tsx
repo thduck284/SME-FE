@@ -111,24 +111,22 @@ export function ImageModalContent({ post, reactions, onReact, onShareSuccess }: 
         {totalReactions > 0 ? (
           <div className="flex items-center gap-1.5 hover:underline cursor-pointer">
             <div className="flex items-center -space-x-1">
-              {/* Test với emoji cứng trước */}
               {topReactions.length > 0 ? (
-                topReactions.map(([type], idx) => (
-                  <div 
-                    key={type} 
-                    style={{ zIndex: topReactions.length - idx }}
-                    className="w-[18px] h-[18px] rounded-full bg-white dark:bg-gray-800 border border-white dark:border-gray-800 flex items-center justify-center"
-                  >
-                    <span className="text-sm leading-none" style={{ fontSize: '14px' }}>
-                      {reactionIcons[type as ReactionType]?.icon || "👍"}
-                    </span>
-                  </div>
-                ))
+                topReactions.map(([type], idx) => {
+                  const cfg = reactionIcons[type as ReactionType]
+                  const IconComp = cfg?.icon as any
+                  return (
+                    <div 
+                      key={type} 
+                      style={{ zIndex: topReactions.length - idx }}
+                      className="w-[18px] h-[18px] rounded-full bg-white dark:bg-gray-800 border border-white dark:border-gray-800 flex items-center justify-center"
+                    >
+                      {IconComp ? <IconComp className="h-[14px] w-[14px]" /> : null}
+                    </div>
+                  )
+                })
               ) : (
-                // Fallback nếu không có reactions
-                <div className="w-[18px] h-[18px] rounded-full bg-white dark:bg-gray-800 border border-white dark:border-gray-800 flex items-center justify-center">
-                  <span className="text-sm leading-none" style={{ fontSize: '14px' }}>👍</span>
-                </div>
+                <div className="w-[18px] h-[18px] rounded-full bg-white dark:bg-gray-800 border border-white dark:border-gray-800 flex items-center justify-center" />
               )}
             </div>
             <span className="text-[15px]">{totalReactions}</span>
@@ -161,9 +159,7 @@ export function ImageModalContent({ post, reactions, onReact, onShareSuccess }: 
                 <div className="animate-spin h-4 w-4 border-2 border-current border-t-transparent rounded-full" />
               ) : (
                 <>
-                  <span className="text-lg leading-none" style={{ fontSize: '16px' }}>
-                    {currentReaction ? reactionIcons[currentReaction]?.icon : "👍"}
-                  </span>
+                  {(() => { const IconComp = reactionIcons[currentReaction as ReactionType]?.icon as any; return IconComp ? <IconComp className="h-[18px] w-[18px]" /> : null })()}
                   <span className="text-sm font-semibold">
                     {currentReaction ? reactionIcons[currentReaction]?.label : "Like"}
                   </span>

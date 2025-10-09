@@ -20,7 +20,7 @@ export const usePostsReactions = (postIds: string[]): UsePostsReactionsReturn =>
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  const userId = "e564d666-c21c-4dee-a5b0-ab2029dae1f2" 
+  const userId = "572a51cc-38a3-4225-a7f2-203a514293f5" 
 
   const fetchReactions = useCallback(async () => {
     if (postIds.length === 0) {
@@ -38,7 +38,7 @@ export const usePostsReactions = (postIds: string[]): UsePostsReactionsReturn =>
       const reactionsData: Record<string, ReactionState> = {}
       Object.entries(reactionsMeta).forEach(([postId, meta]) => {
         reactionsData[postId] = {
-          userReaction: meta.userReaction, 
+          userReaction: (((meta as any).yourReaction) ?? meta.userReaction) || null,
           counters: meta.counters
         }
       })

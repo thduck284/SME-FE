@@ -1,4 +1,4 @@
-import apiClient from "@/lib/services/ApiClient"
+import { injectToken } from "@/lib/api/auth/Interceptor"
 
 interface CreatePostPayload {
   content?: string
@@ -21,15 +21,21 @@ export async function createPost(payload: CreatePostPayload) {
   files?.forEach((file) => formData.append("mediaFiles", file))
 
   try {
-    const res = await apiClient.post("/posts", formData, {
-      headers: {
-        "Content-Type": "multipart/form-data",
-      },
+    const config = injectToken({
+      method: "POST",
+      body: formData,
     })
 
-    return res.data
+    const res = await fetch("/posts", config)
+    
+    if (!res.ok) {
+      const errorText = await res.text()
+      throw new Error(`Create post failed: ${res.statusText} - ${errorText}`)
+    }
+    
+    return await res.json()
   } catch (error: any) {
-    const message = error.response?.data?.message || "Failed to create post"
+    const message = error.message || "Failed to create post"
     throw new Error(message)
   }
 }

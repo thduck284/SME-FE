@@ -9,7 +9,7 @@ import { formatTimeAgo, getVisibilityIcon } from "@/lib/utils/PostUtils"
 import { CommentsSection } from "./CommentsSection"
 import { ShareModal } from "./ShareModal"
 import { PostOptionsMenu } from "./PostOptionsMenu"
-import { MessageCircle, Share, Repeat2, Lock } from "lucide-react"
+import { MessageCircle, Share, Repeat2, Lock, ThumbsUp } from "lucide-react"
 
 interface PostItemProps {
   post: PostFullDto
@@ -78,9 +78,16 @@ export function PostItem({
 
   const totalReactions = reaction?.counters 
     ? Object.values(reaction.counters).reduce((sum, count) => sum + count, 0) : 0
-  const currentReaction = reaction?.userReaction as ReactionType || null
+  // Chuẩn hóa về chữ hoa để khớp enum ReactionType khi hiển thị UI
+  const currentReaction = reaction?.userReaction 
+    ? (reaction.userReaction.toUpperCase() as ReactionType) 
+    : null
   const topReactions = reaction?.counters
-    ? Object.entries(reaction.counters).filter(([_, count]) => count > 0).sort(([, a], [, b]) => b - a).slice(0, 3) : []
+    ? Object.entries(reaction.counters)
+        .filter(([_, count]) => count > 0)
+        .sort(([, a], [, b]) => b - a)
+        .slice(0, 3)
+    : []
 
   const MediaGrid = ({ medias }: { medias: { mediaId: string; mediaUrl: string }[] }) => {
     if (!medias.length) return null
@@ -120,24 +127,29 @@ export function PostItem({
     <div className="relative flex-1" onMouseEnter={handleReactionShow} onMouseLeave={handleReactionHide}>
       <Button variant="ghost" size="sm" disabled={loading || isReacting}
         className={`flex items-center justify-center gap-1.5 rounded-md h-9 w-full transition-all ${
-          currentReaction ? `${reactionIcons[currentReaction].color} bg-blue-50 dark:bg-blue-950/30 hover:bg-blue-100 dark:hover:bg-blue-950/50` 
-          : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'}`}>
+          currentReaction 
+            ? `${reactionIcons[currentReaction].color} ${reactionIcons[currentReaction].bg} ${reactionIcons[currentReaction].darkBg}`
+            : 'bg-white text-gray-700 border border-gray-200 hover:bg-gray-50 dark:bg-gray-900 dark:text-gray-300 dark:border-gray-700 dark:hover:bg-gray-800'}`}>
         {isReacting ? (
           <div className="animate-spin h-4 w-4 border-2 border-current border-t-transparent rounded-full" />
         ) : (
           <>
-            <span className="text-lg leading-none">{currentReaction ? reactionIcons[currentReaction].icon : "👍"}</span>
-            <span className="text-[15px] font-semibold">{currentReaction ? reactionIcons[currentReaction].label : "Like"}</span>
+            {currentReaction ? (
+              React.createElement(reactionIcons[currentReaction].icon, { className: `h-[18px] w-[18px] ${reactionIcons[currentReaction].color}` })
+            ) : (
+              <ThumbsUp className="h-[18px] w-[18px] text-gray-600 dark:text-gray-400" />
+            )}
+            <span className={`text-[15px] font-semibold ${currentReaction ? reactionIcons[currentReaction].color : ''}`}>{currentReaction ? reactionIcons[currentReaction].label : "Like"}</span>
           </>
         )}
       </Button>
 
       {showReactionPicker && !isReacting && (
         <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-full shadow-xl px-2 py-2 flex items-center gap-1 z-50">
-          {Object.entries(reactionIcons).map(([type, { label, icon }]) => (
+          {Object.entries(reactionIcons).map(([type, { label, icon, color }]) => (
             <button key={type} title={label} onClick={() => handleReaction(type as ReactionType)}
               className={`relative p-1 hover:scale-150 transition-all duration-200 text-2xl rounded-full ${currentReaction === type ? 'scale-125' : ''}`}>
-              <span className="block transform hover:-translate-y-1 transition-transform">{icon}</span>
+              <span className="block transform hover:-translate-y-1 transition-transform">{React.createElement(icon, { className: `h-[18px] w-[18px] ${color}` })}</span>
             </button>
           ))}
         </div>
@@ -304,7 +316,7 @@ export function PostItem({
                     {topReactions.map(([type], idx) => (
                       <div key={type} style={{ zIndex: topReactions.length - idx }}
                         className="w-[18px] h-[18px] rounded-full bg-white dark:bg-gray-900 border border-white dark:border-gray-900 flex items-center justify-center">
-                        <span className="text-sm leading-none">{reactionIcons[type as ReactionType]?.icon}</span>
+                        {(() => { const cfg = reactionIcons[(type.toUpperCase() as ReactionType)]; return cfg ? React.createElement(cfg.icon, { className: "h-[14px] w-[14px]" }) : null })()}
                       </div>
                     ))}
                   </div>
