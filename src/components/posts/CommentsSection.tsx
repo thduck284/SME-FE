@@ -9,6 +9,7 @@ import { UserService } from "@/lib/api/users/UserService"
 import { formatTimeAgo } from "@/lib/utils/PostUtils"
 import type { Comment as CommentType } from "@/lib/types/posts/CommentsDTO"
 import type { UserMetadata } from "@/lib/types/User"
+import type { MentionData } from "@/lib/types/users/MentionDto"
 
 interface CommentsSectionProps {
   postId: string
@@ -34,9 +35,12 @@ export function CommentsSection({ postId, isOpen, currentUserId }: CommentsSecti
     handleKeyDown: handleMentionKeyDown,
     selectUser: selectMentionUser,
     closeDropdown: closeMentionDropdown,
+    mentions,
+    setMentions,
   } = useMention({
     currentUserId: currentUserId || '',
     onMentionAdd: () => {}, // We don't need to track mentions in comments for now
+    currentText: comment,
     onTextChange: (newText, cursorPosition) => {
       setComment(newText)
       // Update cursor position after state update
@@ -279,6 +283,8 @@ export function CommentsSection({ postId, isOpen, currentUserId }: CommentsSecti
         onSelectMentionUser={selectMentionUser}
         onCloseMentionDropdown={closeMentionDropdown}
         inputRef={inputRef}
+        mentions={mentions as MentionData[]}
+        setMentions={(next) => setMentions(next)}
       />
     </div>
   )
@@ -424,6 +430,8 @@ interface CommentInputProps {
   onSelectMentionUser: (user: any) => void
   onCloseMentionDropdown: () => void
   inputRef: React.RefObject<HTMLInputElement>
+  mentions: MentionData[]
+  setMentions: (next: MentionData[]) => void
 }
 
 function CommentInput({ 
@@ -440,7 +448,9 @@ function CommentInput({
   onMentionKeyDown,
   onSelectMentionUser,
   onCloseMentionDropdown,
-  inputRef
+  inputRef,
+  mentions,
+  setMentions
 }: CommentInputProps) {
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value
@@ -450,6 +460,97 @@ function CommentInput({
   }
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    const input = inputRef.current || (e.currentTarget as HTMLInputElement | null)
+    if (!input) {
+      onMentionKeyDown(e)
+      return
+    }
+
+    const selectionStart = input.selectionStart || 0
+    const selectionEnd = input.selectionEnd || 0
+
+    const expandDeletionToMentions = (deleteStart: number, deleteEnd: number) => {
+      const overlapped = mentions.filter(m => !(m.endIndex <= deleteStart || m.startIndex >= deleteEnd))
+      if (overlapped.length === 0) return { start: deleteStart, end: deleteEnd }
+      const mentionStart = Math.min(...overlapped.map(m => m.startIndex))
+      const mentionEnd = Math.max(...overlapped.map(m => m.endIndex))
+      const start = Math.min(deleteStart, mentionStart)
+      const end = Math.max(deleteEnd, mentionEnd)
+      return { start, end }
+    }
+
+    const deleteRange = (start: number, end: number) => {
+      const safeStart = Math.max(0, Math.min(start, comment.length))
+      const safeEnd = Math.max(safeStart, Math.min(end, comment.length))
+      const newText = comment.slice(0, safeStart) + comment.slice(safeEnd)
+      const delta = safeEnd - safeStart
+
+      const updatedMentions = mentions
+        .filter(m => !(m.endIndex > safeStart && m.startIndex < safeEnd))
+        .map(m => {
+          if (m.startIndex >= safeEnd) {
+            return {
+              ...m,
+              startIndex: m.startIndex - delta,
+              endIndex: m.endIndex - delta,
+            }
+          }
+          return m
+        })
+
+      e.preventDefault()
+      onChange(newText)
+      setMentions(updatedMentions)
+
+      setTimeout(() => {
+        if (inputRef.current) {
+          inputRef.current.focus()
+          inputRef.current.setSelectionRange(safeStart, safeStart)
+        }
+      }, 0)
+    }
+
+    if (e.key === 'Backspace') {
+      if (selectionStart === selectionEnd) {
+        const mentionAtCursor = mentions.find(m => selectionStart >= m.startIndex && selectionStart < m.endIndex)
+        if (mentionAtCursor) {
+          deleteRange(mentionAtCursor.startIndex, mentionAtCursor.endIndex)
+          return
+        }
+        const pos = selectionStart - 1
+        if (pos >= 0) {
+          const mentionLeft = mentions.find(m => pos >= m.startIndex && pos < m.endIndex)
+          if (mentionLeft) {
+            deleteRange(mentionLeft.startIndex, mentionLeft.endIndex)
+            return
+          }
+        }
+      } else {
+        const { start, end } = expandDeletionToMentions(selectionStart, selectionEnd)
+        if (start !== selectionStart || end !== selectionEnd) {
+          deleteRange(start, end)
+          return
+        }
+      }
+    }
+
+    if (e.key === 'Delete') {
+      if (selectionStart === selectionEnd) {
+        const pos = selectionStart
+        const mention = mentions.find(m => pos >= m.startIndex && pos < m.endIndex)
+        if (mention) {
+          deleteRange(mention.startIndex, mention.endIndex)
+          return
+        }
+      } else {
+        const { start, end } = expandDeletionToMentions(selectionStart, selectionEnd)
+        if (start !== selectionStart || end !== selectionEnd) {
+          deleteRange(start, end)
+          return
+        }
+      }
+    }
+
     onMentionKeyDown(e)
   }
 

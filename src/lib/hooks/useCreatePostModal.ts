@@ -29,6 +29,7 @@ export function useCreatePostModal(onClose: () => void, onPostCreated?: () => vo
   } = useMention({
     currentUserId: currentUserId || '',
     onMentionAdd: setMentions,
+    currentText: content,
     onTextChange: (newText, cursorPosition) => {
       setContent(newText)
       // Update cursor position after state update
@@ -93,8 +94,111 @@ export function useCreatePostModal(onClose: () => void, onPostCreated?: () => vo
   }, [handleMentionTextChange])
 
   const handleTextareaKeyDown = useCallback((e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    const textarea = textareaRef.current || (e.currentTarget as HTMLTextAreaElement | null)
+    if (!textarea) {
+      handleMentionKeyDown(e)
+      return
+    }
+
+    const selectionStart = textarea.selectionStart
+    const selectionEnd = textarea.selectionEnd
+
+    const expandDeletionToMentions = (deleteStart: number, deleteEnd: number) => {
+      // If deletion overlaps any mention, expand to cover full mention(s)
+      const overlapped = mentions.filter(m => !(m.endIndex <= deleteStart || m.startIndex >= deleteEnd))
+      if (overlapped.length === 0) return { start: deleteStart, end: deleteEnd }
+      const mentionStart = Math.min(...overlapped.map(m => m.startIndex))
+      const mentionEnd = Math.max(...overlapped.map(m => m.endIndex))
+      // Preserve user-selected range while ensuring full mentions are removed
+      const start = Math.min(deleteStart, mentionStart)
+      const end = Math.max(deleteEnd, mentionEnd)
+      return { start, end }
+    }
+
+    const deleteRange = (start: number, end: number) => {
+      const safeStart = Math.max(0, Math.min(start, content.length))
+      const safeEnd = Math.max(safeStart, Math.min(end, content.length))
+      const newText = content.slice(0, safeStart) + content.slice(safeEnd)
+      const delta = safeEnd - safeStart
+
+      // Update mentions: remove overlapped, shift those after
+      const updatedMentions = mentions
+        .filter(m => !(m.endIndex > safeStart && m.startIndex < safeEnd))
+        .map(m => {
+          if (m.startIndex >= safeEnd) {
+            return {
+              ...m,
+              startIndex: m.startIndex - delta,
+              endIndex: m.endIndex - delta,
+            }
+          }
+          return m
+        })
+
+      e.preventDefault()
+      setContent(newText)
+      setMentions(updatedMentions)
+
+      // Restore caret to start of deleted range
+      setTimeout(() => {
+        if (textareaRef.current) {
+          textareaRef.current.focus()
+          textareaRef.current.setSelectionRange(safeStart, safeStart)
+        }
+      }, 0)
+    }
+
+    // Handle Backspace/Delete to delete the entire mention block when inside it
+    if (e.key === 'Backspace') {
+      if (selectionStart === selectionEnd) {
+        // Collapsed caret: prefer deleting mention at cursor if caret is at its start
+        const mentionAtCursor = mentions.find(m => selectionStart >= m.startIndex && selectionStart < m.endIndex)
+        if (mentionAtCursor) {
+          deleteRange(mentionAtCursor.startIndex, mentionAtCursor.endIndex)
+          return
+        }
+
+        // Or if caret is after mention, deleting previous char inside mention
+        const pos = selectionStart - 1
+        if (pos >= 0) {
+          const mentionLeft = mentions.find(m => pos >= m.startIndex && pos < m.endIndex)
+          if (mentionLeft) {
+            deleteRange(mentionLeft.startIndex, mentionLeft.endIndex)
+            return
+          }
+        }
+      } else {
+        // Range selection: if overlaps mention(s), delete whole mention block(s)
+        const { start, end } = expandDeletionToMentions(selectionStart, selectionEnd)
+        if (start !== selectionStart || end !== selectionEnd) {
+          deleteRange(start, end)
+          return
+        }
+      }
+    }
+
+    if (e.key === 'Delete') {
+      if (selectionStart === selectionEnd) {
+        // Collapsed caret: deleting next char
+        const pos = selectionStart
+        const mention = mentions.find(m => pos >= m.startIndex && pos < m.endIndex)
+        if (mention) {
+          deleteRange(mention.startIndex, mention.endIndex)
+          return
+        }
+      } else {
+        // Range selection: if overlaps mention(s), delete whole mention block(s)
+        const { start, end } = expandDeletionToMentions(selectionStart, selectionEnd)
+        if (start !== selectionStart || end !== selectionEnd) {
+          deleteRange(start, end)
+          return
+        }
+      }
+    }
+
+    // Fallback to mention navigation/selection behavior
     handleMentionKeyDown(e)
-  }, [handleMentionKeyDown])
+  }, [content, mentions, handleMentionKeyDown])
 
   const handleSubmit = useCallback(async () => {
     setLoading(true)
