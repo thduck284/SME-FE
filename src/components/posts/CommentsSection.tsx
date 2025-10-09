@@ -1,9 +1,10 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
-import { Button } from "@/components/ui"
+import { useState, useEffect, useCallback, useRef } from "react"
+import { Button, MentionPortal } from "@/components/ui"
 import { Send, Heart, Trash2, Loader2, AlertCircle } from "lucide-react"
 import { useComments } from "@/lib/hooks/useComments"
+import { useMention } from "@/lib/hooks/useMention"
 import { UserService } from "@/lib/api/users/UserService"
 import { formatTimeAgo } from "@/lib/utils/PostUtils"
 import type { Comment as CommentType } from "@/lib/types/posts/CommentsDTO"
@@ -13,13 +14,39 @@ interface CommentsSectionProps {
   postId: string
   isOpen: boolean
   onClose: () => void
+  currentUserId?: string
 }
 
-export function CommentsSection({ postId, isOpen, onClose }: CommentsSectionProps) {
+export function CommentsSection({ postId, isOpen, currentUserId }: CommentsSectionProps) {
   const [comment, setComment] = useState("")
   const [error, setError] = useState<string | null>(null)
   const [optimisticComments, setOptimisticComments] = useState<CommentType[]>([])
   const [userCache, setUserCache] = useState<Map<string, UserMetadata>>(new Map())
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  // Mention functionality
+  const {
+    users: mentionUsers,
+    isLoading: isMentionLoading,
+    showDropdown: showMentionDropdown,
+    selectedIndex: mentionSelectedIndex,
+    handleTextChange: handleMentionTextChange,
+    handleKeyDown: handleMentionKeyDown,
+    selectUser: selectMentionUser,
+    closeDropdown: closeMentionDropdown,
+  } = useMention({
+    currentUserId: currentUserId || '',
+    onMentionAdd: () => {}, // We don't need to track mentions in comments for now
+    onTextChange: (newText, cursorPosition) => {
+      setComment(newText)
+      // Update cursor position after state update
+      setTimeout(() => {
+        if (inputRef.current) {
+          inputRef.current.setSelectionRange(cursorPosition, cursorPosition)
+        }
+      }, 0)
+    }
+  })
   
   const {
     comments,
@@ -243,6 +270,15 @@ export function CommentsSection({ postId, isOpen, onClose }: CommentsSectionProp
         onChange={setComment}
         onClearError={() => setError(null)}
         onSubmit={handleSubmitComment}
+        mentionUsers={mentionUsers}
+        isMentionLoading={isMentionLoading}
+        showMentionDropdown={showMentionDropdown}
+        mentionSelectedIndex={mentionSelectedIndex}
+        onMentionTextChange={handleMentionTextChange}
+        onMentionKeyDown={handleMentionKeyDown}
+        onSelectMentionUser={selectMentionUser}
+        onCloseMentionDropdown={closeMentionDropdown}
+        inputRef={inputRef}
       />
     </div>
   )
@@ -378,22 +414,68 @@ interface CommentInputProps {
   onChange: (value: string) => void
   onClearError: () => void
   onSubmit: (e: React.FormEvent) => void
+  // Mention props
+  mentionUsers: any[]
+  isMentionLoading: boolean
+  showMentionDropdown: boolean
+  mentionSelectedIndex: number
+  onMentionTextChange: (text: string, cursorPosition: number) => void
+  onMentionKeyDown: (e: React.KeyboardEvent) => void
+  onSelectMentionUser: (user: any) => void
+  onCloseMentionDropdown: () => void
+  inputRef: React.RefObject<HTMLInputElement>
 }
 
-function CommentInput({ comment, isAdding, onChange, onClearError, onSubmit }: CommentInputProps) {
+function CommentInput({ 
+  comment, 
+  isAdding, 
+  onChange, 
+  onClearError, 
+  onSubmit,
+  mentionUsers,
+  isMentionLoading,
+  showMentionDropdown,
+  mentionSelectedIndex,
+  onMentionTextChange,
+  onMentionKeyDown,
+  onSelectMentionUser,
+  onCloseMentionDropdown,
+  inputRef
+}: CommentInputProps) {
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value
+    onChange(value)
+    onClearError()
+    onMentionTextChange(value, e.target.selectionStart || 0)
+  }
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    onMentionKeyDown(e)
+  }
+
   return (
     <form onSubmit={onSubmit} className="p-4 border-t border-border/50">
-      <div className="flex gap-2">
+      <div className="flex gap-2 relative">
         <input
+          ref={inputRef}
           type="text"
           value={comment}
-          onChange={(e) => {
-            onChange(e.target.value)
-            onClearError()
-          }}
-          placeholder="Write a comment..."
+          onChange={handleInputChange}
+          onKeyDown={handleKeyDown}
+          placeholder="Write a comment... Type @ to see all users"
           disabled={isAdding}
           className="flex-1 px-3 py-2 text-sm bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:opacity-50 transition-colors"
+        />
+        
+        {/* Mention Portal - Renders outside post container */}
+        <MentionPortal
+          users={mentionUsers}
+          selectedIndex={mentionSelectedIndex}
+          onSelect={onSelectMentionUser}
+          onClose={onCloseMentionDropdown}
+          isLoading={isMentionLoading}
+          inputRef={inputRef}
+          show={showMentionDropdown}
         />
         <Button 
           type="submit" 

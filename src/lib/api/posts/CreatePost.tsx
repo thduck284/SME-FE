@@ -5,10 +5,15 @@ interface CreatePostPayload {
   type?: string
   visibility?: string
   files?: File[]
+  mentions?: Array<{
+    userId: string
+    startIndex: number
+    endIndex: number
+  }>
 }
 
 export async function createPost(payload: CreatePostPayload) {
-  const { content, type, visibility, files } = payload
+  const { content, type, visibility, files, mentions } = payload
 
   if (!content?.trim() && (!files || files.length === 0)) {
     throw new Error("Post cannot be empty")
@@ -19,6 +24,9 @@ export async function createPost(payload: CreatePostPayload) {
   if (type) formData.append("type", type)
   if (visibility) formData.append("visibility", visibility)
   files?.forEach((file) => formData.append("mediaFiles", file))
+  if (mentions && mentions.length > 0) {
+    formData.append("mentions", JSON.stringify(mentions))
+  }
 
   try {
     const res = await apiClient.post("/posts", formData, {

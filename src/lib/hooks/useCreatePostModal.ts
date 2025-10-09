@@ -1,8 +1,10 @@
 import { useState, useRef, useCallback } from "react"
 import { createPost } from "@/lib/api/posts/CreatePost"
+import { useMention } from "./useMention"
 import type { CreatePostDto } from "@/lib/types/posts/CreatePostDto"
+import type { MentionData } from "@/lib/types/users/MentionDto"
 
-export function useCreatePostModal(onClose: () => void, onPostCreated?: () => void) {
+export function useCreatePostModal(onClose: () => void, onPostCreated?: () => void, currentUserId?: string) {
   const [content, setContent] = useState("")
   const type: CreatePostDto["type"] = "ORIGINAL"
   const [visibility, setVisibility] = useState<CreatePostDto["visibility"]>("PUBLIC")
@@ -10,8 +12,33 @@ export function useCreatePostModal(onClose: () => void, onPostCreated?: () => vo
   const [loading, setLoading] = useState(false)
   const [isDragging, setIsDragging] = useState(false)
   const [showEmojiPicker, setShowEmojiPicker] = useState(false)
+  const [mentions, setMentions] = useState<MentionData[]>([])
   const fileInputRef = useRef<HTMLInputElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+
+  // Mention functionality
+  const {
+    users: mentionUsers,
+    isLoading: isMentionLoading,
+    showDropdown: showMentionDropdown,
+    selectedIndex: mentionSelectedIndex,
+    handleTextChange: handleMentionTextChange,
+    handleKeyDown: handleMentionKeyDown,
+    selectUser: selectMentionUser,
+    closeDropdown: closeMentionDropdown,
+  } = useMention({
+    currentUserId: currentUserId || '',
+    onMentionAdd: setMentions,
+    onTextChange: (newText, cursorPosition) => {
+      setContent(newText)
+      // Update cursor position after state update
+      setTimeout(() => {
+        if (textareaRef.current) {
+          textareaRef.current.setSelectionRange(cursorPosition, cursorPosition)
+        }
+      }, 0)
+    }
+  })
 
   const handleFileChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
@@ -59,12 +86,35 @@ export function useCreatePostModal(onClose: () => void, onPostCreated?: () => vo
     }, 0)
   }, [content])
 
+  const handleContentChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const newContent = e.target.value
+    setContent(newContent)
+    handleMentionTextChange(newContent, e.target.selectionStart)
+  }, [handleMentionTextChange])
+
+  const handleTextareaKeyDown = useCallback((e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    handleMentionKeyDown(e)
+  }, [handleMentionKeyDown])
+
   const handleSubmit = useCallback(async () => {
     setLoading(true)
     try {
-      await createPost({ content, type, visibility, files })
+      const mentionData = mentions.map(mention => ({
+        userId: mention.userId,
+        startIndex: mention.startIndex,
+        endIndex: mention.endIndex
+      }))
+      
+      await createPost({ 
+        content, 
+        type, 
+        visibility, 
+        files, 
+        mentions: mentionData.length > 0 ? mentionData : undefined 
+      })
       setContent("")
       setFiles([])
+      setMentions([])
       onPostCreated?.()
       onClose()
     } catch (err) {
@@ -73,7 +123,7 @@ export function useCreatePostModal(onClose: () => void, onPostCreated?: () => vo
     } finally {
       setLoading(false)
     }
-  }, [content, files, onClose, onPostCreated, type, visibility])
+  }, [content, files, mentions, onClose, onPostCreated, type, visibility])
 
   return {
     content,
@@ -84,17 +134,32 @@ export function useCreatePostModal(onClose: () => void, onPostCreated?: () => vo
     files,
     setFiles,
     loading,
+    
     isDragging,
     showEmojiPicker,
     setShowEmojiPicker,
+    
     fileInputRef,
     textareaRef,
+    
     handleFileChange,
     handleRemoveFile,
     handleDragOver,
     handleDragLeave,
     handleDrop,
+    
     handleAddEmoji,
+    
     handleSubmit,
+    
+    mentions,
+    mentionUsers,
+    isMentionLoading,
+    showMentionDropdown,
+    mentionSelectedIndex,
+    handleContentChange,
+    handleTextareaKeyDown,
+    selectMentionUser,
+    closeMentionDropdown,
   }
 }

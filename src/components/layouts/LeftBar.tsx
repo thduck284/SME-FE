@@ -110,6 +110,7 @@ export function LeftBar() {
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         onPostCreated={() => console.log("Post created")}
+        currentUserId="572a51cc-38a3-4225-a7f2-203a514293f5" // TODO: Get from auth context
       />
     </>
   )

@@ -358,7 +358,12 @@ export function PostItem({
           </div>
         </div>
 
-        <CommentsSection postId={post.postId} isOpen={showComments} onClose={() => setShowComments(false)} />
+        <CommentsSection 
+          postId={post.postId} 
+          isOpen={showComments} 
+          onClose={() => setShowComments(false)} 
+          currentUserId="572a51cc-38a3-4225-a7f2-203a514293f5" // TODO: Get from auth context
+        />
       </Card>
 
       <ShareModal isOpen={showShareModal} onClose={() => setShowShareModal(false)}
