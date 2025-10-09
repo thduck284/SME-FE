@@ -1,9 +1,10 @@
 "use client"
 
 import { usePostsReactions } from '@/lib/hooks/usePostReaction'
+import { usePostStats } from '@/lib/hooks/usePostStats'
 import { PostItem } from './PostItem'
 import type { PostFullDto } from "@/lib/types/posts/PostFullDto"
-import { useMemo } from 'react'
+import { useMemo, useEffect } from 'react'
 
 interface PostListProps {
   posts: PostFullDto[]
@@ -14,6 +15,14 @@ interface PostListProps {
 export function PostList({ posts, onOpenImage, onDeletePost }: PostListProps) {
   const postIds = useMemo(() => posts.map(post => post.postId), [posts])
   const { reactions, loading, react, removeReaction } = usePostsReactions(postIds)
+  const { fetchMultiplePostsStats, stats } = usePostStats()
+
+  // Fetch stats for all posts when posts change
+  useEffect(() => {
+    if (postIds.length > 0) {
+      fetchMultiplePostsStats(postIds)
+    }
+  }, [postIds, fetchMultiplePostsStats])
   
 
   const handleReact = async (postId: string, reactionType: string) => {
@@ -40,7 +49,8 @@ export function PostList({ posts, onOpenImage, onDeletePost }: PostListProps) {
           loading={loading}
           onReact={(reactionType) => handleReact(post.postId, reactionType)}
           onDelete={onDeletePost} 
-          isOwnPost={true} 
+          isOwnPost={true}
+          postStats={stats[post.postId]}
         />
       ))}
     </div>

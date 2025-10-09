@@ -10,6 +10,7 @@ import { CommentsSection } from "./CommentsSection"
 import { ShareModal } from "./ShareModal"
 import { PostOptionsMenu } from "./PostOptionsMenu"
 import { MessageCircle, Share, Repeat2, Lock, ThumbsUp } from "lucide-react"
+import type { PostStats } from "@/lib/api/posts/PostStats"
 
 interface PostItemProps {
   post: PostFullDto
@@ -25,6 +26,7 @@ interface PostItemProps {
   onPin?: (postId: string) => void
   onHide?: (postId: string) => void
   onReport?: (postId: string) => void
+  postStats?: PostStats
 }
 
 export function PostItem({ 
@@ -40,12 +42,16 @@ export function PostItem({
   onSave = () => {},
   onPin = () => {},
   onHide = () => {},
-  onReport = () => {}
+  onReport = () => {},
+  postStats
 }: PostItemProps) {
   const [showComments, setShowComments] = useState(false)
   const [isReacting, setIsReacting] = useState(false)
   const [showReactionPicker, setShowReactionPicker] = useState(false)
   const [showShareModal, setShowShareModal] = useState(false)
+  
+  // Debug log
+  console.log('📊 PostItem postStats:', postStats, 'for postId:', post.postId)
   
   const hideTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
@@ -325,8 +331,12 @@ export function PostItem({
               )}
             </div>
             <div className="flex items-center gap-3">
-              <span className="hover:underline cursor-pointer">9999 comments</span>
-              <span className="hover:underline cursor-pointer">1233 shares</span>
+              <span className="hover:underline cursor-pointer">
+                {postStats ? `${postStats.commentCount || 0} comments` : '... comments'}
+              </span>
+              <span className="hover:underline cursor-pointer">
+                {postStats ? `${postStats.shareCount || 0} shares` : '... shares'}
+              </span>
             </div>
           </div>
         )}
@@ -335,8 +345,16 @@ export function PostItem({
         <div className="px-2 py-1 border-t border-gray-200 dark:border-gray-700">
           <div className="flex items-center gap-1">
             <ReactionButton />
-            <ActionBtn icon={MessageCircle} label="Comment" onClick={() => setShowComments(!showComments)} />
-            <ActionBtn icon={Share} label="Share" onClick={() => setShowShareModal(true)} />
+            <ActionBtn 
+              icon={MessageCircle} 
+              label={`Comment${postStats ? ` (${postStats.commentCount || 0})` : ''}`} 
+              onClick={() => setShowComments(!showComments)} 
+            />
+            <ActionBtn 
+              icon={Share} 
+              label={`Share${postStats ? ` (${postStats.shareCount || 0})` : ''}`} 
+              onClick={() => setShowShareModal(true)} 
+            />
           </div>
         </div>
 
