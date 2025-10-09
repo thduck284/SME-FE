@@ -1,8 +1,8 @@
 import apiClient from "@/lib/services/ApiClient"
-import { useAuthContext } from '@/lib/context/AuthContext'
+import { getUserId } from '@/lib/context/AuthContext'
 
 export const getPostsByUser = async (limit?: number, cursor?: string) => {
-  const userId = useAuthContext().userId || ''
+  const userId = getUserId || ''
   const params: Record<string, any> = {}
   
   if (limit) params.fetchSize = limit  
@@ -13,7 +13,7 @@ export const getPostsByUser = async (limit?: number, cursor?: string) => {
 }
 
 export const getPostsCount = async () => {
-  const userId = useAuthContext().userId || ''
+  const userId = getUserId || ''
   const res = await apiClient.get(`/posts/user/${userId}/count`)
   return res.data
 }

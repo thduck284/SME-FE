@@ -1,6 +1,7 @@
 import { UserRelationshipsResponseDto } from '@/lib/types/Relationship'
+import { getUserId } from '@/lib/context/AuthContext'
 
-const userId = "572a51cc-38a3-4225-a7f2-203a514293f5";
+const userId = getUserId || ''
 
 export const relationshipService = {
   async getFollowers(): Promise<UserRelationshipsResponseDto> {

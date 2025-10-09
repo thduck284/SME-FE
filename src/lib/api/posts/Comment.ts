@@ -1,4 +1,3 @@
-import { injectToken } from "@/lib/api/auth/Interceptor"
 import type { Comment, CommentsResponse, CreateCommentRequest } from "@/lib/types/posts/CommentsDTO"
 
 export const commentApi = {
@@ -11,15 +10,13 @@ export const commentApi = {
     
     if (limit) params.fetchSize = limit  
     if (cursor) params.pageState = cursor  
-    
-    const config = injectToken({
+
+    const res = await fetch(`/comments/post/${postId}?${new URLSearchParams(params)}`, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
       },
     })
-
-    const res = await fetch(`/comments/post/${postId}?${new URLSearchParams(params)}`, config)
     
     if (!res.ok) {
       const errorText = await res.text()
@@ -43,16 +40,14 @@ export const commentApi = {
     if (data.mentions && data.mentions.length > 0) {
       requestData.mentions = data.mentions
     }
-    
-    const config = injectToken({
+
+    const res = await fetch('/comments', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(requestData),
     })
-
-    const res = await fetch('/comments', config)
     
     if (!res.ok) {
       const errorText = await res.text()
@@ -63,14 +58,12 @@ export const commentApi = {
   },
 
   likeComment: async (commentId: string): Promise<{ likes: number; isLiked: boolean }> => {
-    const config = injectToken({
+    const res = await fetch(`/comments/${commentId}/like`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
     })
-
-    const res = await fetch(`/comments/${commentId}/like`, config)
     
     if (!res.ok) {
       const errorText = await res.text()
@@ -81,14 +74,12 @@ export const commentApi = {
   },
 
   deleteComment: async (commentId: string): Promise<void> => {
-    const config = injectToken({
+    const res = await fetch(`/comments/${commentId}`, {
       method: 'DELETE',
       headers: {
         'Content-Type': 'application/json',
       },
     })
-
-    const res = await fetch(`/comments/${commentId}`, config)
     
     if (!res.ok) {
       const errorText = await res.text()

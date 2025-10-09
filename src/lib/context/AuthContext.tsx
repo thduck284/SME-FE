@@ -58,3 +58,8 @@ export const decodeJWT = (token: string) => {
     return null
   }
 }
+
+export const getUserId = (): string | null => {
+  const { userId } = useAuthContext()
+  return userId
+}

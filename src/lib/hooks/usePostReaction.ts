@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { reactionService } from '@/lib/api/posts/Reaction'
-import { useAuthContext } from '@/lib/context/AuthContext'
+import { getUserId } from '@/lib/context/AuthContext'
 
 interface ReactionState {
   userReaction: string | null
@@ -21,7 +21,7 @@ export const usePostsReactions = (postIds: string[]): UsePostsReactionsReturn =>
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  const userId  = useAuthContext().userId || ''
+  const userId = getUserId() || ''
 
   const fetchReactions = useCallback(async () => {
     if (postIds.length === 0) {

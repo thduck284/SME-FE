@@ -1,5 +1,4 @@
 import { ReactionsMetaResponse, ReactDto, ReactionMeta } from "@/lib/types/posts/Reaction"
-import { injectToken } from "@/lib/api/auth/Interceptor"
 
 export const reactionService = {
   async getPostsReactions(userId: string, postIds: string[]): Promise<ReactionsMetaResponse> {
@@ -12,14 +11,12 @@ export const reactionService = {
       params.append('targetIds', id);
     });
 
-    const config = injectToken({
+    const res = await fetch(`/reaction/metadata?${params.toString()}`, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
       },
     })
-
-    const res = await fetch(`/reaction/metadata?${params.toString()}`, config)
     
     if (!res.ok) {
       const errorText = await res.text();
@@ -36,15 +33,13 @@ export const reactionService = {
   },
 
   async react(dto: ReactDto): Promise<void> {
-    const config = injectToken({
+    const res = await fetch(`/reaction`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(dto),
     })
-
-    const res = await fetch(`/reaction`, config)
     
     if (!res.ok) {
       const errorText = await res.text();
@@ -53,14 +48,12 @@ export const reactionService = {
   },
 
   async removeReaction(targetId: string, targetType: string, userId: string): Promise<void> {
-    const config = injectToken({
+    const res = await fetch(`/reaction/${targetId}/${targetType}/${userId}`, {
       method: 'DELETE',
       headers: {
         'Content-Type': 'application/json',
       },
     })
-
-    const res = await fetch(`/reaction/${targetId}/${targetType}/${userId}`, config)
     
     if (!res.ok) {
       const errorText = await res.text();

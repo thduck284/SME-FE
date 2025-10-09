@@ -5,7 +5,6 @@ import {
   AddRoleDto, 
   AuthResponseDto, 
 } from '@/lib/types/auth/Auth';
-import { injectToken } from './Interceptor';
 
 export const authService = {
   async register(body: RegisterDto): Promise<void> {
@@ -58,15 +57,11 @@ export const authService = {
   },
 
   async logout(body: TokenActionRequestDto): Promise<void> {
-    const config = injectToken({
+    const res = await fetch(`/auth/logout`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-    });
-
-    const res = await fetch(`/auth/logout`, {
-      ...config,
       body: JSON.stringify(body),
     });
     
@@ -77,15 +72,11 @@ export const authService = {
   },
 
   async assignRole(body: AddRoleDto): Promise<void> {
-    const config = injectToken({
+    const res = await fetch(`/auth/assign-role`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-    });
-
-    const res = await fetch(`/auth/assign-role`, {
-      ...config,
       body: JSON.stringify(body),
     });
     
@@ -96,14 +87,12 @@ export const authService = {
   },
 
   async getProfile(): Promise<any> {
-    const config = injectToken({
+    const res = await fetch(`/auth/profile`, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
       },
     });
-
-    const res = await fetch(`/auth/profile`, config);
     
     if (!res.ok) {
       const errorText = await res.text();

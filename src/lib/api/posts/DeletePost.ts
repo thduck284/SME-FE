@@ -1,16 +1,12 @@
-import { injectToken } from "@/lib/api/auth/Interceptor"
-
 export const deleteApi = {
   deletePost: async (postId: string): Promise<void> => {
     try {
-      const config = injectToken({
+      const res = await fetch(`/posts/${postId}`, {
         method: 'DELETE',
         headers: {
           'Content-Type': 'application/json',
         },
       })
-      
-      const res = await fetch(`/posts/${postId}`, config)
       
       if (!res.ok) {
         const errorText = await res.text()

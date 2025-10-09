@@ -1,4 +1,3 @@
-import { injectToken } from "@/lib/api/auth/Interceptor"
 import type { PostFullDto } from "@/lib/types/posts/PostFullDto"
 import type { CreatePostDto } from "@/lib/types/posts/CreatePostDto"
 
@@ -26,13 +25,10 @@ export const shareApi = {
       formData.append('mentions', JSON.stringify(data.mentions))
     }
 
-    // Sử dụng injectToken - KHÔNG set Content-Type header
-    const config = injectToken({
+    const res = await fetch(`/posts/${rootPostId}/share`, {
       method: 'POST',
       body: formData,
     })
-
-    const res = await fetch(`/posts/${rootPostId}/share`, config)
     
     if (!res.ok) {
       const errorText = await res.text()

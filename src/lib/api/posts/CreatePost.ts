@@ -1,5 +1,3 @@
-import { injectToken } from "@/lib/api/auth/Interceptor"
-
 interface CreatePostPayload {
   content?: string
   type?: string
@@ -21,17 +19,17 @@ export async function createPost(payload: CreatePostPayload) {
   files?.forEach((file) => formData.append("mediaFiles", file))
 
   try {
-    const config = injectToken({
+    const res = await fetch("/posts", {
       method: "POST",
       body: formData,
     })
-
-    const res = await fetch("/posts", config)
     
     if (!res.ok) {
       const errorText = await res.text()
       throw new Error(`Create post failed: ${res.statusText} - ${errorText}`)
     }
+
+    console.log("Post", res)
     
     return await res.json()
   } catch (error: any) {
