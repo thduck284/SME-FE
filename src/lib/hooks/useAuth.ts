@@ -7,6 +7,35 @@ export const useAuth = () => {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
+  const storeTokens = (result: any) => {
+    localStorage.setItem('accessToken', result.accessToken);
+    localStorage.setItem('refreshToken', result.refreshToken);
+    localStorage.setItem('tokenExpires', (Date.now() + result.expiresIn * 1000).toString());
+  };
+
+  const clearTokens = () => {
+    localStorage.removeItem('accessToken');
+    localStorage.removeItem('refreshToken');
+    localStorage.removeItem('tokenExpires');
+  };
+
+  const refreshToken = async (): Promise<boolean> => {
+    const refreshToken = localStorage.getItem('refreshToken');
+    if (!refreshToken) {
+      clearTokens();
+      return false;
+    }
+
+    try {
+      const result = await authService.refreshToken({ refreshToken });
+      storeTokens(result);
+      return true;
+    } catch (error) {
+      clearTokens();
+      return false;
+    }
+  };
+
   const register = async (data: RegisterDto) => {
     setLoading(true);
     setError(null);
@@ -28,7 +57,6 @@ export const useAuth = () => {
       let message = 'Registration failed';
       
       try {
-        // Tìm JSON trong error message
         const jsonMatch = err?.message?.match(/\{.*\}/);
         if (jsonMatch) {
           const errorData = JSON.parse(jsonMatch[0]);
@@ -37,7 +65,6 @@ export const useAuth = () => {
           message = err?.message || message;
         }
       } catch {
-        // Nếu parse JSON thất bại, dùng message gốc
         message = err?.message || message;
       }
       
@@ -54,11 +81,28 @@ export const useAuth = () => {
     setSuccess(null);
     try {
       const result = await authService.login(data);
+      
+      // Store tokens after successful login
+      storeTokens(result);
+      
       setSuccess('Login successful!');
       return { success: true, data: result };
     } catch (err: any) {
-      // Sử dụng message từ API
-      const message = 'Login failed';
+      // Parse JSON message từ API
+      let message = 'Login failed';
+      
+      try {
+        const jsonMatch = err?.message?.match(/\{.*\}/);
+        if (jsonMatch) {
+          const errorData = JSON.parse(jsonMatch[0]);
+          message = errorData.message || message;
+        } else {
+          message = err?.message || message;
+        }
+      } catch {
+        message = err?.message || message;
+      }
+      
       setError(message);
       return { success: false };
     } finally {
@@ -66,16 +110,25 @@ export const useAuth = () => {
     }
   };
 
-  const logout = async (refreshToken: string) => {
+  const logout = async () => {
     setLoading(true);
     setError(null);
     setSuccess(null);
     try {
-      await authService.logout({ refreshToken });
+      const refreshToken = localStorage.getItem('refreshToken');
+      if (refreshToken) {
+        await authService.logout({ refreshToken });
+      }
+      
+      // Clear tokens from storage
+      clearTokens();
+      
       setSuccess('Logout successful!');
       return { success: true };
     } catch (err: any) {
-      // Sử dụng message từ API
+      // Even if logout API fails, clear local tokens
+      clearTokens();
+      
       const message = 'Logout failed';
       setError(message);
       return { success: false };
@@ -84,7 +137,7 @@ export const useAuth = () => {
     }
   };
 
-  const refreshToken = async (refreshToken: string) => {
+  const refreshTokenMethod = async (refreshToken: string) => {
     setLoading(true);
     setError(null);
     setSuccess(null);
@@ -93,8 +146,7 @@ export const useAuth = () => {
       setSuccess('Token refreshed successfully!');
       return { success: true, data: result };
     } catch (err: any) {
-      // Sử dụng message từ API
-      const message = err?.message || 'Token refresh failed';
+      const message = 'Token refresh failed';
       setError(message);
       return { success: false };
     } finally {
@@ -111,8 +163,7 @@ export const useAuth = () => {
       setSuccess('Token verified successfully!');
       return { success: true, data: result };
     } catch (err: any) {
-      // Sử dụng message từ API
-      const message = err?.message || 'Token verification failed';
+      const message = 'Token verification failed';
       setError(message);
       return { success: false };
     } finally {
@@ -129,13 +180,28 @@ export const useAuth = () => {
       setSuccess('Role assigned successfully!');
       return { success: true };
     } catch (err: any) {
-      // Sử dụng message từ API
-      const message = err?.message || 'Role assignment failed';
+      const message = 'Role assignment failed';
       setError(message);
       return { success: false };
     } finally {
       setLoading(false);
     }
+  };
+
+  // Check if user is authenticated
+  const isAuthenticated = (): boolean => {
+    const token = localStorage.getItem('accessToken');
+    const expires = localStorage.getItem('tokenExpires');
+    
+    if (!token || !expires) return false;
+    
+    // Check if token is expired
+    return Date.now() < parseInt(expires);
+  };
+
+  // Get current access token
+  const getAccessToken = (): string | null => {
+    return localStorage.getItem('accessToken');
   };
 
   const clearError = () => setError(null);
@@ -150,8 +216,11 @@ export const useAuth = () => {
     register,
     login,
     logout,
-    refreshToken,
+    refreshToken: refreshTokenMethod,
     verifyToken,
     assignRole,
+    isAuthenticated,
+    getAccessToken,
+    autoRefreshToken: refreshToken, // Internal auto refresh
   };
 };

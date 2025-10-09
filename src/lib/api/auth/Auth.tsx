@@ -7,6 +7,7 @@ import {
   AuthResponseDto, 
   TokenVerifyResponseDto 
 } from '@/lib/types/auth/Auth';
+import { injectToken } from './Interceptor';
 
 export const authService = {
   async register(body: RegisterDto): Promise<void> {
@@ -59,11 +60,15 @@ export const authService = {
   },
 
   async logout(body: TokenActionRequestDto): Promise<void> {
-    const res = await fetch(`/auth/logout`, {
+    const config = injectToken({
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
+    });
+
+    const res = await fetch(`/auth/logout`, {
+      ...config,
       body: JSON.stringify(body),
     });
     
@@ -74,11 +79,15 @@ export const authService = {
   },
 
   async verifyToken(body: TokenVerifyDto): Promise<TokenVerifyResponseDto> {
-    const res = await fetch(`/auth/verify-token`, {
+    const config = injectToken({
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
+    });
+
+    const res = await fetch(`/auth/verify-token`, {
+      ...config,
       body: JSON.stringify(body),
     });
     
@@ -91,11 +100,15 @@ export const authService = {
   },
 
   async assignRole(body: AddRoleDto): Promise<void> {
-    const res = await fetch(`/auth/assign-role`, {
+    const config = injectToken({
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
+    });
+
+    const res = await fetch(`/auth/assign-role`, {
+      ...config,
       body: JSON.stringify(body),
     });
     
@@ -103,5 +116,23 @@ export const authService = {
       const errorText = await res.text();
       throw new Error(`Role assignment failed: ${res.statusText} - ${errorText}`);
     }
-  }
+  },
+
+  async getProfile(): Promise<any> {
+    const config = injectToken({
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+
+    const res = await fetch(`/auth/profile`, config);
+    
+    if (!res.ok) {
+      const errorText = await res.text();
+      throw new Error(`Get profile failed: ${res.statusText} - ${errorText}`);
+    }
+    
+    return await res.json();
+  },
 };
