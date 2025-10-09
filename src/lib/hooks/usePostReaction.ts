@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { reactionService } from '@/lib/api/posts/Reaction'
+import { useAuthContext } from '@/lib/context/AuthContext'
 
 interface ReactionState {
   userReaction: string | null
@@ -20,7 +21,7 @@ export const usePostsReactions = (postIds: string[]): UsePostsReactionsReturn =>
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  const userId = "572a51cc-38a3-4225-a7f2-203a514293f5" 
+  const userId  = useAuthContext().userId || ''
 
   const fetchReactions = useCallback(async () => {
     if (postIds.length === 0) {
@@ -50,7 +51,7 @@ export const usePostsReactions = (postIds: string[]): UsePostsReactionsReturn =>
     } finally {
       setLoading(false)
     }
-  }, [postIds.join(',')]) 
+  }, [postIds.join(','), userId]) 
 
   const react = useCallback(async (postId: string, reactionType: string) => {
     setError(null)
@@ -93,13 +94,12 @@ export const usePostsReactions = (postIds: string[]): UsePostsReactionsReturn =>
       })
 
     } catch (err) {
-      // Rollback nếu lỗi
       setReactions(prevReactions)
       setError(err instanceof Error ? err.message : 'Failed to react')
       console.error('Error reacting:', err)
       throw err
     }
-  }, [userId]) // Chỉ phụ thuộc vào userId
+  }, [userId, reactions])
 
   const removeReaction = useCallback(async (postId: string) => {
     if (!reactions[postId] || !reactions[postId].userReaction) return
@@ -110,7 +110,6 @@ export const usePostsReactions = (postIds: string[]): UsePostsReactionsReturn =>
     const oldReaction = reactions[postId].userReaction
 
     try {
-      // Optimistic update
       setReactions(prev => {
         const newReactions = { ...prev }
         
@@ -132,15 +131,13 @@ export const usePostsReactions = (postIds: string[]): UsePostsReactionsReturn =>
 
       await reactionService.removeReaction(postId, 'POST', userId)
 
-      // Không refetch ngay lập tức
-
     } catch (err) {
       setReactions(prevReactions)
       setError(err instanceof Error ? err.message : 'Failed to remove reaction')
       console.error('Error removing reaction:', err)
       throw err
     }
-  }, [userId, reactions]) // Phụ thuộc vào reactions và userId
+  }, [userId, reactions])
 
   useEffect(() => {
     fetchReactions()
