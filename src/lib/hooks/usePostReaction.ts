@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { reactionService } from '@/lib/api/posts/Reaction'
-import { getUserId } from '@/lib/context/AuthContext'
+import { getUserId } from '@/lib/utils/Jwt'
 
 interface ReactionState {
   userReaction: string | null

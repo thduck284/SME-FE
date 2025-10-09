@@ -23,15 +23,26 @@ export async function createPost(payload: CreatePostPayload) {
       method: "POST",
       body: formData,
     })
-    
-    if (!res.ok) {
-      const errorText = await res.text()
-      throw new Error(`Create post failed: ${res.statusText} - ${errorText}`)
+
+    const contentType = res.headers.get("content-type")
+    let data
+
+    if (contentType && contentType.includes("application/json")) {
+      data = await res.json()
+    } else {
+      data = await res.text()
+      if (typeof data === 'string') {
+        data = { postId: data }
+      }
     }
 
-    console.log("Post", res)
+    if (!res.ok) {
+      throw new Error(data?.message || `Create post failed: ${res.status}`)
+    }
+
+    console.log("Post created:", data)
+    return data
     
-    return await res.json()
   } catch (error: any) {
     const message = error.message || "Failed to create post"
     throw new Error(message)

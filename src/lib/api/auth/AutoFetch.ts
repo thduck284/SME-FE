@@ -1,20 +1,31 @@
-import { useAuthContext } from '@/lib/context/AuthContext'
+// lib/api/auth/AutoFetch.ts
+declare global {
+  interface Window {
+    _originalFetch?: typeof fetch;
+  }
+}
 
-export const authFetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
-  const url = input.toString();
+if (typeof window !== 'undefined' && !window._originalFetch) {
+  window._originalFetch = window.fetch;
   
-  const excludeRoutes = ['/auth/login', '/auth/register'];
-  const shouldExclude = excludeRoutes.some(route => url.includes(route));
+  window.fetch = async (input: any, init?: RequestInit): Promise<Response> => {
+    const url = input.toString();
+    
+    const excludeRoutes = ['/auth/login', '/auth/register'];
+    const shouldExclude = excludeRoutes.some(route => url.includes(route));
 
-  const token = useAuthContext().accessToken || '';
-  
-  const config: RequestInit = {
-    ...init,
-    headers: {
-      ...init?.headers,
-      ...(token && !shouldExclude && { Authorization: `Bearer ${token}` })
-    }
+    const token = localStorage.getItem('accessToken');
+
+    const config: RequestInit = {
+      ...init,
+      headers: {
+        ...init?.headers,
+        ...(token && !shouldExclude && { Authorization: `Bearer ${token}` })
+      }
+    };
+
+    return window._originalFetch!(input, config);
   };
-  
-  return fetch(input, config);
-};
+}
+
+export {};
