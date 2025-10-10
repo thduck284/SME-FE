@@ -1,4 +1,3 @@
-// lib/api/auth/AutoFetch.ts
 declare global {
   interface Window {
     _originalFetch?: typeof fetch;

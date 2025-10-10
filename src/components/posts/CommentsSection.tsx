@@ -1,11 +1,12 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useRef } from "react"
 import { Button } from "@/components/ui"
-import { Send, Heart, Trash2, Loader2, AlertCircle } from "lucide-react"
+import { Send, Heart, Trash2, Loader2, AlertCircle, ChevronDown } from "lucide-react"
 import { useComments } from "@/lib/hooks/useComments"
 import { UserService } from "@/lib/api/users/UserService"
 import { formatTimeAgo } from "@/lib/utils/PostUtils"
+import { getUserId } from "@/lib/utils/Jwt" 
 import type { Comment as CommentType } from "@/lib/types/posts/CommentsDTO"
 import type { UserMetadata } from "@/lib/types/User"
 
@@ -20,21 +21,29 @@ export function CommentsSection({ postId, isOpen, onClose }: CommentsSectionProp
   const [error, setError] = useState<string | null>(null)
   const [optimisticComments, setOptimisticComments] = useState<CommentType[]>([])
   const [userCache, setUserCache] = useState<Map<string, UserMetadata>>(new Map())
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null)
+  const fetchingRef = useRef<Set<string>>(new Set())
+  const commentsContainerRef = useRef<HTMLDivElement>(null)
   
   const {
     comments,
     isLoading,
     isAdding,
     isLiking,
+    pagination,
     fetchComments,
+    loadMoreComments,
     addComment,
     toggleLikeComment,
     deleteComment
   } = useComments(postId)
 
-  // Sử dụng UserService.getUserMetadata thay vì useUsers hook
+  // ✅ Get current user ID on mount
+  useEffect(() => {
+    const userId = getUserId()
+    setCurrentUserId(userId)
+  }, [])
 
-  // Combine comments from API and optimistic updates, ensuring unique IDs
   const displayComments = [...optimisticComments, ...comments]
     .filter(Boolean)
     .reduce((acc, comment) => {
@@ -44,21 +53,27 @@ export function CommentsSection({ postId, isOpen, onClose }: CommentsSectionProp
       return acc
     }, [] as CommentType[])
 
-  // Fetch comments when section opens
   useEffect(() => {
     if (isOpen && postId) {
       setError(null)
       setOptimisticComments([])
-      fetchComments(10)
+      fetchComments(5)
     }
   }, [isOpen, postId, fetchComments])
 
-  // Fetch user metadata for comments
   useEffect(() => {
     const fetchUserMetadata = async () => {
       const commentsToFetch = displayComments
-        .filter(comment => comment && !userCache.has(comment.authorId))
-        .slice(0, 10) // Limit concurrent requests
+        .filter(comment => {
+          if (!comment || !comment.authorId) return false
+          return !userCache.has(comment.authorId) && 
+                 !fetchingRef.current.has(comment.authorId)
+        })
+        .slice(0, 5)
+
+      if (commentsToFetch.length === 0) return
+
+      commentsToFetch.forEach(c => fetchingRef.current.add(c.authorId))
 
       const userPromises = commentsToFetch.map(async (comment) => {
         try {
@@ -70,42 +85,57 @@ export function CommentsSection({ postId, isOpen, onClose }: CommentsSectionProp
         }
       })
 
-      const results = await Promise.all(userPromises)
-      const newCache = new Map(userCache)
-      
-      results.forEach(result => {
-        if (result?.userMetadata) {
-          newCache.set(result.authorId, result.userMetadata)
-        }
-      })
-      
-      setUserCache(newCache)
+      try {
+        const results = await Promise.all(userPromises)
+        const newCache = new Map(userCache)
+        
+        results.forEach(result => {
+          if (result?.userMetadata) {
+            newCache.set(result.authorId, result.userMetadata)
+          }
+        })
+        
+        setUserCache(newCache)
+      } finally {
+        commentsToFetch.forEach(c => fetchingRef.current.delete(c.authorId))
+      }
     }
 
     if (displayComments.length > 0) {
       fetchUserMetadata()
     }
-  }, [displayComments, userCache])
+  }, [displayComments.length])
 
-  // Helper functions
+  const handleScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
+    const container = e.currentTarget
+    const isNearBottom = container.scrollHeight - (container.scrollTop + container.clientHeight) < 100
+
+    if (isNearBottom && pagination.hasMore && !isLoading) {
+      loadMoreComments()
+    }
+  }, [pagination.hasMore, isLoading, loadMoreComments])
+
   const getUserFromCache = useCallback((authorId: string): UserMetadata | undefined => 
     userCache.get(authorId), [userCache])
 
   const isTempComment = useCallback((comment: CommentType): boolean => 
     comment?.id?.startsWith?.('temp-') || false, [])
 
+  const isOwnComment = useCallback((comment: CommentType): boolean => {
+    return currentUserId ? comment.authorId === currentUserId : false
+  }, [currentUserId])
+
   const getDisplayInfo = useCallback((comment: CommentType) => {
     const userMetadata = getUserFromCache(comment.authorId)
-    const displayName = comment.authorName === 'You' ? 'You' : 
+    const displayName = isOwnComment(comment) ? 'You' : 
                        (userMetadata ? `${userMetadata.firstName} ${userMetadata.lastName}`.trim() : comment.authorName || 'Unknown User')
     const avatarUrl = userMetadata?.avtUrl || comment.authorAvatar
     const fullName = userMetadata ? `${userMetadata.firstName} ${userMetadata.lastName}`.trim() : 
                     comment.authorName || 'Unknown User'
 
     return { displayName, avatarUrl, fullName }
-  }, [getUserFromCache])
+  }, [getUserFromCache, isOwnComment])
 
-  // Comment handlers
   const handleSubmitComment = async (e: React.FormEvent) => {
     e.preventDefault()
     
@@ -119,7 +149,7 @@ export function CommentsSection({ postId, isOpen, onClose }: CommentsSectionProp
     const tempComment: CommentType = {
       id: `temp-${Date.now()}`,
       content: comment,
-      authorId: 'current-user',
+      authorId: currentUserId || 'current-user',
       authorName: 'You',
       authorAvatar: undefined,
       createdAt: new Date().toISOString(),
@@ -135,7 +165,6 @@ export function CommentsSection({ postId, isOpen, onClose }: CommentsSectionProp
     try {
       const newComment = await addComment(currentComment)
       
-      // Cache user metadata for new comment
       if (newComment.authorId) {
         try {
           const userMetadata = await UserService.getUserMetadata(newComment.authorId)
@@ -149,10 +178,8 @@ export function CommentsSection({ postId, isOpen, onClose }: CommentsSectionProp
       
     } catch (error: any) {
       console.error('Failed to submit comment:', error)
-      
       setOptimisticComments(prev => prev.filter(c => c.id !== tempComment.id))
       setComment(currentComment)
-      
       const errorMessage = error.response?.data?.message || error.message || 'Failed to post comment'
       setError(errorMessage)
     }
@@ -185,7 +212,6 @@ export function CommentsSection({ postId, isOpen, onClose }: CommentsSectionProp
 
   return (
     <div className="border-t border-border/50 bg-muted/30">
-      {/* Error Message */}
       {error && (
         <div className="mx-4 mt-3 p-3 bg-red-50 border border-red-200 rounded-lg flex items-center gap-2 text-red-700 text-sm">
           <AlertCircle className="h-4 w-4 flex-shrink-0" />
@@ -201,8 +227,11 @@ export function CommentsSection({ postId, isOpen, onClose }: CommentsSectionProp
         </div>
       )}
 
-      {/* Comments List */}
-      <div className="max-h-60 overflow-y-auto p-4 space-y-3">
+      <div 
+        ref={commentsContainerRef}
+        onScroll={handleScroll}
+        className="max-h-60 overflow-y-auto p-4 space-y-3"
+      >
         {isLoading && displayComments.length === 0 ? (
           <div className="flex justify-center items-center py-8">
             <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
@@ -213,30 +242,53 @@ export function CommentsSection({ postId, isOpen, onClose }: CommentsSectionProp
             No comments yet. Be the first to comment!
           </div>
         ) : (
-          displayComments.map((comment, index) => {
-            if (!comment) return null
+          <>
+            {displayComments.map((comment, index) => {
+              if (!comment) return null
+              
+              const tempComment = isTempComment(comment)
+              const isOwn = isOwnComment(comment)
+              const { displayName, avatarUrl, fullName } = getDisplayInfo(comment)
+              
+              return (
+                <CommentItem
+                  key={comment.id || `comment-${index}-${comment.authorId}`}
+                  comment={comment}
+                  isTemp={tempComment}
+                  isOwn={isOwn}
+                  displayName={displayName}
+                  avatarUrl={avatarUrl}
+                  fullName={fullName}
+                  isLiking={isLiking}
+                  onLike={handleLikeComment}
+                  onDelete={handleDeleteComment}
+                />
+              )
+            })}
             
-            const tempComment = isTempComment(comment)
-            const { displayName, avatarUrl, fullName } = getDisplayInfo(comment)
+            {pagination.hasMore && !isLoading && (
+              <div className="flex justify-center pt-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={loadMoreComments}
+                  className="text-muted-foreground hover:text-foreground"
+                >
+                  <ChevronDown className="h-4 w-4 mr-1" />
+                  Load more
+                </Button>
+              </div>
+            )}
             
-            return (
-              <CommentItem
-                key={comment.id || `comment-${index}-${comment.authorId}`}
-                comment={comment}
-                isTemp={tempComment}
-                displayName={displayName}
-                avatarUrl={avatarUrl}
-                fullName={fullName}
-                isLiking={isLiking}
-                onLike={handleLikeComment}
-                onDelete={handleDeleteComment}
-              />
-            )
-          })
+            {isLoading && displayComments.length > 0 && (
+              <div className="flex justify-center py-2">
+                <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+              </div>
+            )}
+          </>
         )}
       </div>
 
-      {/* Comment Input */}
       <CommentInput
         comment={comment}
         isAdding={isAdding}
@@ -248,10 +300,10 @@ export function CommentsSection({ postId, isOpen, onClose }: CommentsSectionProp
   )
 }
 
-// Sub-components for better organization
 interface CommentItemProps {
   comment: CommentType
   isTemp: boolean
+  isOwn: boolean
   displayName: string
   avatarUrl?: string
   fullName?: string
@@ -263,6 +315,7 @@ interface CommentItemProps {
 function CommentItem({ 
   comment, 
   isTemp, 
+  isOwn,
   displayName, 
   avatarUrl, 
   fullName, 
@@ -272,7 +325,6 @@ function CommentItem({
 }: CommentItemProps) {
   return (
     <div className={`flex gap-3 ${isTemp ? 'opacity-70' : ''}`}>
-      {/* Avatar */}
       <div className="flex-shrink-0">
         {avatarUrl ? (
           <img
@@ -287,14 +339,12 @@ function CommentItem({
         )}
       </div>
       
-      {/* Content */}
       <div className="flex-1 min-w-0">
         <div className="flex items-start justify-between gap-2">
           <div className="flex-1">
-            <div className="flex items-center gap-2 mb-1">
-              {/* Name with tooltip */}
-              {fullName ? (
-                <div className="group relative">
+            <div className="flex items-center gap-2 mb-1 flex-wrap">
+              {fullName && fullName !== 'Unknown User' ? (
+                <div className="group relative inline-block">
                   <span className="font-medium text-sm text-foreground cursor-help">
                     {displayName}
                   </span>
@@ -308,11 +358,7 @@ function CommentItem({
                 </span>
               )}
               
-              {isTemp && (
-                <span className="ml-2 text-xs text-muted-foreground">
-                  (Posting...)
-                </span>
-              )}
+              {isTemp && <span className="text-xs text-muted-foreground">(Posting...)</span>}
               
               <span className="text-xs text-muted-foreground">
                 {isTemp ? 'Just now' : formatTimeAgo(comment.createdAt)}
@@ -324,7 +370,7 @@ function CommentItem({
             </p>
           </div>
           
-          {!isTemp && (
+          {!isTemp && isOwn && (
             <Button
               variant="ghost"
               size="sm"
@@ -337,7 +383,6 @@ function CommentItem({
           )}
         </div>
         
-        {/* Actions */}
         {!isTemp && (
           <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
             <button 
@@ -354,13 +399,9 @@ function CommentItem({
               )}
               <span>{comment.likes || 0}</span>
             </button>
-            <button className="hover:text-foreground transition-colors">
-              Reply
-            </button>
           </div>
         )}
         
-        {/* Loading for temp comments */}
         {isTemp && (
           <div className="flex items-center gap-2 mt-2 text-xs text-muted-foreground">
             <Loader2 className="h-3 w-3 animate-spin" />
@@ -404,7 +445,7 @@ function CommentInput({ comment, isAdding, onChange, onClearError, onSubmit }: C
           {isAdding ? (
             <>
               <Loader2 className="h-4 w-4 animate-spin" />
-              <span>Posting...</span>
+              <span>Post</span>
             </>
           ) : (
             <>
