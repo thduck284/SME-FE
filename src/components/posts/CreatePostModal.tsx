@@ -3,7 +3,7 @@
 import { useState } from "react"
 import { X, ImageIcon, Video, Smile, MapPin } from "lucide-react"
 import toast from "react-hot-toast"
-import { EmojiPicker } from "@/components/ui"
+import { EmojiPicker, MentionPortal } from "@/components/ui"
 import { FilePreviewGrid } from "./FilePreviewGrid"
 import { getVisibilityIcon, VISIBILITY_OPTIONS } from "@/lib/utils/PostUtils"
 import { useCreatePostModal } from "@/lib/hooks/useCreatePostModal"
@@ -12,14 +12,14 @@ interface CreatePostModalProps {
   isOpen: boolean
   onClose: () => void
   onPostCreated?: () => void
+  currentUserId?: string
 }
 
-export function CreatePostModal({ isOpen, onClose, onPostCreated }: CreatePostModalProps) {
+export function CreatePostModal({ isOpen, onClose, onPostCreated, currentUserId }: CreatePostModalProps) {
   const preventClose = () => {}
 
   const {
     content,
-    setContent,
     visibility,
     setVisibility,
     files,
@@ -36,7 +36,16 @@ export function CreatePostModal({ isOpen, onClose, onPostCreated }: CreatePostMo
     handleDrop,
     handleAddEmoji,
     handleSubmit: originalHandleSubmit,
-  } = useCreatePostModal(preventClose, onPostCreated)
+    // Mention related
+    mentionUsers,
+    isMentionLoading,
+    showMentionDropdown,
+    mentionSelectedIndex,
+    handleContentChange,
+    handleTextareaKeyDown,
+    selectMentionUser,
+    closeMentionDropdown,
+  } = useCreatePostModal(preventClose, onPostCreated, currentUserId)
 
   const [visibilityDropdownOpen, setVisibilityDropdownOpen] = useState(false)
 
@@ -122,13 +131,26 @@ export function CreatePostModal({ isOpen, onClose, onPostCreated }: CreatePostMo
             </div>
           </div>
 
-          <textarea
-            ref={textareaRef}
-            className="w-full border-0 text-lg resize-none min-h-[120px] max-h-[180px] focus:outline-none focus:ring-2 focus:ring-orange-400 placeholder-gray-400 rounded-2xl p-4 bg-gray-50 shadow-inner"
-            placeholder="What's inspiring you today?"
-            value={content}
-            onChange={(e) => setContent(e.target.value)}
-            maxLength={1000}
+          <div className="relative">
+            <textarea
+              ref={textareaRef}
+              className="w-full border-0 text-lg resize-none min-h-[120px] max-h-[180px] focus:outline-none focus:ring-2 focus:ring-orange-400 placeholder-gray-400 rounded-2xl p-4 bg-gray-50 shadow-inner"
+              placeholder="What's inspiring you today? Type @ to see all users..."
+              value={content}
+              onChange={handleContentChange}
+              onKeyDown={handleTextareaKeyDown}
+              maxLength={1000}
+          />
+
+          {/* Mention Portal - Renders outside modal container */}
+          <MentionPortal
+            users={mentionUsers}
+            selectedIndex={mentionSelectedIndex}
+            onSelect={selectMentionUser}
+            onClose={closeMentionDropdown}
+            isLoading={isMentionLoading}
+            inputRef={textareaRef}
+            show={showMentionDropdown}
           />
 
           {showEmojiPicker && (
@@ -136,6 +158,7 @@ export function CreatePostModal({ isOpen, onClose, onPostCreated }: CreatePostMo
               <EmojiPicker onSelect={handleAddEmoji} />
             </div>
           )}
+          </div>
 
           {files.length > 0 && <FilePreviewGrid files={files} onRemoveFile={handleRemoveFile} />}
 
