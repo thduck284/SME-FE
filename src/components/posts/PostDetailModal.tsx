@@ -106,6 +106,19 @@ export function PostDetailModal({
     }
   }
 
+  const handleRemoveReaction = async () => {
+    if (isReacting || !onReact) return
+    setIsReacting(true)
+    setShowReactionPicker(false)
+    if (hideTimeoutRef.current) clearTimeout(hideTimeoutRef.current)
+    try {
+      // Gọi với reaction hiện tại để remove
+      await onReact(currentReaction!)
+    } finally {
+      setIsReacting(false)
+    }
+  }
+
   const totalReactions = reaction?.counters 
     ? Object.values(reaction.counters).reduce((sum, count) => sum + count, 0) : 0
   const currentReaction = reaction?.userReaction 
@@ -154,10 +167,14 @@ export function PostDetailModal({
 
   const ReactionButton = () => (
     <div className="relative flex-1" onMouseEnter={handleReactionShow} onMouseLeave={handleReactionHide}>
-      <Button variant="ghost" size="sm" disabled={loading || isReacting}
+      <Button 
+        variant="ghost" 
+        size="sm" 
+        disabled={loading || isReacting}
+        onClick={currentReaction ? handleRemoveReaction : undefined}
         className={`flex items-center justify-center gap-1.5 rounded-md h-9 w-full transition-all ${
           currentReaction 
-            ? `${reactionIcons[currentReaction].color} ${reactionIcons[currentReaction].bg} ${reactionIcons[currentReaction].darkBg}`
+            ? `${reactionIcons[currentReaction].color} ${reactionIcons[currentReaction].bg} ${reactionIcons[currentReaction].darkBg} hover:opacity-80`
             : 'bg-white text-gray-700 border border-gray-200 hover:bg-gray-50 dark:bg-gray-900 dark:text-gray-300 dark:border-gray-700 dark:hover:bg-gray-800'}`}>
         {isReacting ? (
           <div className="animate-spin h-4 w-4 border-2 border-current border-t-transparent rounded-full" />
@@ -168,7 +185,9 @@ export function PostDetailModal({
             ) : (
               <ThumbsUp className="h-[18px] w-[18px] text-gray-600 dark:text-gray-400" />
             )}
-            <span className={`text-[15px] font-semibold ${currentReaction ? reactionIcons[currentReaction].color : ''}`}>{currentReaction ? reactionIcons[currentReaction].label : "Like"}</span>
+            <span className={`text-[15px] font-semibold ${currentReaction ? reactionIcons[currentReaction].color : ''}`}>
+              {currentReaction ? `Remove ${reactionIcons[currentReaction].label}` : "Like"}
+            </span>
           </>
         )}
       </Button>
@@ -176,8 +195,16 @@ export function PostDetailModal({
       {showReactionPicker && !isReacting && (
         <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-full shadow-xl px-2 py-2 flex items-center gap-1 z-50">
           {Object.entries(reactionIcons).map(([type, { label, icon, color }]) => (
-            <button key={type} title={label} onClick={() => handleReaction(type as ReactionType)}
-              className={`relative p-1 hover:scale-150 transition-all duration-200 text-2xl rounded-full ${currentReaction === type ? 'scale-125' : ''}`}>
+            <button 
+              key={type} 
+              title={currentReaction === type ? `Remove ${label}` : label} 
+              onClick={() => handleReaction(type as ReactionType)}
+              className={`relative p-1 hover:scale-150 transition-all duration-200 text-2xl rounded-full ${
+                currentReaction === type 
+                  ? 'scale-125 ring-2 ring-red-300 dark:ring-red-700 bg-red-50 dark:bg-red-900/20' 
+                  : 'hover:bg-gray-100 dark:hover:bg-gray-700'
+              }`}
+            >
               <span className={`block transform hover:-translate-y-1 transition-transform ${color}`}>{icon}</span>
             </button>
           ))}
