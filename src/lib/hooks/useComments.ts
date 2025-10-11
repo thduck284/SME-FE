@@ -23,15 +23,33 @@ export function useComments(postId: string) {
       throw new Error('Invalid post ID')
     }
     
+    console.log('📡 Fetching comments from API:', { postId, limit, cursor })
     setIsLoading(true)
     try {
       const response = await commentApi.getCommentsByPost(postId, limit, cursor)
-      setComments(prev => cursor ? [...prev, ...response.comments] : response.comments)
+      console.log('📡 API Response:', {
+        commentsCount: response.comments?.length || 0,
+        comments: response.comments?.map(c => ({ id: c.id, content: c.content?.substring(0, 50) })) || [],
+        hasMore: response.hasMore,
+        nextCursor: response.nextCursor
+      })
+      
+      setComments(prev => {
+        const newComments = cursor ? [...prev, ...response.comments] : response.comments
+        console.log('📡 Setting comments:', {
+          prevCount: prev.length,
+          newCount: newComments.length,
+          total: newComments.length
+        })
+        return newComments
+      })
+      
       setPagination({
         nextCursor: response.nextCursor,
         hasMore: response.hasMore
       })
     } catch (error) {
+      console.error('❌ Error fetching comments:', error)
       throw error
     } finally {
       setIsLoading(false)
@@ -61,6 +79,8 @@ export function useComments(postId: string) {
         content: content.trim(),
         ...(mentions && mentions.length > 0 ? { mentions } : {})
       }
+      
+      console.log('📤 Creating comment with data:', createData)
       
       const newComment = await commentApi.createComment(createData)
       

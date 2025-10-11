@@ -12,13 +12,11 @@ export function usePostStats() {
     
     try {
       const postStats = await postStatsApi.getPostStats(postId)
-      console.log('📊 usePostStats fetchPostStats result:', postStats, 'for postId:', postId)
       setStats(prev => {
         const newStats = {
           ...prev,
           [postId]: postStats
         }
-        console.log('📊 usePostStats setStats:', newStats)
         return newStats
       })
       return postStats
@@ -37,13 +35,11 @@ export function usePostStats() {
     
     try {
       const statsMap = await postStatsApi.getMultiplePostsStats(postIds)
-      console.log('📊 usePostStats fetchMultiplePostsStats result:', statsMap)
       setStats(prev => {
         const newStats = {
           ...prev,
           ...statsMap
         }
-        console.log('📊 usePostStats setStats (multiple):', newStats)
         return newStats
       })
       return statsMap

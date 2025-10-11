@@ -1,7 +1,8 @@
 "use client"
 
 import React, { useState, useRef, useEffect } from "react"
-import { Card, Avatar, Badge, Button } from "@/components/ui"
+import { useNavigate } from "react-router-dom"
+import { Card, Avatar, Button } from "@/components/ui"
 import { PostFullDto } from "@/lib/types/posts/PostFullDto"
 import { CreateSharePostDto } from "@/lib/types/posts/CreatePostDto"
 import { ReactionType, reactionIcons } from "@/lib/constants/reactions"
@@ -10,7 +11,9 @@ import { CommentsSection } from "./CommentsSection"
 import { ShareModal } from "./ShareModal"
 import { PostOptionsMenu } from "./PostOptionsMenu"
 import { MessageCircle, Share, Repeat2, Lock, ThumbsUp } from "lucide-react"
+import { UserService } from "@/lib/api/users/UserService"
 import type { PostStats } from "@/lib/api/posts/PostStats"
+import type { UserMetadata } from "@/lib/types/User"
 
 interface PostItemProps {
   post: PostFullDto
@@ -45,13 +48,13 @@ export function PostItem({
   onReport = () => {},
   postStats
 }: PostItemProps) {
+  const navigate = useNavigate()
   const [showComments, setShowComments] = useState(false)
   const [isReacting, setIsReacting] = useState(false)
   const [showReactionPicker, setShowReactionPicker] = useState(false)
   const [showShareModal, setShowShareModal] = useState(false)
   
   // Debug log
-  console.log('📊 PostItem postStats:', postStats, 'for postId:', post.postId)
   
   const hideTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
@@ -218,7 +221,7 @@ export function PostItem({
         {/* Nội dung của người share (nếu có) */}
         {isSharePost && post.content && (
           <div className="px-4 pt-0.5 pb-0">
-            <p className="text-[15px] text-gray-900 dark:text-gray-100 leading-[1.3333] whitespace-pre-wrap break-words">{post.content}</p>
+            <PostContentWithMentions content={post.content} mentions={post.mentions} onMentionClick={navigate} />
           </div>
         )}
 
@@ -232,7 +235,7 @@ export function PostItem({
           <>
             {post.content && (
               <div className="px-4 pt-0.5 pb-0">
-                <p className="text-[15px] text-gray-900 dark:text-gray-100 leading-[1.3333] whitespace-pre-wrap break-words">{post.content}</p>
+                <PostContentWithMentions content={post.content} mentions={post.mentions} onMentionClick={navigate} />
               </div>
             )}
             {post.medias && post.medias.length > 0 && (
@@ -299,18 +302,6 @@ export function PostItem({
           </div>
         )}
 
-        {/* Mentions */}
-        {post.mentions && post.mentions.length > 0 && (
-          <div className="px-4 py-3">
-            <div className="flex flex-wrap gap-1.5">
-              {post.mentions.map((mention, idx) => (
-                <Badge key={idx} variant="secondary" className="text-xs px-2 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 border-0 hover:bg-blue-200 dark:hover:bg-blue-900/50 cursor-pointer transition-colors">
-                  @user{mention.userId.slice(0, 8)}
-                </Badge>
-              ))}
-            </div>
-          </div>
-        )}
 
         {/* Reactions summary */}
         {totalReactions > 0 && (
@@ -371,4 +362,145 @@ export function PostItem({
         onSuccess={() => { onShareSuccess?.() }} />
     </>
   )
+}
+
+// Component để render content với mentions được highlight
+function PostContentWithMentions({ content, mentions, onMentionClick }: { content: string; mentions?: any[]; onMentionClick?: (path: string) => void }) {
+  const [userCache, setUserCache] = useState<Map<string, UserMetadata>>(new Map())
+
+  // Fetch user metadata for all mentions
+  useEffect(() => {
+    if (!mentions || mentions.length === 0) return
+
+    const fetchUserMetadata = async () => {
+      // Get unique user IDs that we haven't fetched yet
+      const userIdsToFetch = mentions
+        .map(m => m.userId)
+        .filter((userId, index, self) => self.indexOf(userId) === index)
+        .filter(userId => !userCache.has(userId))
+
+      if (userIdsToFetch.length === 0) {
+        return
+      }
+
+      try {
+        // Fetch all user metadata in parallel
+        const userPromises = userIdsToFetch.map(async (userId) => {
+          try {
+            const metadata = await UserService.getUserMetadata(userId)
+            return { userId, metadata }
+          } catch (error) {
+            console.error('Failed to fetch user metadata for mention:', error)
+            return {
+              userId,
+              metadata: {
+                userId,
+                firstName: 'User',
+                lastName: userId.slice(0, 8),
+                avtUrl: null
+              }
+            }
+          }
+        })
+
+        const results = await Promise.all(userPromises)
+        
+        // Update cache with all results
+        setUserCache(prevCache => {
+          const updatedCache = new Map(prevCache)
+          results.forEach(({ userId, metadata }) => {
+            updatedCache.set(userId, metadata)
+          })
+          return updatedCache
+        })
+      } catch (error) {
+        console.error('Error fetching user metadata:', error)
+      }
+    }
+
+    fetchUserMetadata()
+  }, [mentions]) // Only depend on mentions
+
+  // Render content with highlighted mentions
+  const renderContent = () => {
+    if (!mentions || mentions.length === 0) {
+      return <span className="text-[15px] text-gray-900 dark:text-gray-100 leading-[1.3333] whitespace-pre-wrap break-words">{content}</span>
+    }
+
+    // Sort mentions by startIndex to process them in order
+    const sortedMentions = [...mentions].sort((a, b) => a.startIndex - b.startIndex)
+    
+    const parts: Array<{
+      type: 'text' | 'mention'
+      content: string
+      startIndex: number
+      endIndex: number
+      userId?: string
+    }> = []
+    let lastIndex = 0
+
+    sortedMentions.forEach((mention) => {
+      // Add text before mention
+      if (mention.startIndex > lastIndex) {
+        parts.push({
+          type: 'text',
+          content: content.slice(lastIndex, mention.startIndex),
+          startIndex: lastIndex,
+          endIndex: mention.startIndex
+        })
+      }
+
+      // Add mention
+      const userMetadata = userCache.get(mention.userId)
+      const displayName = userMetadata 
+        ? `${userMetadata.firstName} ${userMetadata.lastName}`.trim()
+        : `@user${mention.userId.slice(0, 8)}`
+
+      parts.push({
+        type: 'mention',
+        content: `@${displayName}`,
+        userId: mention.userId,
+        startIndex: mention.startIndex,
+        endIndex: mention.endIndex
+      })
+
+      lastIndex = mention.endIndex
+    })
+
+    // Add remaining text after last mention
+    if (lastIndex < content.length) {
+      parts.push({
+        type: 'text',
+        content: content.slice(lastIndex),
+        startIndex: lastIndex,
+        endIndex: content.length
+      })
+    }
+
+    return (
+      <span className="text-[15px] text-gray-900 dark:text-gray-100 leading-[1.3333] whitespace-pre-wrap break-words">
+        {parts.map((part, index) => {
+          if (part.type === 'mention') {
+            return (
+              <span
+                key={index}
+                className="text-blue-600 dark:text-blue-400 font-medium hover:underline cursor-pointer"
+                title={`@${part.userId}`}
+                onClick={() => {
+                  if (onMentionClick && part.userId) {
+                    onMentionClick(`/profile/${part.userId}`)
+                  }
+                }}
+              >
+                {part.content}
+              </span>
+            )
+          }
+          return <span key={index}>{part.content}</span>
+        })}
+      </span>
+    )
+  }
+
+  return renderContent()
 }

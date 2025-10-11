@@ -1,13 +1,13 @@
 "use client"
 
-import { useState, useEffect, useCallback, useRef } from "react"
+import { useState, useEffect, useCallback, useRef, useMemo } from "react"
 import { Button, MentionPortal } from "@/components/ui"
 import { Send, Heart, Trash2, Loader2, AlertCircle } from "lucide-react"
 import { useComments } from "@/lib/hooks/useComments"
 import { useMention } from "@/lib/hooks/useMention"
 import { UserService } from "@/lib/api/users/UserService"
 import { formatTimeAgo } from "@/lib/utils/PostUtils"
-import type { Comment as CommentType } from "@/lib/types/posts/CommentsDTO"
+import type { Comment as CommentType, CommentMention } from "@/lib/types/posts/CommentsDTO"
 import type { UserMetadata } from "@/lib/types/User"
 import type { MentionData } from "@/lib/types/users/MentionDto"
 
@@ -66,59 +66,95 @@ export function CommentsSection({ postId, isOpen, currentUserId }: CommentsSecti
   // Sử dụng UserService.getUserMetadata thay vì useUsers hook
 
   // Combine comments from API and optimistic updates, ensuring unique IDs
-  const displayComments = [...optimisticComments, ...comments]
-    .filter(Boolean)
-    .reduce((acc, comment) => {
-      if (!acc.find(c => c.id === comment.id)) {
-        acc.push(comment)
+  const displayComments = useMemo(() => {
+    
+    // Start with real comments from API
+    const allComments = [...comments]
+    
+    // Add optimistic comments that don't exist in real comments
+    optimisticComments.forEach(optimisticComment => {
+      const exists = allComments.find(c => c.id === optimisticComment.id)
+      if (!exists) {
+        allComments.push(optimisticComment)
       }
-      return acc
-    }, [] as CommentType[])
+    })
+    
+    // Filter out any null/undefined comments
+    const validComments = allComments.filter(Boolean)
+    
+    // Sort by creation time (newest first)
+    const sortedComments = validComments.sort((a, b) => 
+      new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    )
+    
+    
+    return sortedComments
+  }, [optimisticComments, comments])
 
   // Fetch comments when section opens
   useEffect(() => {
     if (isOpen && postId) {
+      console.log('🔄 Fetching comments for postId:', postId)
       setError(null)
       setOptimisticComments([])
       fetchComments(10)
     }
-  }, [isOpen, postId, fetchComments])
+  }, [isOpen, postId]) // Removed fetchComments from dependencies to prevent infinite loop
 
-  // Fetch user metadata for comments
+  // Fetch user metadata for comments with debouncing
   useEffect(() => {
     const fetchUserMetadata = async () => {
       const commentsToFetch = displayComments
         .filter(comment => comment && !userCache.has(comment.authorId))
-        .slice(0, 10) // Limit concurrent requests
+        .filter(comment => comment.authorId && comment.authorId !== 'current-user') // Skip current-user
+        .slice(0, 5) // Reduced limit to prevent blocking
 
-      const userPromises = commentsToFetch.map(async (comment) => {
-        try {
-          const userMetadata = await UserService.getUserMetadata(comment.authorId)
-          return { authorId: comment.authorId, userMetadata }
-        } catch (error) {
-          console.error(`Failed to fetch user metadata ${comment.authorId}:`, error)
-          return null
-        }
-      })
+      if (commentsToFetch.length === 0) return
 
-      const results = await Promise.all(userPromises)
-      const newCache = new Map(userCache)
-      
-      results.forEach(result => {
-        if (result?.userMetadata) {
-          newCache.set(result.authorId, result.userMetadata)
+      // Process in batches to prevent blocking
+      const batchSize = 3
+      for (let i = 0; i < commentsToFetch.length; i += batchSize) {
+        const batch = commentsToFetch.slice(i, i + batchSize)
+        
+        const userPromises = batch.map(async (comment) => {
+          try {
+            const userMetadata = await UserService.getUserMetadata(comment.authorId)
+            return { authorId: comment.authorId, userMetadata }
+          } catch (error) {
+            console.error(`Failed to fetch user metadata ${comment.authorId}:`, error)
+            return null
+          }
+        })
+
+        const results = await Promise.all(userPromises)
+        const newCache = new Map(userCache)
+        
+        results.forEach(result => {
+          if (result?.userMetadata) {
+            newCache.set(result.authorId, result.userMetadata)
+          }
+        })
+        
+        setUserCache(newCache)
+        
+        // Small delay between batches to prevent blocking
+        if (i + batchSize < commentsToFetch.length) {
+          await new Promise(resolve => setTimeout(resolve, 100))
         }
-      })
-      
-      setUserCache(newCache)
+      }
     }
 
-    if (displayComments.length > 0) {
-      fetchUserMetadata()
-    }
-  }, [displayComments, userCache])
+    // Debounce user metadata fetching
+    const timeoutId = setTimeout(() => {
+      if (displayComments.length > 0) {
+        fetchUserMetadata()
+      }
+    }, 300) // 300ms debounce
 
-  // Helper functions
+    return () => clearTimeout(timeoutId)
+  }, [displayComments.length]) // Only depend on comment count, not userCache
+
+  // Helper functions with memoization
   const getUserFromCache = useCallback((authorId: string): UserMetadata | undefined => 
     userCache.get(authorId), [userCache])
 
@@ -126,18 +162,30 @@ export function CommentsSection({ postId, isOpen, currentUserId }: CommentsSecti
     comment?.id?.startsWith?.('temp-') || false, [])
 
   const getDisplayInfo = useCallback((comment: CommentType) => {
+    // Handle current-user case - show "You" for current user
+    if (comment.authorId === 'current-user') {
+      return {
+        displayName: 'You',
+        avatarUrl: comment.authorAvatar,
+        fullName: 'You'
+      }
+    }
+
+    // Fetch real user metadata for other users
     const userMetadata = getUserFromCache(comment.authorId)
-    const displayName = comment.authorName === 'You' ? 'You' : 
-                       (userMetadata ? `${userMetadata.firstName} ${userMetadata.lastName}`.trim() : comment.authorName || 'Unknown User')
+    
+    // Ưu tiên metadata thật, không dùng authorName từ comment
+    const displayName = userMetadata ? `${userMetadata.firstName} ${userMetadata.lastName}`.trim() : 
+                       'Loading...' // Hiển thị loading khi chưa fetch xong
     const avatarUrl = userMetadata?.avtUrl || comment.authorAvatar
     const fullName = userMetadata ? `${userMetadata.firstName} ${userMetadata.lastName}`.trim() : 
-                    comment.authorName || 'Unknown User'
+                    'Loading...'
 
     return { displayName, avatarUrl, fullName }
   }, [getUserFromCache])
 
-  // Comment handlers
-  const handleSubmitComment = async (e: React.FormEvent) => {
+  // Memoized comment submission handler
+  const handleSubmitComment = useCallback(async (e: React.FormEvent) => {
     e.preventDefault()
     
     if (!comment.trim()) {
@@ -150,8 +198,8 @@ export function CommentsSection({ postId, isOpen, currentUserId }: CommentsSecti
     const tempComment: CommentType = {
       id: `temp-${Date.now()}`,
       content: comment,
-      authorId: 'current-user',
-      authorName: 'You',
+      authorId: currentUserId || 'current-user',
+      authorName: '', // Empty để fetch metadata thật
       authorAvatar: undefined,
       createdAt: new Date().toISOString(),
       likes: 0,
@@ -164,19 +212,23 @@ export function CommentsSection({ postId, isOpen, currentUserId }: CommentsSecti
     setComment("")
 
     try {
-      const newComment = await addComment(currentComment)
+      // Convert mentions from MentionData format to CommentMention format
+      const commentMentions = mentions.map(mention => ({
+        userId: mention.userId,
+        startIndex: mention.startIndex,
+        endIndex: mention.endIndex
+      }))
       
-      // Cache user metadata for new comment
-      if (newComment.authorId) {
-        try {
-          const userMetadata = await UserService.getUserMetadata(newComment.authorId)
-          setUserCache(prev => new Map(prev).set(newComment.authorId, userMetadata))
-        } catch (error) {
-          console.error('Failed to fetch user metadata for new comment:', error)
-        }
-      }
+      await addComment(currentComment, commentMentions)
       
+      // Clear mentions after successful submission
+      setMentions([])
+      
+      // Load lại tất cả comments sau khi comment xong
       setOptimisticComments(prev => prev.filter(c => c.id !== tempComment.id))
+      
+      // Refresh tất cả comments
+      await fetchComments(10)
       
     } catch (error: any) {
       console.error('Failed to submit comment:', error)
@@ -187,18 +239,19 @@ export function CommentsSection({ postId, isOpen, currentUserId }: CommentsSecti
       const errorMessage = error.response?.data?.message || error.message || 'Failed to post comment'
       setError(errorMessage)
     }
-  }
+  }, [comment, currentUserId, postId, addComment, fetchComments])
 
-  const handleLikeComment = async (commentId: string) => {
+  // Other comment handlers with memoization
+  const handleLikeComment = useCallback(async (commentId: string) => {
     try {
       await toggleLikeComment(commentId)
     } catch (error) {
       console.error('Failed to like comment:', error)
       setError('Failed to like comment')
     }
-  }
+  }, [toggleLikeComment])
 
-  const handleDeleteComment = async (commentId: string) => {
+  const handleDeleteComment = useCallback(async (commentId: string) => {
     if (!confirm("Are you sure you want to delete this comment?")) return
     
     try {
@@ -210,7 +263,7 @@ export function CommentsSection({ postId, isOpen, currentUserId }: CommentsSecti
       console.error('Failed to delete comment:', error)
       setError('Failed to delete comment')
     }
-  }
+  }, [deleteComment])
 
   if (!isOpen) return null
 
@@ -361,9 +414,10 @@ function CommentItem({
               </span>
             </div>
             
-            <p className="text-sm text-foreground bg-background rounded-lg p-3 whitespace-pre-wrap break-words">
-              {comment.content}
-            </p>
+            <CommentContentWithMentions 
+              content={comment.content}
+              mentions={comment.mentions}
+            />
           </div>
           
           {!isTemp && (
@@ -605,4 +659,143 @@ function CommentInput({
       )}
     </form>
   )
+}
+
+// Component to render comment content with mentions highlighted
+function CommentContentWithMentions({ content, mentions }: { content: string; mentions?: CommentMention[] }) {
+  const [userCache, setUserCache] = useState<Map<string, UserMetadata>>(new Map())
+
+  // Fetch user metadata for all mentions
+  useEffect(() => {
+    if (!mentions || mentions.length === 0) return
+
+    const fetchUserMetadata = async () => {
+      // Get unique user IDs that we haven't fetched yet
+      const userIdsToFetch = mentions
+        .map(m => m.userId)
+        .filter((userId, index, self) => self.indexOf(userId) === index)
+        .filter(userId => !userCache.has(userId))
+
+      if (userIdsToFetch.length === 0) {
+        return
+      }
+
+      try {
+        // Fetch all user metadata in parallel
+        const userPromises = userIdsToFetch.map(async (userId) => {
+          try {
+            const metadata = await UserService.getUserMetadata(userId)
+            return { userId, metadata }
+          } catch (error) {
+            console.error('Failed to fetch user metadata for mention:', error)
+            return {
+              userId,
+              metadata: {
+                userId,
+                firstName: 'User',
+                lastName: userId.slice(0, 8),
+                avtUrl: null
+              }
+            }
+          }
+        })
+
+        const results = await Promise.all(userPromises)
+        
+        // Update cache with all results
+        setUserCache(prevCache => {
+          const updatedCache = new Map(prevCache)
+          results.forEach(({ userId, metadata }) => {
+            updatedCache.set(userId, metadata)
+          })
+          return updatedCache
+        })
+      } catch (error) {
+        console.error('Error fetching user metadata:', error)
+      }
+    }
+
+    fetchUserMetadata()
+  }, [mentions]) // Only depend on mentions
+
+  // Render content with highlighted mentions
+  const renderContent = () => {
+    if (!mentions || mentions.length === 0) {
+      return <span className="text-sm text-foreground bg-background rounded-lg p-3 whitespace-pre-wrap break-words block">{content}</span>
+    }
+
+    // Sort mentions by startIndex to process them in order
+    const sortedMentions = [...mentions].sort((a, b) => a.startIndex - b.startIndex)
+    
+    const parts: Array<{
+      type: 'text' | 'mention'
+      content: string
+      startIndex: number
+      endIndex: number
+      userId?: string
+    }> = []
+    let lastIndex = 0
+
+    sortedMentions.forEach((mention) => {
+      // Add text before mention
+      if (mention.startIndex > lastIndex) {
+        parts.push({
+          type: 'text',
+          content: content.slice(lastIndex, mention.startIndex),
+          startIndex: lastIndex,
+          endIndex: mention.startIndex
+        })
+      }
+
+      // Add mention
+      const userMetadata = userCache.get(mention.userId)
+      const displayName = userMetadata 
+        ? `${userMetadata.firstName} ${userMetadata.lastName}`.trim()
+        : `@user${mention.userId.slice(0, 8)}`
+
+      parts.push({
+        type: 'mention',
+        content: `@${displayName}`,
+        userId: mention.userId,
+        startIndex: mention.startIndex,
+        endIndex: mention.endIndex
+      })
+
+      lastIndex = mention.endIndex
+    })
+
+    // Add remaining text after last mention
+    if (lastIndex < content.length) {
+      parts.push({
+        type: 'text',
+        content: content.slice(lastIndex),
+        startIndex: lastIndex,
+        endIndex: content.length
+      })
+    }
+
+    return (
+      <span className="text-sm text-foreground bg-background rounded-lg p-3 whitespace-pre-wrap break-words block">
+        {parts.map((part, index) => {
+          if (part.type === 'mention') {
+            return (
+              <span
+                key={index}
+                className="text-blue-600 dark:text-blue-400 font-medium cursor-pointer hover:underline"
+                onClick={() => {
+                  // Navigate to user profile
+                  console.log('Navigate to user profile:', part.userId)
+                }}
+              >
+                {part.content}
+              </span>
+            )
+          }
+          return <span key={index}>{part.content}</span>
+        })}
+      </span>
+    )
+  }
+
+  return renderContent()
 }

@@ -23,7 +23,6 @@ export interface CommentMention {
   userId: string
   startIndex: number
   endIndex: number
-  userName?: string
 }
 
 export interface CommentsResponse {

@@ -14,7 +14,6 @@ export interface PostStatsResponse {
 export const postStatsApi = {
   getPostStats: async (postId: string): Promise<PostStats> => {
     const res = await apiClient.get(`/posts/${postId}/stats`)
-    console.log('📊 Post stats response:', res.data)
     // API response structure: { success: true, message: "OK", data: { commentCount: 1, shareCount: 0 } }
     return res.data.data
   },

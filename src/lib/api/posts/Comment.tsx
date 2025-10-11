@@ -32,7 +32,11 @@ export const commentApi = {
 
     // Chỉ gửi mentions khi có items
     if (data.mentions && data.mentions.length > 0) {
-      requestData.mentions = data.mentions
+      requestData.mentions = data.mentions.map(mention => ({
+        userId: mention.userId,
+        startIndex: mention.startIndex,
+        endIndex: mention.endIndex
+      }))
     }
     // KHÔNG gửi mentions array rỗng
     

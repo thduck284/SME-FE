@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useRef, useEffect } from "react"
-import { useParams } from "react-router-dom"
+import { useParams, useSearchParams } from "react-router-dom"
 import { Badge, Button, Card, Avatar } from "@/components/ui" 
 import { User, FileText, ImageIcon, MapPin, LinkIcon, Calendar, Mail, Camera } from "lucide-react"
 import { LeftBar, RightBar } from "@/components/layouts"
@@ -12,7 +12,11 @@ import { getPostsCount } from "@/lib/api/posts/GetPostsByUser"
 
 export function ProfilePage() {
   const { userId } = useParams()
-  const [activeTab, setActiveTab] = useState<"profile" | "posts" | "images">("profile")
+  const [searchParams, setSearchParams] = useSearchParams()
+  
+  // Get tab from URL, default to "profile"
+  const tabFromUrl = searchParams.get('tab') as "profile" | "posts" | "images" | null
+  const [activeTab, setActiveTab] = useState<"profile" | "posts" | "images">(tabFromUrl || "profile")
   const [avatarUrl, setAvatarUrl] = useState("/image.png?height=128&width=128")
   const [isHoveringAvatar, setIsHoveringAvatar] = useState(false)
   const [postsCount, setPostsCount] = useState(0) 
@@ -40,6 +44,20 @@ export function ProfilePage() {
     following, 
     loading: loadingRelationships
   } = useUserRelationship()
+
+  // Sync tab state with URL
+  useEffect(() => {
+    const tabFromUrl = searchParams.get('tab') as "profile" | "posts" | "images" | null
+    if (tabFromUrl && tabFromUrl !== activeTab) {
+      setActiveTab(tabFromUrl)
+    }
+  }, [searchParams, activeTab])
+
+  // Handle tab change and update URL
+  const handleTabChange = (tab: "profile" | "posts" | "images") => {
+    setActiveTab(tab)
+    setSearchParams({ tab })
+  }
 
   useEffect(() => {
     const fetchPostsCount = async () => {
@@ -243,7 +261,7 @@ export function ProfilePage() {
               return (
                 <button
                   key={key}
-                  onClick={() => setActiveTab(key)}
+                  onClick={() => handleTabChange(key)}
                   className={`group flex items-center gap-4 border-b-2 pb-5 text-base font-semibold transition-colors ${
                     isActive 
                       ? "border-primary text-gray-900" 

@@ -24,18 +24,39 @@ export async function createPost(payload: CreatePostPayload) {
   if (type) formData.append("type", type)
   if (visibility) formData.append("visibility", visibility)
   files?.forEach((file) => formData.append("mediaFiles", file))
+  
   if (mentions && mentions.length > 0) {
     formData.append("mentions", JSON.stringify(mentions))
   }
 
   try {
-    const res = await apiClient.post("/posts", formData, {
-      headers: {
-        "Content-Type": "multipart/form-data",
-      },
-    })
-
-    return res.data
+    // Send as JSON if no files, FormData if files present
+    if (!files || files.length === 0) {
+      const jsonPayload: any = {
+        content,
+        type,
+        visibility
+      }
+      
+      // Only include mentions if they exist and are not empty
+      if (mentions && mentions.length > 0) {
+        jsonPayload.mentions = mentions
+      }
+      
+      const res = await apiClient.post("/posts", jsonPayload, {
+        headers: {
+          "Content-Type": "application/json",
+        },
+      })
+      return res.data
+    } else {
+      const res = await apiClient.post("/posts", formData, {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      })
+      return res.data
+    }
   } catch (error: any) {
     const message = error.response?.data?.message || "Failed to create post"
     throw new Error(message)
