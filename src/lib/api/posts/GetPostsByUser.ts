@@ -1,19 +1,40 @@
-import apiClient from "@/lib/services/ApiClient"
-import { useAuthContext } from '@/lib/context/AuthContext'
+import { getUserId } from '@/lib/utils/Jwt'
 
 export const getPostsByUser = async (limit?: number, cursor?: string) => {
-  const userId = useAuthContext().userId || ''
+  const userId = getUserId() || ''
   const params: Record<string, any> = {}
   
   if (limit) params.fetchSize = limit  
   if (cursor) params.pageState = cursor  
+
+  const res = await fetch(`/posts/user/${userId}?${new URLSearchParams(params)}`, {
+    method: 'GET',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+  })
   
-  const res = await apiClient.get(`/posts/user/${userId}`, { params })
-  return res.data
+  if (!res.ok) {
+    const errorText = await res.text()
+    throw new Error(`Get posts failed: ${res.statusText} - ${errorText}`)
+  }
+  
+  return await res.json()
 }
 
 export const getPostsCount = async () => {
-  const userId = useAuthContext().userId || ''
-  const res = await apiClient.get(`/posts/user/${userId}/count`)
-  return res.data
+  const userId = getUserId() || ''
+  const res = await fetch(`/posts/user/${userId}/count`, {
+    method: 'GET',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+  })
+  
+  if (!res.ok) {
+    const errorText = await res.text()
+    throw new Error(`Get posts count failed: ${res.statusText} - ${errorText}`)
+  }
+  
+  return await res.json()
 }

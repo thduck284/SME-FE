@@ -1,11 +1,11 @@
 import { useRoutes, Navigate } from "react-router-dom"
+import '@/lib/api/auth/AutoFetch';
 import { authRoutes } from "@/pages/auth/route"
 import { feedRoutes } from "@/pages/main/route"
 import { Toaster } from "react-hot-toast"
-import { useAuthContext } from "@/lib/context/AuthContext"
 
 function App() {
-  const { accessToken } = useAuthContext()
+  const accessToken = localStorage.getItem('accessToken');
   
   const protectedFeedRoutes = feedRoutes.map(route => ({
     ...route,
@@ -14,13 +14,13 @@ function App() {
 
   const publicAuthRoutes = authRoutes.map(route => ({
     ...route,
-    element: !accessToken ? route.element : <Navigate to="/" replace />
+    element: !accessToken ? route.element : <Navigate to="/home" replace />  
   }))
 
   const element = useRoutes([
     ...publicAuthRoutes,
     ...protectedFeedRoutes,
-    { path: "*", element: <Navigate to={accessToken ? "/" : "/login"} replace /> }
+    { path: "*", element: <Navigate to={accessToken ? "/home" : "/login"} replace /> }
   ])
 
   return (

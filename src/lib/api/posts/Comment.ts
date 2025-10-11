@@ -1,32 +1,39 @@
-import { injectToken } from "@/lib/api/auth/Interceptor"
 import type { Comment, CommentsResponse, CreateCommentRequest } from "@/lib/types/posts/CommentsDTO"
 
 export const commentApi = {
   getCommentsByPost: async (
     postId: string, 
-    limit?: number, 
+    limit: number = 5,  
     cursor?: string
   ): Promise<CommentsResponse> => {
-    const params: Record<string, any> = {}
-    
-    if (limit) params.fetchSize = limit  
-    if (cursor) params.pageState = cursor  
-    
-    const config = injectToken({
+    const params = new URLSearchParams()
+    params.append('fetchSize', limit.toString())
+    if (cursor) params.append('pageState', cursor)
+
+    const res = await fetch(`/comments/post/${postId}?${params.toString()}`, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
       },
     })
 
-    const res = await fetch(`/comments/post/${postId}?${new URLSearchParams(params)}`, config)
-    
     if (!res.ok) {
       const errorText = await res.text()
       throw new Error(`Get comments failed: ${res.statusText} - ${errorText}`)
     }
-    
-    return await res.json()
+
+    const data = await res.json()
+
+    const comments = Array.isArray(data.comments) ? data.comments.map((comment: any) => ({
+      id: comment.commentId,
+      ...comment
+    })) : []
+
+    return {
+      comments,
+      nextCursor: data.nextPageState,
+      hasMore: !!data.nextPageState,
+    }
   },
 
   createComment: async (data: CreateCommentRequest): Promise<Comment> => {
@@ -35,7 +42,7 @@ export const commentApi = {
     }
 
     if (data.content) {
-      requestData.content = data.content
+      requestData.content = data.content.trim()
     } else {
       requestData.content = ""
     }
@@ -43,56 +50,96 @@ export const commentApi = {
     if (data.mentions && data.mentions.length > 0) {
       requestData.mentions = data.mentions
     }
-    
-    const config = injectToken({
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(requestData),
-    })
 
-    const res = await fetch('/comments', config)
-    
-    if (!res.ok) {
-      const errorText = await res.text()
-      throw new Error(`Create comment failed: ${res.statusText} - ${errorText}`)
+    try {
+      const res = await fetch('/comments', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestData),
+      })
+
+      const contentType = res.headers.get("content-type")
+      let responseData
+
+      if (contentType && contentType.includes("application/json")) {
+        responseData = await res.json()
+      } else {
+        responseData = await res.text()
+        try {
+          responseData = JSON.parse(responseData)
+        } catch {
+          if (typeof responseData === 'string' && res.ok) {
+            responseData = { 
+              id: responseData,
+              content: requestData.content,
+              postId: data.postId,
+              authorId: 'current-user',
+              authorName: 'You',
+              createdAt: new Date().toISOString(),
+              likes: 0,
+              isLiked: false
+            }
+          }
+        }
+      }
+
+      if (!res.ok) {
+        throw new Error(responseData?.message || `Create comment failed: ${res.status}`)
+      }
+
+      console.log("Comment created:", responseData)
+      return responseData
+      
+    } catch (error: any) {
+      const message = error.message || "Failed to create comment"
+      console.error("Create comment error:", error)
+      throw new Error(message)
     }
-    
-    return await res.json()
   },
 
   likeComment: async (commentId: string): Promise<{ likes: number; isLiked: boolean }> => {
-    const config = injectToken({
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    })
-
-    const res = await fetch(`/comments/${commentId}/like`, config)
-    
-    if (!res.ok) {
-      const errorText = await res.text()
-      throw new Error(`Like comment failed: ${res.statusText} - ${errorText}`)
+    try {
+      const res = await fetch(`/comments/${commentId}/like`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      })
+      
+      if (!res.ok) {
+        const errorText = await res.text()
+        throw new Error(`Like comment failed: ${res.statusText} - ${errorText}`)
+      }
+      
+      return await res.json()
+    } catch (error: any) {
+      console.error("Like comment error:", error)
+      throw error
     }
-    
-    return await res.json()
   },
 
   deleteComment: async (commentId: string): Promise<void> => {
-    const config = injectToken({
-      method: 'DELETE',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    })
+    try {
+      const res = await fetch(`/comments/${commentId}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      })
 
-    const res = await fetch(`/comments/${commentId}`, config)
-    
-    if (!res.ok) {
-      const errorText = await res.text()
-      throw new Error(`Delete comment failed: ${res.statusText} - ${errorText}`)
+      if (!res.ok) {
+        const errorText = await res.text()
+        throw new Error(`Delete comment failed: ${res.status} - ${errorText}`)
+      }
+
+      console.log("Comment deleted:", commentId)
+      
+    } catch (error: any) {
+      const message = error.message || "Failed to delete comment"
+      console.error("Delete comment error:", error)
+      throw new Error(message)
     }
   }
 }

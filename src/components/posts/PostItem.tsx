@@ -10,7 +10,7 @@ import { CommentsSection } from "./CommentsSection"
 import { ShareModal } from "./ShareModal"
 import { PostOptionsMenu } from "./PostOptionsMenu"
 import { MessageCircle, Share, Repeat2, Lock, ThumbsUp } from "lucide-react"
-import type { PostStats } from "@/lib/api/posts/PostStats"
+import { PostStats } from "@/lib/api/posts/PostStats"
 
 interface PostItemProps {
   post: PostFullDto
@@ -50,9 +50,6 @@ export function PostItem({
   const [showReactionPicker, setShowReactionPicker] = useState(false)
   const [showShareModal, setShowShareModal] = useState(false)
   
-  // Debug log
-  console.log('📊 PostItem postStats:', postStats, 'for postId:', post.postId)
-  
   const hideTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
   useEffect(() => {
@@ -84,7 +81,6 @@ export function PostItem({
 
   const totalReactions = reaction?.counters 
     ? Object.values(reaction.counters).reduce((sum, count) => sum + count, 0) : 0
-  // Chuẩn hóa về chữ hoa để khớp enum ReactionType khi hiển thị UI
   const currentReaction = reaction?.userReaction 
     ? (reaction.userReaction.toUpperCase() as ReactionType) 
     : null
@@ -141,11 +137,15 @@ export function PostItem({
         ) : (
           <>
             {currentReaction ? (
-              React.createElement(reactionIcons[currentReaction].icon, { className: `h-[18px] w-[18px] ${reactionIcons[currentReaction].color}` })
+              <span className={`text-[18px] ${reactionIcons[currentReaction].color}`}>
+                {reactionIcons[currentReaction].icon}
+              </span>
             ) : (
               <ThumbsUp className="h-[18px] w-[18px] text-gray-600 dark:text-gray-400" />
             )}
-            <span className={`text-[15px] font-semibold ${currentReaction ? reactionIcons[currentReaction].color : ''}`}>{currentReaction ? reactionIcons[currentReaction].label : "Like"}</span>
+            <span className={`text-[15px] font-semibold ${currentReaction ? reactionIcons[currentReaction].color : ''}`}>
+              {currentReaction ? reactionIcons[currentReaction].label : "Like"}
+            </span>
           </>
         )}
       </Button>
@@ -153,9 +153,15 @@ export function PostItem({
       {showReactionPicker && !isReacting && (
         <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-full shadow-xl px-2 py-2 flex items-center gap-1 z-50">
           {Object.entries(reactionIcons).map(([type, { label, icon, color }]) => (
-            <button key={type} title={label} onClick={() => handleReaction(type as ReactionType)}
-              className={`relative p-1 hover:scale-150 transition-all duration-200 text-2xl rounded-full ${currentReaction === type ? 'scale-125' : ''}`}>
-              <span className="block transform hover:-translate-y-1 transition-transform">{React.createElement(icon, { className: `h-[18px] w-[18px] ${color}` })}</span>
+            <button 
+              key={type} 
+              title={label} 
+              onClick={() => handleReaction(type as ReactionType)}
+              className={`relative p-1 hover:scale-150 transition-all duration-200 text-2xl rounded-full ${currentReaction === type ? 'scale-125' : ''}`}
+            >
+              <span className={`block transform hover:-translate-y-1 transition-transform ${color}`}>
+                {icon}
+              </span>
             </button>
           ))}
         </div>
@@ -319,12 +325,16 @@ export function PostItem({
               {loading ? <span className="text-sm">Loading...</span> : (
                 <div className="flex items-center gap-1.5 hover:underline cursor-pointer">
                   <div className="flex items-center -space-x-1">
-                    {topReactions.map(([type], idx) => (
-                      <div key={type} style={{ zIndex: topReactions.length - idx }}
-                        className="w-[18px] h-[18px] rounded-full bg-white dark:bg-gray-900 border border-white dark:border-gray-900 flex items-center justify-center">
-                        {(() => { const cfg = reactionIcons[(type.toUpperCase() as ReactionType)]; return cfg ? React.createElement(cfg.icon, { className: "h-[14px] w-[14px]" }) : null })()}
-                      </div>
-                    ))}
+                    {topReactions.map(([type], idx) => {
+                      const reactionType = type.toUpperCase() as ReactionType
+                      const config = reactionIcons[reactionType]
+                      return (
+                        <div key={type} style={{ zIndex: topReactions.length - idx }}
+                          className="w-[18px] h-[18px] rounded-full bg-white dark:bg-gray-900 border border-white dark:border-gray-900 flex items-center justify-center">
+                          {config && <span className="text-[14px]">{config.icon}</span>}
+                        </div>
+                      )
+                    })}
                   </div>
                   <span className="text-[15px]">{totalReactions}</span>
                 </div>
@@ -358,7 +368,12 @@ export function PostItem({
           </div>
         </div>
 
-        <CommentsSection postId={post.postId} isOpen={showComments} onClose={() => setShowComments(false)} />
+        <CommentsSection 
+          postId={post.postId} 
+          isOpen={showComments} 
+          onClose={() => setShowComments(false)} 
+          currentUserId="572a51cc-38a3-4225-a7f2-203a514293f5" // TODO: Get from auth context
+        />
       </Card>
 
       <ShareModal isOpen={showShareModal} onClose={() => setShowShareModal(false)}

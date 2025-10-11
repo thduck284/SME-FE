@@ -1,60 +1,40 @@
-import { createContext, useContext, useState, ReactNode, useEffect } from 'react'
+import React, { createContext, useContext, useState, useEffect } from 'react';
 
-interface AuthContextProps {
-  accessToken: string | null
-  userId: string | null
-  setAccessToken: (token: string | null) => void
+interface AuthContextType {
+  accessToken: string | null;
+  login: (token: string) => void;
+  logout: () => void;
 }
 
-interface AuthProviderProps {
-  children: ReactNode
-}
+const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-const AuthContext = createContext<AuthContextProps>({
-  accessToken: null,
-  userId: null,
-  setAccessToken: () => {},
-})
-
-export const AuthProvider = ({ children }: AuthProviderProps) => {
-  const [accessToken, setAccessToken] = useState<string | null>(null)
-  const [userId, setUserId] = useState<string | null>(null)
+export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const [accessToken, setAccessToken] = useState<string | null>(null);
 
   useEffect(() => {
-    if (accessToken) {
-      try {
-        const decoded = decodeJWT(accessToken)
-        setUserId(decoded?.sub || null)
-      } catch {
-        setUserId(null)
-      }
-    } else {
-      setUserId(null)
-    }
-  }, [accessToken])
+    const token = localStorage.getItem('accessToken');
+    if (token) setAccessToken(token);
+  }, []);
+
+  const login = (token: string) => {
+    localStorage.setItem('accessToken', token);
+    setAccessToken(token);
+  };
+
+  const logout = () => {
+    localStorage.removeItem('accessToken');
+    setAccessToken(null);
+  };
 
   return (
-    <AuthContext.Provider value={{ accessToken, userId, setAccessToken }}>
+    <AuthContext.Provider value={{ accessToken, login, logout }}>
       {children}
     </AuthContext.Provider>
-  )
-}
+  );
+};
 
-export const useAuthContext = () => useContext(AuthContext)
-
-export const decodeJWT = (token: string) => {
-  try {
-    const base64Url = token.split('.')[1]
-    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/')
-    const jsonPayload = decodeURIComponent(
-      atob(base64)
-        .split('')
-        .map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
-        .join('')
-    )
-    return JSON.parse(jsonPayload)
-  } catch (error) {
-    console.error('Failed to decode JWT:', error)
-    return null
-  }
-}
+export const useAuth = () => {
+  const context = useContext(AuthContext);
+  if (!context) throw new Error('useAuth must be used within AuthProvider');
+  return context;
+};

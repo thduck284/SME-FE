@@ -1,12 +1,22 @@
 "use client"
 
 import { useState } from "react"
-import { Home, Search, Compass, Film, MessageCircle, Bell, PlusSquare, User, MoreHorizontal, UserPlus } from "lucide-react"
+import { Home, Search, Compass, Film, MessageCircle, Bell, PlusSquare, User, UserPlus, LogOut } from "lucide-react"
 import { CreatePostModal } from "@/components/posts/CreatePostModal"
+import { SearchModal } from "@/components/search/SearchModal"
 import { Link } from "react-router-dom"
+import { getUserId } from "@/lib/utils/Jwt"
 
 export function LeftBar() {
   const [isModalOpen, setIsModalOpen] = useState(false)
+  const [isSearchModalOpen, setIsSearchModalOpen] = useState(false)
+  const userId = getUserId()
+
+  const handleLogout = () => {
+    localStorage.removeItem('accessToken')
+    localStorage.removeItem('userId')
+    window.location.href = '/login'
+  }
 
   return (
     <>
@@ -29,13 +39,13 @@ export function LeftBar() {
               <span>Home</span>
             </Link>
 
-            <a
-              href="#"
-              className="flex items-center gap-4 px-4 py-3.5 text-gray-700 hover:text-orange-700 hover:bg-orange-50 rounded-xl transition-all duration-300 font-medium group"
+            <button
+              onClick={() => setIsSearchModalOpen(true)}
+              className="flex items-center gap-4 px-4 py-3.5 text-gray-700 hover:text-orange-700 hover:bg-orange-50 rounded-xl transition-all duration-300 font-medium group w-full"
             >
               <Search className="w-6 h-6 group-hover:scale-110 transition-transform" />
               <span>Search</span>
-            </a>
+            </button>
 
             <a
               href="#"
@@ -79,7 +89,7 @@ export function LeftBar() {
             </button>
 
             <Link 
-              to="/profile" 
+              to={userId ? `/profile/${userId}` : "/login"}
               className="flex items-center gap-4 px-4 py-3.5 text-gray-700 hover:text-orange-700 hover:bg-orange-50 rounded-xl transition-all duration-300 font-medium group"
             >
               <User className="w-6 h-6 group-hover:scale-110 transition-transform" />
@@ -94,13 +104,14 @@ export function LeftBar() {
               <span>Gợi ý kết bạn</span>
             </Link>
 
-            <a
-              href="#"
-              className="flex items-center gap-4 px-4 py-3.5 text-gray-700 hover:text-orange-700 hover:bg-orange-50 rounded-xl transition-all duration-300 font-medium group"
+            {/* Logout Button */}
+            <button
+              onClick={handleLogout}
+              className="flex items-center gap-4 px-4 py-3.5 text-gray-700 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all duration-300 font-medium group w-full"
             >
-              <MoreHorizontal className="w-6 h-6 group-hover:scale-110 transition-transform" />
-              <span>More</span>
-            </a>
+              <LogOut className="w-6 h-6 group-hover:scale-110 transition-transform" />
+              <span>Logout</span>
+            </button>
           </nav>
         </div>
       </aside>
@@ -110,6 +121,13 @@ export function LeftBar() {
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         onPostCreated={() => console.log("Post created")}
+        currentUserId="572a51cc-38a3-4225-a7f2-203a514293f5" // TODO: Get from auth context
+      />
+
+      {/* Search Modal */}
+      <SearchModal
+        isOpen={isSearchModalOpen}
+        onClose={() => setIsSearchModalOpen(false)}
       />
     </>
   )

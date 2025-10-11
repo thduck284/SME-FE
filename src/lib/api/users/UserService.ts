@@ -17,13 +17,14 @@ export class UserService {
         },
         mode: 'cors'
       })
-      
+    
       if (!response.ok) return []
       
       const result: RelationshipResponse = await response.json()
       
       if (!result.success) return []
-      
+      console.log("aaaa", result.data)
+
       return result.data
     } catch (error) {
       console.error('Error fetching suggested users:', error)

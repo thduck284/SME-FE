@@ -4,3 +4,4 @@ export { default as Input } from "./Input";
 export { EmojiPicker } from "./EmojiPicker";
 export { Card } from "./Card";
 export { Badge } from "./Badge";
+export { MentionPortal } from "./MentionPortal";

@@ -1,13 +1,16 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useRef } from "react"
 import { Button } from "@/components/ui"
-import { Send, Heart, Trash2, Loader2, AlertCircle } from "lucide-react"
+import { Send, Heart, Trash2, Loader2, AlertCircle, ChevronDown } from "lucide-react"
 import { useComments } from "@/lib/hooks/useComments"
+import { useMention } from "@/lib/hooks/useMention"
 import { UserService } from "@/lib/api/users/UserService"
 import { formatTimeAgo } from "@/lib/utils/PostUtils"
+import { getUserId } from "@/lib/utils/Jwt"
 import type { Comment as CommentType } from "@/lib/types/posts/CommentsDTO"
 import type { UserMetadata } from "@/lib/types/User"
+import type { MentionData } from "@/lib/types/users/MentionDto"
 
 interface CommentsSectionProps {
   postId: string
@@ -20,19 +23,56 @@ export function CommentsSection({ postId, isOpen, onClose }: CommentsSectionProp
   const [error, setError] = useState<string | null>(null)
   const [optimisticComments, setOptimisticComments] = useState<CommentType[]>([])
   const [userCache, setUserCache] = useState<Map<string, UserMetadata>>(new Map())
-  
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null)
+
+  const inputRef = useRef<HTMLInputElement>(null)
+  const fetchingRef = useRef<Set<string>>(new Set())
+  const commentsContainerRef = useRef<HTMLDivElement>(null)
+
+  // Mention functionality
+  const {
+    users: mentionUsers,
+    isLoading: isMentionLoading,
+    showDropdown: showMentionDropdown,
+    selectedIndex: mentionSelectedIndex,
+    handleTextChange: handleMentionTextChange,
+    handleKeyDown: handleMentionKeyDown,
+    selectUser: selectMentionUser,
+    closeDropdown: closeMentionDropdown,
+    mentions,
+    setMentions,
+  } = useMention({
+    currentUserId: currentUserId || '',
+    onMentionAdd: () => {},
+    currentText: comment,
+    onTextChange: (newText, cursorPosition) => {
+      setComment(newText)
+      setTimeout(() => {
+        if (inputRef.current) {
+          inputRef.current.setSelectionRange(cursorPosition, cursorPosition)
+        }
+      }, 0)
+    }
+  })
+
   const {
     comments,
     isLoading,
     isAdding,
     isLiking,
+    pagination,
     fetchComments,
+    loadMoreComments,
     addComment,
     toggleLikeComment,
     deleteComment
   } = useComments(postId)
 
-  // Sử dụng UserService.getUserMetadata thay vì useUsers hook
+  // Get current user ID on mount
+  useEffect(() => {
+    const userId = getUserId()
+    setCurrentUserId(userId)
+  }, [])
 
   // Combine comments from API and optimistic updates, ensuring unique IDs
   const displayComments = [...optimisticComments, ...comments]
@@ -57,8 +97,16 @@ export function CommentsSection({ postId, isOpen, onClose }: CommentsSectionProp
   useEffect(() => {
     const fetchUserMetadata = async () => {
       const commentsToFetch = displayComments
-        .filter(comment => comment && !userCache.has(comment.authorId))
-        .slice(0, 10) // Limit concurrent requests
+        .filter(comment => {
+          if (!comment || !comment.authorId) return false
+          return !userCache.has(comment.authorId) && 
+                 !fetchingRef.current.has(comment.authorId)
+        })
+        .slice(0, 5)
+
+      if (commentsToFetch.length === 0) return
+
+      commentsToFetch.forEach(c => fetchingRef.current.add(c.authorId))
 
       const userPromises = commentsToFetch.map(async (comment) => {
         try {
@@ -70,40 +118,57 @@ export function CommentsSection({ postId, isOpen, onClose }: CommentsSectionProp
         }
       })
 
-      const results = await Promise.all(userPromises)
-      const newCache = new Map(userCache)
-      
-      results.forEach(result => {
-        if (result?.userMetadata) {
-          newCache.set(result.authorId, result.userMetadata)
-        }
-      })
-      
-      setUserCache(newCache)
+      try {
+        const results = await Promise.all(userPromises)
+        const newCache = new Map(userCache)
+        
+        results.forEach(result => {
+          if (result?.userMetadata) {
+            newCache.set(result.authorId, result.userMetadata)
+          }
+        })
+        
+        setUserCache(newCache)
+      } finally {
+        commentsToFetch.forEach(c => fetchingRef.current.delete(c.authorId))
+      }
     }
 
     if (displayComments.length > 0) {
       fetchUserMetadata()
     }
-  }, [displayComments, userCache])
+  }, [displayComments.length])
 
   // Helper functions
+  const handleScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
+    const container = e.currentTarget
+    const isNearBottom = container.scrollHeight - (container.scrollTop + container.clientHeight) < 100
+
+    if (isNearBottom && pagination.hasMore && !isLoading) {
+      loadMoreComments()
+    }
+  }, [pagination.hasMore, isLoading, loadMoreComments])
+
   const getUserFromCache = useCallback((authorId: string): UserMetadata | undefined => 
     userCache.get(authorId), [userCache])
 
   const isTempComment = useCallback((comment: CommentType): boolean => 
     comment?.id?.startsWith?.('temp-') || false, [])
 
+  const isOwnComment = useCallback((comment: CommentType): boolean => {
+    return currentUserId ? comment.authorId === currentUserId : false
+  }, [currentUserId])
+
   const getDisplayInfo = useCallback((comment: CommentType) => {
     const userMetadata = getUserFromCache(comment.authorId)
-    const displayName = comment.authorName === 'You' ? 'You' : 
+    const displayName = isOwnComment(comment) ? 'You' : 
                        (userMetadata ? `${userMetadata.firstName} ${userMetadata.lastName}`.trim() : comment.authorName || 'Unknown User')
     const avatarUrl = userMetadata?.avtUrl || comment.authorAvatar
     const fullName = userMetadata ? `${userMetadata.firstName} ${userMetadata.lastName}`.trim() : 
                     comment.authorName || 'Unknown User'
 
     return { displayName, avatarUrl, fullName }
-  }, [getUserFromCache])
+  }, [getUserFromCache, isOwnComment])
 
   // Comment handlers
   const handleSubmitComment = async (e: React.FormEvent) => {
@@ -119,7 +184,7 @@ export function CommentsSection({ postId, isOpen, onClose }: CommentsSectionProp
     const tempComment: CommentType = {
       id: `temp-${Date.now()}`,
       content: comment,
-      authorId: 'current-user',
+      authorId: currentUserId || 'current-user',
       authorName: 'You',
       authorAvatar: undefined,
       createdAt: new Date().toISOString(),
@@ -202,7 +267,11 @@ export function CommentsSection({ postId, isOpen, onClose }: CommentsSectionProp
       )}
 
       {/* Comments List */}
-      <div className="max-h-60 overflow-y-auto p-4 space-y-3">
+      <div 
+        ref={commentsContainerRef}
+        onScroll={handleScroll}
+        className="max-h-60 overflow-y-auto p-4 space-y-3"
+      >
         {isLoading && displayComments.length === 0 ? (
           <div className="flex justify-center items-center py-8">
             <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
@@ -213,26 +282,50 @@ export function CommentsSection({ postId, isOpen, onClose }: CommentsSectionProp
             No comments yet. Be the first to comment!
           </div>
         ) : (
-          displayComments.map((comment, index) => {
-            if (!comment) return null
+          <>
+            {displayComments.map((comment, index) => {
+              if (!comment) return null
+              
+              const tempComment = isTempComment(comment)
+              const isOwn = isOwnComment(comment)
+              const { displayName, avatarUrl, fullName } = getDisplayInfo(comment)
+              
+              return (
+                <CommentItem
+                  key={comment.id || `comment-${index}-${comment.authorId}`}
+                  comment={comment}
+                  isTemp={tempComment}
+                  isOwn={isOwn}
+                  displayName={displayName}
+                  avatarUrl={avatarUrl}
+                  fullName={fullName}
+                  isLiking={isLiking}
+                  onLike={handleLikeComment}
+                  onDelete={handleDeleteComment}
+                />
+              )
+            })}
             
-            const tempComment = isTempComment(comment)
-            const { displayName, avatarUrl, fullName } = getDisplayInfo(comment)
+            {pagination.hasMore && !isLoading && (
+              <div className="flex justify-center pt-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={loadMoreComments}
+                  className="text-muted-foreground hover:text-foreground"
+                >
+                  <ChevronDown className="h-4 w-4 mr-1" />
+                  Load more
+                </Button>
+              </div>
+            )}
             
-            return (
-              <CommentItem
-                key={comment.id || `comment-${index}-${comment.authorId}`}
-                comment={comment}
-                isTemp={tempComment}
-                displayName={displayName}
-                avatarUrl={avatarUrl}
-                fullName={fullName}
-                isLiking={isLiking}
-                onLike={handleLikeComment}
-                onDelete={handleDeleteComment}
-              />
-            )
-          })
+            {isLoading && displayComments.length > 0 && (
+              <div className="flex justify-center py-2">
+                <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+              </div>
+            )}
+          </>
         )}
       </div>
 
@@ -243,6 +336,17 @@ export function CommentsSection({ postId, isOpen, onClose }: CommentsSectionProp
         onChange={setComment}
         onClearError={() => setError(null)}
         onSubmit={handleSubmitComment}
+        mentionUsers={mentionUsers}
+        isMentionLoading={isMentionLoading}
+        showMentionDropdown={showMentionDropdown}
+        mentionSelectedIndex={mentionSelectedIndex}
+        onMentionTextChange={handleMentionTextChange}
+        onMentionKeyDown={handleMentionKeyDown}
+        onSelectMentionUser={selectMentionUser}
+        onCloseMentionDropdown={closeMentionDropdown}
+        inputRef={inputRef}
+        mentions={mentions as MentionData[]}
+        setMentions={(next) => setMentions(next)}
       />
     </div>
   )
@@ -252,6 +356,7 @@ export function CommentsSection({ postId, isOpen, onClose }: CommentsSectionProp
 interface CommentItemProps {
   comment: CommentType
   isTemp: boolean
+  isOwn: boolean
   displayName: string
   avatarUrl?: string
   fullName?: string
@@ -263,6 +368,7 @@ interface CommentItemProps {
 function CommentItem({ 
   comment, 
   isTemp, 
+  isOwn,
   displayName, 
   avatarUrl, 
   fullName, 
@@ -291,10 +397,9 @@ function CommentItem({
       <div className="flex-1 min-w-0">
         <div className="flex items-start justify-between gap-2">
           <div className="flex-1">
-            <div className="flex items-center gap-2 mb-1">
-              {/* Name with tooltip */}
-              {fullName ? (
-                <div className="group relative">
+            <div className="flex items-center gap-2 mb-1 flex-wrap">
+              {fullName && fullName !== 'Unknown User' ? (
+                <div className="group relative inline-block">
                   <span className="font-medium text-sm text-foreground cursor-help">
                     {displayName}
                   </span>
@@ -308,11 +413,7 @@ function CommentItem({
                 </span>
               )}
               
-              {isTemp && (
-                <span className="ml-2 text-xs text-muted-foreground">
-                  (Posting...)
-                </span>
-              )}
+              {isTemp && <span className="text-xs text-muted-foreground">(Posting...)</span>}
               
               <span className="text-xs text-muted-foreground">
                 {isTemp ? 'Just now' : formatTimeAgo(comment.createdAt)}
@@ -324,7 +425,7 @@ function CommentItem({
             </p>
           </div>
           
-          {!isTemp && (
+          {!isTemp && isOwn && (
             <Button
               variant="ghost"
               size="sm"
@@ -378,23 +479,154 @@ interface CommentInputProps {
   onChange: (value: string) => void
   onClearError: () => void
   onSubmit: (e: React.FormEvent) => void
+  // Mention props
+  mentionUsers: any[]
+  isMentionLoading: boolean
+  showMentionDropdown: boolean
+  mentionSelectedIndex: number
+  onMentionTextChange: (text: string, cursorPosition: number) => void
+  onMentionKeyDown: (e: React.KeyboardEvent) => void
+  onSelectMentionUser: (user: any) => void
+  onCloseMentionDropdown: () => void
+  inputRef: React.RefObject<HTMLInputElement>
+  mentions: MentionData[]
+  setMentions: (next: MentionData[]) => void
 }
 
-function CommentInput({ comment, isAdding, onChange, onClearError, onSubmit }: CommentInputProps) {
+function CommentInput({ 
+  comment, 
+  isAdding, 
+  onChange, 
+  onClearError, 
+  onSubmit,
+  mentionUsers,
+  isMentionLoading,
+  showMentionDropdown,
+  mentionSelectedIndex,
+  onMentionTextChange,
+  onMentionKeyDown,
+  onSelectMentionUser,
+  onCloseMentionDropdown,
+  inputRef,
+  mentions,
+  setMentions
+}: CommentInputProps) {
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value
+    onChange(value)
+    onClearError()
+    onMentionTextChange(value, e.target.selectionStart || 0)
+  }
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    const input = inputRef.current || (e.currentTarget as HTMLInputElement | null)
+    if (!input) {
+      onMentionKeyDown(e)
+      return
+    }
+
+    const selectionStart = input.selectionStart || 0
+    const selectionEnd = input.selectionEnd || 0
+
+    const expandDeletionToMentions = (deleteStart: number, deleteEnd: number) => {
+      const overlapped = mentions.filter(m => !(m.endIndex <= deleteStart || m.startIndex >= deleteEnd))
+      if (overlapped.length === 0) return { start: deleteStart, end: deleteEnd }
+      const mentionStart = Math.min(...overlapped.map(m => m.startIndex))
+      const mentionEnd = Math.max(...overlapped.map(m => m.endIndex))
+      const start = Math.min(deleteStart, mentionStart)
+      const end = Math.max(deleteEnd, mentionEnd)
+      return { start, end }
+    }
+
+    const deleteRange = (start: number, end: number) => {
+      const safeStart = Math.max(0, Math.min(start, comment.length))
+      const safeEnd = Math.max(safeStart, Math.min(end, comment.length))
+      const newText = comment.slice(0, safeStart) + comment.slice(safeEnd)
+      const delta = safeEnd - safeStart
+
+      const updatedMentions = mentions
+        .filter(m => !(m.endIndex > safeStart && m.startIndex < safeEnd))
+        .map(m => {
+          if (m.startIndex >= safeEnd) {
+            return {
+              ...m,
+              startIndex: m.startIndex - delta,
+              endIndex: m.endIndex - delta,
+            }
+          }
+          return m
+        })
+
+      e.preventDefault()
+      onChange(newText)
+      setMentions(updatedMentions)
+
+      setTimeout(() => {
+        if (inputRef.current) {
+          inputRef.current.focus()
+          inputRef.current.setSelectionRange(safeStart, safeStart)
+        }
+      }, 0)
+    }
+
+    if (e.key === 'Backspace') {
+      if (selectionStart === selectionEnd) {
+        const mentionAtCursor = mentions.find(m => selectionStart >= m.startIndex && selectionStart < m.endIndex)
+        if (mentionAtCursor) {
+          deleteRange(mentionAtCursor.startIndex, mentionAtCursor.endIndex)
+          return
+        }
+        const pos = selectionStart - 1
+        if (pos >= 0) {
+          const mentionLeft = mentions.find(m => pos >= m.startIndex && pos < m.endIndex)
+          if (mentionLeft) {
+            deleteRange(mentionLeft.startIndex, mentionLeft.endIndex)
+            return
+          }
+        }
+      } else {
+        const { start, end } = expandDeletionToMentions(selectionStart, selectionEnd)
+        if (start !== selectionStart || end !== selectionEnd) {
+          deleteRange(start, end)
+          return
+        }
+      }
+    }
+
+    if (e.key === 'Delete') {
+      if (selectionStart === selectionEnd) {
+        const pos = selectionStart
+        const mention = mentions.find(m => pos >= m.startIndex && pos < m.endIndex)
+        if (mention) {
+          deleteRange(mention.startIndex, mention.endIndex)
+          return
+        }
+      } else {
+        const { start, end } = expandDeletionToMentions(selectionStart, selectionEnd)
+        if (start !== selectionStart || end !== selectionEnd) {
+          deleteRange(start, end)
+          return
+        }
+      }
+    }
+
+    onMentionKeyDown(e)
+  }
+
   return (
     <form onSubmit={onSubmit} className="p-4 border-t border-border/50">
-      <div className="flex gap-2">
+      <div className="flex gap-2 relative">
         <input
+          ref={inputRef}
           type="text"
           value={comment}
-          onChange={(e) => {
-            onChange(e.target.value)
-            onClearError()
-          }}
-          placeholder="Write a comment..."
+          onChange={handleInputChange}
+          onKeyDown={handleKeyDown}
+          placeholder="Write a comment... Type @ to see all users"
           disabled={isAdding}
           className="flex-1 px-3 py-2 text-sm bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:opacity-50 transition-colors"
         />
+        
         <Button 
           type="submit" 
           size="sm" 

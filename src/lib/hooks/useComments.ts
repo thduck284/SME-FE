@@ -12,13 +12,11 @@ export function useComments(postId: string) {
     hasMore: boolean
   }>({ hasMore: false })
 
-  // Validate postId
   const isValidPostId = useCallback(() => {
     return postId && typeof postId === 'string' && postId.trim().length > 0
   }, [postId])
 
-  // Lấy comments từ API
-  const fetchComments = useCallback(async (limit?: number, cursor?: string) => {
+  const fetchComments = useCallback(async (limit: number = 5, cursor?: string) => {
     if (!isValidPostId()) {
       throw new Error('Invalid post ID')
     }
@@ -26,25 +24,37 @@ export function useComments(postId: string) {
     setIsLoading(true)
     try {
       const response = await commentApi.getCommentsByPost(postId, limit, cursor)
-      setComments(prev => cursor ? [...prev, ...response.comments] : response.comments)
+      
+      const newComments = Array.isArray(response.comments) ? response.comments : []
+      
+      setComments(prev => cursor ? [...prev, ...newComments] : newComments)
       setPagination({
         nextCursor: response.nextCursor,
-        hasMore: response.hasMore
+        hasMore: response.hasMore ?? false
       })
+      
     } catch (error) {
+      console.error('fetchComments error:', error)
       throw error
     } finally {
       setIsLoading(false)
     }
   }, [postId, isValidPostId])
 
-  // Load more comments
   const loadMoreComments = useCallback(async () => {
-    if (!pagination.hasMore || !pagination.nextCursor) return
-    await fetchComments(10, pagination.nextCursor)
+    if (!pagination.hasMore || !pagination.nextCursor) {
+      console.warn('No more comments to load')
+      return
+    }
+    
+    try {
+      await fetchComments(5, pagination.nextCursor)
+    } catch (error) {
+      console.error('loadMoreComments error:', error)
+      throw error
+    }
   }, [pagination, fetchComments])
 
-  // Thêm comment mới - ĐẢM BẢO CONTENT LUÔN CÓ GIÁ TRỊ
   const addComment = useCallback(async (content: string, mentions?: CommentMention[]) => {
     if (!content.trim()) {
       throw new Error('Comment content cannot be empty')
@@ -64,7 +74,6 @@ export function useComments(postId: string) {
       
       const newComment = await commentApi.createComment(createData)
       
-      // Đảm bảo comment mới có đầy đủ thông tin
       const enrichedComment: Comment = {
         ...newComment,
         content: newComment.content || content.trim(),
@@ -79,15 +88,18 @@ export function useComments(postId: string) {
       setComments(prev => [enrichedComment, ...prev])
       return enrichedComment
     } catch (error) {
+      console.error('addComment error:', error)
       throw error
     } finally {
       setIsAdding(false)
     }
   }, [postId, isValidPostId])
 
-  // Like/unlike comment
   const toggleLikeComment = useCallback(async (commentId: string) => {
-    if (isLiking) return
+    if (isLiking === commentId) {
+      console.warn('Already liking this comment')
+      return
+    }
     
     setIsLiking(commentId)
     try {
@@ -105,30 +117,29 @@ export function useComments(postId: string) {
       
       return result
     } catch (error) {
+      console.error('toggleLikeComment error:', error)
       throw error
     } finally {
       setIsLiking(null)
     }
   }, [isLiking])
 
-  // Xóa comment
   const deleteComment = useCallback(async (commentId: string) => {
     try {
       await commentApi.deleteComment(commentId)
       setComments(prev => prev.filter(comment => comment.id !== commentId))
     } catch (error) {
+      console.error('deleteComment error:', error)
       throw error
     }
   }, [])
 
-  // Refresh comments
   const refreshComments = useCallback(() => {
     if (isValidPostId()) {
-      fetchComments(10)
+      fetchComments(5)
     }
   }, [fetchComments, isValidPostId])
 
-  // Clear comments
   const clearComments = useCallback(() => {
     setComments([])
     setPagination({ hasMore: false })
