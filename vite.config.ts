@@ -11,11 +11,12 @@ export default defineConfig({
   },
   server: {
     proxy: {
-      '/posts': 'http://localhost:3003',
+      '/comments': 'http://localhost:3013',
+      '/posts': 'http://localhost:3013',
       '/reaction': 'http://localhost:3004',
       '/users': 'http://localhost:3001',
       '/relationships': 'http://localhost:3002',
-      '/auth': 'http://localhost:3010',
+      '/auth': 'http://localhost:3011',
     }
   }
 });
