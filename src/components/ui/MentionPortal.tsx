@@ -95,7 +95,7 @@ export function MentionPortal({
               onClick={() => onSelect(user)}
             >
               <Avatar 
-                src={user.avtUrl || '/assets/images/profile.png'} 
+                src={user.avtUrl || '/assets/images/default.png'} 
                 alt={`${user.firstName} ${user.lastName}`}
                 className="h-8 w-8"
               />

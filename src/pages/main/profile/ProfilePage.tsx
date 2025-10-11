@@ -147,7 +147,7 @@ export function ProfilePage() {
       try {
         setLoadingProfile(true)
         setErrorProfile(null)
-        const res = await fetch(`/users/${userId}/metadata`, {
+        const res = await fetch(`/users/${userId}`, {
           method: 'GET',
           headers: { 'Content-Type': 'application/json' },
           signal: controller.signal,
@@ -157,6 +157,7 @@ export function ProfilePage() {
           throw new Error(`Failed to load profile: ${res.status} ${text}`)
         }
         const json = await res.json()
+        console.log(json)
         setProfile(json.data)
         if (json.data) {
           const avatarUrlToSet = getAvatarUrl(json.data.avtUrl)

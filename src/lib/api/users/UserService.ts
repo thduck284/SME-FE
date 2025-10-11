@@ -2,15 +2,15 @@ import { UserMetadata, UserMetadataResponse } from "@/lib/types/User"
 import { RelationshipSuggestion, RelationshipResponse, RelationshipDto } from "@/lib/types/Relationship"
 
 export class UserService {
-  private static readonly RELATIONSHIPS_BASE_URL = 'http://localhost:3002'
-  private static readonly USERS_BASE_URL = 'http://localhost:3001'
+  private static readonly RELATIONSHIPS_BASE_URL = '/relationships'
+  private static readonly USERS_BASE_URL = '/users'
 
   /**
    * Lấy danh sách gợi ý kết bạn
    */
   static async getSuggestedUsers(currentUserId: string): Promise<RelationshipSuggestion[]> {
     try {
-      const response = await fetch(`${this.RELATIONSHIPS_BASE_URL}/relationships/${currentUserId}/suggestion`, {
+      const response = await fetch(`${this.RELATIONSHIPS_BASE_URL}/${currentUserId}/suggestion`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -37,7 +37,7 @@ export class UserService {
    */
   static async getUserMetadata(userId: string): Promise<UserMetadata> {
     try {
-      const response = await fetch(`${this.USERS_BASE_URL}/users/${userId}/metadata`, {
+      const response = await fetch(`${this.USERS_BASE_URL}/${userId}/metadata`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -97,7 +97,7 @@ export class UserService {
    */
   static async followUser(fromUserId: string, toUserId: string): Promise<RelationshipDto> {
     try {
-      const response = await fetch(`${this.RELATIONSHIPS_BASE_URL}/relationships/${fromUserId}/follow`, {
+      const response = await fetch(`${this.RELATIONSHIPS_BASE_URL}/${fromUserId}/follow`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -123,7 +123,7 @@ export class UserService {
    */
   static async unfollowUser(fromUserId: string, toUserId: string): Promise<void> {
     try {
-      const response = await fetch(`${this.RELATIONSHIPS_BASE_URL}/relationships/${fromUserId}/unfollow`, {
+      const response = await fetch(`${this.RELATIONSHIPS_BASE_URL}/${fromUserId}/unfollow`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

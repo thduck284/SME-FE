@@ -79,7 +79,7 @@ export function PostReactions({ postId, onCommentClick }: PostReactionsProps) {
             ) : (
               <>
               {currentReaction 
-                ? React.createElement(reactionIcons[currentReaction].icon, { className: `h-4 w-4 ${reactionIcons[currentReaction].color}` })
+                ? <span className={`text-lg ${reactionIcons[currentReaction].color}`}>{reactionIcons[currentReaction].icon}</span>
                 : <ThumbsUp className="h-4 w-4 text-gray-600 dark:text-gray-400" />}
                 <span className={`transition-all ${currentReaction ? `font-semibold ${reactionIcons[currentReaction].color}` : ''}`}>
                   {totalReactions}
@@ -104,7 +104,7 @@ export function PostReactions({ postId, onCommentClick }: PostReactionsProps) {
                   onClick={() => handleReaction(type as ReactionType)}
                   title={label}
                 >
-                  {React.createElement(icon, { className: "h-4 w-4" })}
+                  <span className="text-lg">{icon}</span>
                 </button>
               ))}
             </div>
@@ -142,7 +142,7 @@ export function PostReactions({ postId, onCommentClick }: PostReactionsProps) {
               const reactionConfig = reactionIcons[type as ReactionType]
               return (
                 <div key={type} className="flex items-center gap-1">
-                  {reactionConfig?.icon ? React.createElement(reactionConfig.icon, { className: "h-3.5 w-3.5" }) : null}
+                  {reactionConfig?.icon ? <span className="text-sm">{reactionConfig.icon}</span> : null}
                   <span>{count}</span>
                 </div>
               )

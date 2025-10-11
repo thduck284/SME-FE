@@ -1,7 +1,7 @@
 import axios from "axios"
 
 const userApiClient = axios.create({
-  baseURL: "http://localhost:3001",
+  baseURL: "/users",
   withCredentials: false,
 })
 

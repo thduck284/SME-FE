@@ -55,6 +55,8 @@ export function PostItem({
   const [isReacting, setIsReacting] = useState(false)
   const [showReactionPicker, setShowReactionPicker] = useState(false)
   const [showShareModal, setShowShareModal] = useState(false)
+  const [authorMetadata, setAuthorMetadata] = useState<UserMetadata | null>(null)
+  const [loadingAuthor, setLoadingAuthor] = useState(true)
   
   // Debug log
   
@@ -65,6 +67,24 @@ export function PostItem({
       if (hideTimeoutRef.current) clearTimeout(hideTimeoutRef.current)
     }
   }, [])
+
+  // Fetch author metadata
+  useEffect(() => {
+    const fetchAuthorMetadata = async () => {
+      try {
+        setLoadingAuthor(true)
+        const metadata = await UserService.getUserMetadata(post.authorId)
+        setAuthorMetadata(metadata)
+      } catch (error) {
+        console.error('Failed to fetch author metadata:', error)
+        setAuthorMetadata(null)
+      } finally {
+        setLoadingAuthor(false)
+      }
+    }
+
+    fetchAuthorMetadata()
+  }, [post.authorId])
 
   const handleReactionShow = () => {
     if (hideTimeoutRef.current) clearTimeout(hideTimeoutRef.current)
@@ -146,7 +166,7 @@ export function PostItem({
         ) : (
           <>
             {currentReaction ? (
-              React.createElement(reactionIcons[currentReaction].icon, { className: `h-[18px] w-[18px] ${reactionIcons[currentReaction].color}` })
+              <span className={`text-lg ${reactionIcons[currentReaction].color}`}>{reactionIcons[currentReaction].icon}</span>
             ) : (
               <ThumbsUp className="h-[18px] w-[18px] text-gray-600 dark:text-gray-400" />
             )}
@@ -160,7 +180,7 @@ export function PostItem({
           {Object.entries(reactionIcons).map(([type, { label, icon, color }]) => (
             <button key={type} title={label} onClick={() => handleReaction(type as ReactionType)}
               className={`relative p-1 hover:scale-150 transition-all duration-200 text-2xl rounded-full ${currentReaction === type ? 'scale-125' : ''}`}>
-              <span className="block transform hover:-translate-y-1 transition-transform">{React.createElement(icon, { className: `h-[18px] w-[18px] ${color}` })}</span>
+              <span className={`block transform hover:-translate-y-1 transition-transform ${color}`}>{icon}</span>
             </button>
           ))}
         </div>
@@ -188,7 +208,15 @@ export function PostItem({
           <div className="px-4 pt-3 pb-0">
             <div className="flex items-center gap-2 text-[13px] text-gray-500 dark:text-gray-400">
               <Repeat2 className="h-3.5 w-3.5" />
-              <span className="font-normal">Sarah Anderson shared a post</span>
+              <span className="font-normal">
+                {loadingAuthor ? (
+                  <div className="h-4 w-32 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+                ) : authorMetadata ? (
+                  `${authorMetadata.firstName} ${authorMetadata.lastName} shared a post`
+                ) : (
+                  "Unknown User shared a post"
+                )}
+              </span>
             </div>
           </div>
         )}
@@ -196,9 +224,29 @@ export function PostItem({
         {/* Thông tin tác giả */}
         <div className="flex items-start justify-between px-4 pt-3 pb-2">
           <div className="flex items-start gap-3 flex-1">
-            <Avatar src="/image.png?height=40&width=40" alt="User avatar" className="h-10 w-10 cursor-pointer hover:opacity-90 transition-opacity" />
+            <div 
+              className="cursor-pointer hover:opacity-90 transition-opacity ring-2 ring-transparent hover:ring-blue-200 dark:hover:ring-blue-800 rounded-full"
+              onClick={() => navigate(`/profile/${post.authorId}`)}
+            >
+              <Avatar 
+                src={authorMetadata?.avtUrl || "/assets/images/default.png"} 
+                alt={authorMetadata ? `${authorMetadata.firstName} ${authorMetadata.lastName}` : "User avatar"} 
+                className="h-10 w-10" 
+              />
+            </div>
             <div className="flex-1 min-w-0">
-              <h4 className="font-semibold text-[15px] text-gray-900 dark:text-gray-100 hover:underline cursor-pointer">Sarah Anderson</h4>
+              <h4 
+                className="font-semibold text-[15px] text-gray-900 dark:text-gray-100 hover:underline cursor-pointer"
+                onClick={() => navigate(`/profile/${post.authorId}`)}
+              >
+                {loadingAuthor ? (
+                  <div className="h-4 w-24 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+                ) : authorMetadata ? (
+                  `${authorMetadata.firstName} ${authorMetadata.lastName}`.trim()
+                ) : (
+                  "Unknown User"
+                )}
+              </h4>
               <div className="flex items-center gap-1 text-[13px] text-gray-500 dark:text-gray-400">
                 <span className="hover:underline cursor-pointer">{formatTimeAgo(post.createdAt)}</span>
                 <span>·</span>
@@ -250,9 +298,29 @@ export function PostItem({
         {isSharePost && hasRootPost && post.rootPost && (
           <div className="mx-4 my-3 border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden bg-gray-50 dark:bg-gray-800/50 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors cursor-pointer">
             <div className="flex items-center gap-2.5 px-3 py-2.5 border-b border-gray-200 dark:border-gray-700">
-              <Avatar src="/image.png?height=32&width=32" alt="Original author" className="h-8 w-8" />
+              <div 
+                className="cursor-pointer hover:opacity-90 transition-opacity ring-2 ring-transparent hover:ring-blue-200 dark:hover:ring-blue-800 rounded-full"
+                onClick={() => navigate(`/profile/${post.authorId}`)}
+              >
+                <Avatar 
+                  src={authorMetadata?.avtUrl || "/assets/images/default.png"} 
+                  alt={authorMetadata ? `${authorMetadata.firstName} ${authorMetadata.lastName}` : "Original author"} 
+                  className="h-8 w-8" 
+                />
+              </div>
               <div className="flex-1 min-w-0">
-                <p className="font-semibold text-[15px] text-gray-900 dark:text-gray-100 hover:underline">Original Author</p>
+                <p 
+                  className="font-semibold text-[15px] text-gray-900 dark:text-gray-100 hover:underline cursor-pointer"
+                  onClick={() => navigate(`/profile/${post.authorId}`)}
+                >
+                  {loadingAuthor ? (
+                    <div className="h-4 w-20 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+                  ) : authorMetadata ? (
+                    `${authorMetadata.firstName} ${authorMetadata.lastName}`.trim()
+                  ) : (
+                    "Original Author"
+                  )}
+                </p>
                 <p className="text-[13px] text-gray-500 dark:text-gray-400">{formatTimeAgo(post.rootPost.createdAt)}</p>
               </div>
             </div>
@@ -315,7 +383,7 @@ export function PostItem({
                     {topReactions.map(([type], idx) => (
                       <div key={type} style={{ zIndex: topReactions.length - idx }}
                         className="w-[18px] h-[18px] rounded-full bg-white dark:bg-gray-900 border border-white dark:border-gray-900 flex items-center justify-center">
-                        {(() => { const cfg = reactionIcons[(type.toUpperCase() as ReactionType)]; return cfg ? React.createElement(cfg.icon, { className: "h-[14px] w-[14px]" }) : null })()}
+                        {(() => { const cfg = reactionIcons[(type.toUpperCase() as ReactionType)]; return cfg ? <span className="text-sm">{cfg.icon}</span> : null })()}
                       </div>
                     ))}
                   </div>
@@ -379,7 +447,13 @@ export function PostItem({
       />
 
       <ShareModal isOpen={showShareModal} onClose={() => setShowShareModal(false)}
-        post={{ postId: post.postId, content: post.content, medias: post.medias || [], authorName: "Sarah Anderson", authorAvatar: "/image.png?height=40&width=40" }}
+        post={{ 
+          postId: post.postId, 
+          content: post.content, 
+          medias: post.medias || [], 
+          authorName: authorMetadata ? `${authorMetadata.firstName} ${authorMetadata.lastName}`.trim() : "Unknown User", 
+          authorAvatar: authorMetadata?.avtUrl || "/assets/images/default.png" 
+        }}
         onSuccess={() => { onShareSuccess?.() }} />
     </>
   )
@@ -444,8 +518,11 @@ function PostContentWithMentions({ content, mentions, onMentionClick }: { conten
 
   // Render content with highlighted mentions
   const renderContent = () => {
+    // Ensure content is a valid string
+    const safeContent = content || ''
+    
     if (!mentions || mentions.length === 0) {
-      return <span className="text-[15px] text-gray-900 dark:text-gray-100 leading-[1.3333] whitespace-pre-wrap break-words">{content}</span>
+      return <span className="text-[15px] text-gray-900 dark:text-gray-100 leading-[1.3333] whitespace-pre-wrap break-words">{safeContent}</span>
     }
 
     // Sort mentions by startIndex to process them in order
@@ -465,7 +542,7 @@ function PostContentWithMentions({ content, mentions, onMentionClick }: { conten
       if (mention.startIndex > lastIndex) {
         parts.push({
           type: 'text',
-          content: content.slice(lastIndex, mention.startIndex),
+          content: safeContent.slice(lastIndex, mention.startIndex),
           startIndex: lastIndex,
           endIndex: mention.startIndex
         })
@@ -474,7 +551,7 @@ function PostContentWithMentions({ content, mentions, onMentionClick }: { conten
       // Add mention
       const userMetadata = userCache.get(mention.userId)
       const displayName = userMetadata 
-        ? `${userMetadata.firstName} ${userMetadata.lastName}`.trim()
+        ? `${userMetadata.firstName || ''} ${userMetadata.lastName || ''}`.trim()
         : `@user${mention.userId.slice(0, 8)}`
 
       parts.push({
@@ -489,12 +566,12 @@ function PostContentWithMentions({ content, mentions, onMentionClick }: { conten
     })
 
     // Add remaining text after last mention
-    if (lastIndex < content.length) {
+    if (lastIndex < safeContent.length) {
       parts.push({
         type: 'text',
-        content: content.slice(lastIndex),
+        content: safeContent.slice(lastIndex),
         startIndex: lastIndex,
-        endIndex: content.length
+        endIndex: safeContent.length
       })
     }
 

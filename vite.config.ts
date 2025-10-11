@@ -11,12 +11,32 @@ export default defineConfig({
   },
   server: {
     proxy: {
-      '/comments': 'http://localhost:3013',
-      '/posts': 'http://localhost:3013',
-      '/reaction': 'http://localhost:3004',
-      '/users': 'http://localhost:3001',
-      '/relationships': 'http://localhost:3002',
-      '/auth': 'http://localhost:3011',
-    }
+      '/comments': {
+        target: 'http://localhost:3003',
+        changeOrigin: true,
+      },
+      '/posts': {
+        target: 'http://localhost:3003',
+        changeOrigin: true,
+      },
+      '/reaction': {
+        target: 'http://localhost:3004',
+        changeOrigin: true,
+      },
+      '/users': {
+        target: 'http://localhost:3001',
+        changeOrigin: true,
+        secure: false, // cho phép http
+      },
+      '/relationships': {
+        target: 'http://localhost:3002',
+        changeOrigin: true,
+      },
+      '/auth': {
+        target: 'http://localhost:3011',
+        changeOrigin: true,
+      },
+    },
   }
+  
 });
