@@ -222,7 +222,7 @@ export function ProfileOtherPage() {
       try {
         setLoadingProfile(true)
         setErrorProfile(null)
-        const res = await fetch(`/users/${userId}/metadata`, {
+        const res = await fetch(`/users/${userId}`, {
           method: 'GET',
           headers: { 'Content-Type': 'application/json' },
           signal: controller.signal,

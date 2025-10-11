@@ -1,10 +1,7 @@
 import { UserRelationshipsResponseDto } from '@/lib/types/Relationship'
-import { getUserId } from '@/lib/utils/Jwt'
-
-const userId = getUserId() || ''
 
 export const relationshipService = {
-  async getFollowers(): Promise<UserRelationshipsResponseDto> {
+  async getFollowers(userId: string): Promise<UserRelationshipsResponseDto> {
     const res = await fetch(`/relationships/${userId}/followers`, {
       method: 'GET',
       headers: {
@@ -20,7 +17,7 @@ export const relationshipService = {
     return await res.json();
   },
 
-  async getFollowing(): Promise<UserRelationshipsResponseDto> {
+  async getFollowing(userId: string): Promise<UserRelationshipsResponseDto> {
     const res = await fetch(`/relationships/${userId}/following`, { 
       method: 'GET',
       headers: {

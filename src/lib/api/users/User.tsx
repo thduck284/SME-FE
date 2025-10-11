@@ -124,5 +124,24 @@ export const userApi = {
     const data = await handleResponse(response)
     
     return transformUserData(data)
+  },
+
+  getUser: async (userId: string): Promise<User> => {
+    const response = await fetch(`/users/${userId}`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    })
+    
+    if (!response.ok) {
+      const errorText = await response.text()
+      throw new Error(`Failed to fetch user: ${response.status} - ${errorText}`)
+    }
+    
+    const json = await response.json()
+    const userData = json.data
+    
+    return transformUserData(userData)
   }
 }

@@ -1,12 +1,13 @@
 "use client"
 
 import { useState, useRef, useEffect } from "react"
-import { useParams, useSearchParams } from "react-router-dom"
+import { useSearchParams } from "react-router-dom"
 import { Badge, Button, Card } from "@/components/ui"
 import { User, FileText, ImageIcon, MapPin, LinkIcon, Calendar, Mail, Camera } from "lucide-react"
 import { LeftBar, RightBar } from "@/components/layouts"
 import { PostsTab } from "@/components/profile/PostsTab"
 import { ImagesTab } from "@/components/profile/ImagesTab"
+import { RelationshipModal } from "@/components/profile/RelationshipModal"
 import { useUserRelationship } from "@/lib/hooks/useRelationship"
 import { getPostsCount } from "@/lib/api/posts/GetPostsByUser"
 import { useUsers } from "@/lib/hooks/useUsers"
@@ -66,7 +67,6 @@ const getAvatarUrl = (avtUrl: string | null): string => {
 }
 
 export function ProfilePage() {
-  const { userId: userIdFromParams } = useParams()
   const [searchParams, setSearchParams] = useSearchParams()
   
   const [userId, setUserId] = useState<string | null>(null)
@@ -88,6 +88,13 @@ export function ProfilePage() {
   } | null>(null)
   const [loadingProfile, setLoadingProfile] = useState<boolean>(true)
   const [errorProfile, setErrorProfile] = useState<string | null>(null)
+  const [relationshipModal, setRelationshipModal] = useState<{
+    isOpen: boolean
+    type: "followers" | "following"
+  }>({
+    isOpen: false,
+    type: "followers"
+  })
 
   const fileInputRef = useRef<HTMLInputElement>(null)
   const mainContentRef = useRef<HTMLDivElement>(null)
@@ -97,7 +104,7 @@ export function ProfilePage() {
     followers, 
     following, 
     loading: loadingRelationships
-  } = useUserRelationship()
+  } = useUserRelationship(userId || undefined)
 
   // Lấy userId từ JWT khi component mount
   useEffect(() => {
@@ -241,6 +248,20 @@ export function ProfilePage() {
     setAvatarUrl("/default.png")
   }
 
+  const handleRelationshipClick = (type: "followers" | "following") => {
+    setRelationshipModal({
+      isOpen: true,
+      type
+    })
+  }
+
+  const closeRelationshipModal = () => {
+    setRelationshipModal({
+      isOpen: false,
+      type: "followers"
+    })
+  }
+
   // Hiển thị loading nếu chưa có userId
   if (!userId) {
     return (
@@ -351,7 +372,22 @@ export function ProfilePage() {
             <div className="flex gap-10">
               {stats.map((stat) => (
                 <div key={stat.label} className="space-y-2">
-                  <div className="text-2xl font-bold text-gray-900">{stat.value}</div>
+                  <div 
+                    className={`text-2xl font-bold text-gray-900 ${
+                      stat.label === "Followers" || stat.label === "Following" 
+                        ? "cursor-pointer hover:text-primary transition-colors" 
+                        : ""
+                    }`}
+                    onClick={() => {
+                      if (stat.label === "Followers") {
+                        handleRelationshipClick("followers")
+                      } else if (stat.label === "Following") {
+                        handleRelationshipClick("following")
+                      }
+                    }}
+                  >
+                    {stat.value}
+                  </div>
                   <div className="text-sm text-gray-600">{stat.label}</div>
                 </div>
               ))}
@@ -453,6 +489,14 @@ export function ProfilePage() {
           <RightBar />
         </div>
       </div>
+
+      {/* Relationship Modal */}
+      <RelationshipModal
+        isOpen={relationshipModal.isOpen}
+        onClose={closeRelationshipModal}
+        type={relationshipModal.type}
+        userId={userId || ""}
+      />
     </div>
   )
 }
