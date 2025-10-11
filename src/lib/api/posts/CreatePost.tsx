@@ -26,7 +26,11 @@ export async function createPost(payload: CreatePostPayload) {
   files?.forEach((file) => formData.append("mediaFiles", file))
   
   if (mentions && mentions.length > 0) {
-    formData.append("mentions", JSON.stringify(mentions))
+    mentions.forEach((mention, index) => {
+      formData.append(`mentions[${index}][userId]`, mention.userId)
+      formData.append(`mentions[${index}][startIndex]`, mention.startIndex.toString())
+      formData.append(`mentions[${index}][endIndex]`, mention.endIndex.toString())
+    })
   }
 
   try {

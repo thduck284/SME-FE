@@ -36,4 +36,5 @@ export interface CreateCommentRequest {
   parentCommentId?: string
   content?: string
   mentions?: CommentMention[]
+  files?: File[]
 }
