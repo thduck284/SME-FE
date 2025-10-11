@@ -1,14 +1,13 @@
 "use client"
 
-import { useState, useEffect, useCallback, useRef } from "react"
-import { Button } from "@/components/ui"
-import { Send, Heart, Trash2, Loader2, AlertCircle, ChevronDown } from "lucide-react"
+import { useState, useEffect, useCallback, useRef, useMemo } from "react"
+import { Button, MentionPortal } from "@/components/ui"
+import { Send, Heart, Trash2, Loader2, AlertCircle } from "lucide-react"
 import { useComments } from "@/lib/hooks/useComments"
 import { useMention } from "@/lib/hooks/useMention"
 import { UserService } from "@/lib/api/users/UserService"
 import { formatTimeAgo } from "@/lib/utils/PostUtils"
-import { getUserId } from "@/lib/utils/Jwt"
-import type { Comment as CommentType } from "@/lib/types/posts/CommentsDTO"
+import type { Comment as CommentType, CommentMention } from "@/lib/types/posts/CommentsDTO"
 import type { UserMetadata } from "@/lib/types/User"
 import type { MentionData } from "@/lib/types/users/MentionDto"
 
@@ -16,18 +15,15 @@ interface CommentsSectionProps {
   postId: string
   isOpen: boolean
   onClose: () => void
+  currentUserId?: string
 }
 
-export function CommentsSection({ postId, isOpen, onClose }: CommentsSectionProps) {
+export function CommentsSection({ postId, isOpen, currentUserId }: CommentsSectionProps) {
   const [comment, setComment] = useState("")
   const [error, setError] = useState<string | null>(null)
   const [optimisticComments, setOptimisticComments] = useState<CommentType[]>([])
   const [userCache, setUserCache] = useState<Map<string, UserMetadata>>(new Map())
-  const [currentUserId, setCurrentUserId] = useState<string | null>(null)
-
   const inputRef = useRef<HTMLInputElement>(null)
-  const fetchingRef = useRef<Set<string>>(new Set())
-  const commentsContainerRef = useRef<HTMLDivElement>(null)
 
   // Mention functionality
   const {
@@ -43,10 +39,11 @@ export function CommentsSection({ postId, isOpen, onClose }: CommentsSectionProp
     setMentions,
   } = useMention({
     currentUserId: currentUserId || '',
-    onMentionAdd: () => {},
+    onMentionAdd: () => {}, // We don't need to track mentions in comments for now
     currentText: comment,
     onTextChange: (newText, cursorPosition) => {
       setComment(newText)
+      // Update cursor position after state update
       setTimeout(() => {
         if (inputRef.current) {
           inputRef.current.setSelectionRange(cursorPosition, cursorPosition)
@@ -54,71 +51,81 @@ export function CommentsSection({ postId, isOpen, onClose }: CommentsSectionProp
       }, 0)
     }
   })
-
+  
   const {
     comments,
     isLoading,
     isAdding,
     isLiking,
-    pagination,
     fetchComments,
-    loadMoreComments,
     addComment,
     toggleLikeComment,
     deleteComment
   } = useComments(postId)
 
-  // Get current user ID on mount
-  useEffect(() => {
-    const userId = getUserId()
-    setCurrentUserId(userId)
-  }, [])
+  // Sử dụng UserService.getUserMetadata thay vì useUsers hook
 
   // Combine comments from API and optimistic updates, ensuring unique IDs
-  const displayComments = [...optimisticComments, ...comments]
-    .filter(Boolean)
-    .reduce((acc, comment) => {
-      if (!acc.find(c => c.id === comment.id)) {
-        acc.push(comment)
+  const displayComments = useMemo(() => {
+    
+    // Start with real comments from API
+    const allComments = [...comments]
+    
+    // Add optimistic comments that don't exist in real comments
+    optimisticComments.forEach(optimisticComment => {
+      const exists = allComments.find(c => c.id === optimisticComment.id)
+      if (!exists) {
+        allComments.push(optimisticComment)
       }
-      return acc
-    }, [] as CommentType[])
+    })
+    
+    // Filter out any null/undefined comments
+    const validComments = allComments.filter(Boolean)
+    
+    // Sort by creation time (newest first)
+    const sortedComments = validComments.sort((a, b) => 
+      new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    )
+    
+    
+    return sortedComments
+  }, [optimisticComments, comments])
 
   // Fetch comments when section opens
   useEffect(() => {
     if (isOpen && postId) {
+      console.log('🔄 Fetching comments for postId:', postId)
       setError(null)
       setOptimisticComments([])
       fetchComments(10)
     }
-  }, [isOpen, postId, fetchComments])
+  }, [isOpen, postId]) // Removed fetchComments from dependencies to prevent infinite loop
 
-  // Fetch user metadata for comments
+  // Fetch user metadata for comments with debouncing
   useEffect(() => {
     const fetchUserMetadata = async () => {
       const commentsToFetch = displayComments
-        .filter(comment => {
-          if (!comment || !comment.authorId) return false
-          return !userCache.has(comment.authorId) && 
-                 !fetchingRef.current.has(comment.authorId)
-        })
-        .slice(0, 5)
+        .filter(comment => comment && !userCache.has(comment.authorId))
+        .filter(comment => comment.authorId && comment.authorId !== 'current-user') // Skip current-user
+        .slice(0, 5) // Reduced limit to prevent blocking
 
       if (commentsToFetch.length === 0) return
 
-      commentsToFetch.forEach(c => fetchingRef.current.add(c.authorId))
+      // Process in batches to prevent blocking
+      const batchSize = 3
+      for (let i = 0; i < commentsToFetch.length; i += batchSize) {
+        const batch = commentsToFetch.slice(i, i + batchSize)
+        
+        const userPromises = batch.map(async (comment) => {
+          try {
+            const userMetadata = await UserService.getUserMetadata(comment.authorId)
+            return { authorId: comment.authorId, userMetadata }
+          } catch (error) {
+            console.error(`Failed to fetch user metadata ${comment.authorId}:`, error)
+            return null
+          }
+        })
 
-      const userPromises = commentsToFetch.map(async (comment) => {
-        try {
-          const userMetadata = await UserService.getUserMetadata(comment.authorId)
-          return { authorId: comment.authorId, userMetadata }
-        } catch (error) {
-          console.error(`Failed to fetch user metadata ${comment.authorId}:`, error)
-          return null
-        }
-      })
-
-      try {
         const results = await Promise.all(userPromises)
         const newCache = new Map(userCache)
         
@@ -129,49 +136,56 @@ export function CommentsSection({ postId, isOpen, onClose }: CommentsSectionProp
         })
         
         setUserCache(newCache)
-      } finally {
-        commentsToFetch.forEach(c => fetchingRef.current.delete(c.authorId))
+        
+        // Small delay between batches to prevent blocking
+        if (i + batchSize < commentsToFetch.length) {
+          await new Promise(resolve => setTimeout(resolve, 100))
+        }
       }
     }
 
-    if (displayComments.length > 0) {
-      fetchUserMetadata()
-    }
-  }, [displayComments.length])
+    // Debounce user metadata fetching
+    const timeoutId = setTimeout(() => {
+      if (displayComments.length > 0) {
+        fetchUserMetadata()
+      }
+    }, 300) // 300ms debounce
 
-  // Helper functions
-  const handleScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
-    const container = e.currentTarget
-    const isNearBottom = container.scrollHeight - (container.scrollTop + container.clientHeight) < 100
+    return () => clearTimeout(timeoutId)
+  }, [displayComments.length]) // Only depend on comment count, not userCache
 
-    if (isNearBottom && pagination.hasMore && !isLoading) {
-      loadMoreComments()
-    }
-  }, [pagination.hasMore, isLoading, loadMoreComments])
-
+  // Helper functions with memoization
   const getUserFromCache = useCallback((authorId: string): UserMetadata | undefined => 
     userCache.get(authorId), [userCache])
 
   const isTempComment = useCallback((comment: CommentType): boolean => 
     comment?.id?.startsWith?.('temp-') || false, [])
 
-  const isOwnComment = useCallback((comment: CommentType): boolean => {
-    return currentUserId ? comment.authorId === currentUserId : false
-  }, [currentUserId])
-
   const getDisplayInfo = useCallback((comment: CommentType) => {
+    // Handle current-user case - show "You" for current user
+    if (comment.authorId === 'current-user') {
+      return {
+        displayName: 'You',
+        avatarUrl: comment.authorAvatar,
+        fullName: 'You'
+      }
+    }
+
+    // Fetch real user metadata for other users
     const userMetadata = getUserFromCache(comment.authorId)
-    const displayName = isOwnComment(comment) ? 'You' : 
-                       (userMetadata ? `${userMetadata.firstName} ${userMetadata.lastName}`.trim() : comment.authorName || 'Unknown User')
+    
+    // Ưu tiên metadata thật, không dùng authorName từ comment
+    const displayName = userMetadata ? `${userMetadata.firstName} ${userMetadata.lastName}`.trim() : 
+                       'Loading...' // Hiển thị loading khi chưa fetch xong
     const avatarUrl = userMetadata?.avtUrl || comment.authorAvatar
     const fullName = userMetadata ? `${userMetadata.firstName} ${userMetadata.lastName}`.trim() : 
-                    comment.authorName || 'Unknown User'
+                    'Loading...'
 
     return { displayName, avatarUrl, fullName }
-  }, [getUserFromCache, isOwnComment])
+  }, [getUserFromCache])
 
-  // Comment handlers
-  const handleSubmitComment = async (e: React.FormEvent) => {
+  // Memoized comment submission handler
+  const handleSubmitComment = useCallback(async (e: React.FormEvent) => {
     e.preventDefault()
     
     if (!comment.trim()) {
@@ -185,7 +199,7 @@ export function CommentsSection({ postId, isOpen, onClose }: CommentsSectionProp
       id: `temp-${Date.now()}`,
       content: comment,
       authorId: currentUserId || 'current-user',
-      authorName: 'You',
+      authorName: '', // Empty để fetch metadata thật
       authorAvatar: undefined,
       createdAt: new Date().toISOString(),
       likes: 0,
@@ -198,19 +212,23 @@ export function CommentsSection({ postId, isOpen, onClose }: CommentsSectionProp
     setComment("")
 
     try {
-      const newComment = await addComment(currentComment)
+      // Convert mentions from MentionData format to CommentMention format
+      const commentMentions = mentions.map(mention => ({
+        userId: mention.userId,
+        startIndex: mention.startIndex,
+        endIndex: mention.endIndex
+      }))
       
-      // Cache user metadata for new comment
-      if (newComment.authorId) {
-        try {
-          const userMetadata = await UserService.getUserMetadata(newComment.authorId)
-          setUserCache(prev => new Map(prev).set(newComment.authorId, userMetadata))
-        } catch (error) {
-          console.error('Failed to fetch user metadata for new comment:', error)
-        }
-      }
+      await addComment(currentComment, commentMentions)
       
+      // Clear mentions after successful submission
+      setMentions([])
+      
+      // Load lại tất cả comments sau khi comment xong
       setOptimisticComments(prev => prev.filter(c => c.id !== tempComment.id))
+      
+      // Refresh tất cả comments
+      await fetchComments(10)
       
     } catch (error: any) {
       console.error('Failed to submit comment:', error)
@@ -221,18 +239,19 @@ export function CommentsSection({ postId, isOpen, onClose }: CommentsSectionProp
       const errorMessage = error.response?.data?.message || error.message || 'Failed to post comment'
       setError(errorMessage)
     }
-  }
+  }, [comment, currentUserId, postId, addComment, fetchComments])
 
-  const handleLikeComment = async (commentId: string) => {
+  // Other comment handlers with memoization
+  const handleLikeComment = useCallback(async (commentId: string) => {
     try {
       await toggleLikeComment(commentId)
     } catch (error) {
       console.error('Failed to like comment:', error)
       setError('Failed to like comment')
     }
-  }
+  }, [toggleLikeComment])
 
-  const handleDeleteComment = async (commentId: string) => {
+  const handleDeleteComment = useCallback(async (commentId: string) => {
     if (!confirm("Are you sure you want to delete this comment?")) return
     
     try {
@@ -244,7 +263,7 @@ export function CommentsSection({ postId, isOpen, onClose }: CommentsSectionProp
       console.error('Failed to delete comment:', error)
       setError('Failed to delete comment')
     }
-  }
+  }, [deleteComment])
 
   if (!isOpen) return null
 
@@ -267,11 +286,7 @@ export function CommentsSection({ postId, isOpen, onClose }: CommentsSectionProp
       )}
 
       {/* Comments List */}
-      <div 
-        ref={commentsContainerRef}
-        onScroll={handleScroll}
-        className="max-h-60 overflow-y-auto p-4 space-y-3"
-      >
+      <div className="max-h-60 overflow-y-auto p-4 space-y-3">
         {isLoading && displayComments.length === 0 ? (
           <div className="flex justify-center items-center py-8">
             <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
@@ -282,50 +297,26 @@ export function CommentsSection({ postId, isOpen, onClose }: CommentsSectionProp
             No comments yet. Be the first to comment!
           </div>
         ) : (
-          <>
-            {displayComments.map((comment, index) => {
-              if (!comment) return null
-              
-              const tempComment = isTempComment(comment)
-              const isOwn = isOwnComment(comment)
-              const { displayName, avatarUrl, fullName } = getDisplayInfo(comment)
-              
-              return (
-                <CommentItem
-                  key={comment.id || `comment-${index}-${comment.authorId}`}
-                  comment={comment}
-                  isTemp={tempComment}
-                  isOwn={isOwn}
-                  displayName={displayName}
-                  avatarUrl={avatarUrl}
-                  fullName={fullName}
-                  isLiking={isLiking}
-                  onLike={handleLikeComment}
-                  onDelete={handleDeleteComment}
-                />
-              )
-            })}
+          displayComments.map((comment, index) => {
+            if (!comment) return null
             
-            {pagination.hasMore && !isLoading && (
-              <div className="flex justify-center pt-2">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={loadMoreComments}
-                  className="text-muted-foreground hover:text-foreground"
-                >
-                  <ChevronDown className="h-4 w-4 mr-1" />
-                  Load more
-                </Button>
-              </div>
-            )}
+            const tempComment = isTempComment(comment)
+            const { displayName, avatarUrl, fullName } = getDisplayInfo(comment)
             
-            {isLoading && displayComments.length > 0 && (
-              <div className="flex justify-center py-2">
-                <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-              </div>
-            )}
-          </>
+            return (
+              <CommentItem
+                key={comment.id || `comment-${index}-${comment.authorId}`}
+                comment={comment}
+                isTemp={tempComment}
+                displayName={displayName}
+                avatarUrl={avatarUrl}
+                fullName={fullName}
+                isLiking={isLiking}
+                onLike={handleLikeComment}
+                onDelete={handleDeleteComment}
+              />
+            )
+          })
         )}
       </div>
 
@@ -356,7 +347,6 @@ export function CommentsSection({ postId, isOpen, onClose }: CommentsSectionProp
 interface CommentItemProps {
   comment: CommentType
   isTemp: boolean
-  isOwn: boolean
   displayName: string
   avatarUrl?: string
   fullName?: string
@@ -368,7 +358,6 @@ interface CommentItemProps {
 function CommentItem({ 
   comment, 
   isTemp, 
-  isOwn,
   displayName, 
   avatarUrl, 
   fullName, 
@@ -397,9 +386,10 @@ function CommentItem({
       <div className="flex-1 min-w-0">
         <div className="flex items-start justify-between gap-2">
           <div className="flex-1">
-            <div className="flex items-center gap-2 mb-1 flex-wrap">
-              {fullName && fullName !== 'Unknown User' ? (
-                <div className="group relative inline-block">
+            <div className="flex items-center gap-2 mb-1">
+              {/* Name with tooltip */}
+              {fullName ? (
+                <div className="group relative">
                   <span className="font-medium text-sm text-foreground cursor-help">
                     {displayName}
                   </span>
@@ -413,19 +403,24 @@ function CommentItem({
                 </span>
               )}
               
-              {isTemp && <span className="text-xs text-muted-foreground">(Posting...)</span>}
+              {isTemp && (
+                <span className="ml-2 text-xs text-muted-foreground">
+                  (Posting...)
+                </span>
+              )}
               
               <span className="text-xs text-muted-foreground">
                 {isTemp ? 'Just now' : formatTimeAgo(comment.createdAt)}
               </span>
             </div>
             
-            <p className="text-sm text-foreground bg-background rounded-lg p-3 whitespace-pre-wrap break-words">
-              {comment.content}
-            </p>
+            <CommentContentWithMentions 
+              content={comment.content}
+              mentions={comment.mentions}
+            />
           </div>
           
-          {!isTemp && isOwn && (
+          {!isTemp && (
             <Button
               variant="ghost"
               size="sm"
@@ -627,6 +622,16 @@ function CommentInput({
           className="flex-1 px-3 py-2 text-sm bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:opacity-50 transition-colors"
         />
         
+        {/* Mention Portal - Renders outside post container */}
+        <MentionPortal
+          users={mentionUsers}
+          selectedIndex={mentionSelectedIndex}
+          onSelect={onSelectMentionUser}
+          onClose={onCloseMentionDropdown}
+          isLoading={isMentionLoading}
+          inputRef={inputRef}
+          show={showMentionDropdown}
+        />
         <Button 
           type="submit" 
           size="sm" 
@@ -654,4 +659,143 @@ function CommentInput({
       )}
     </form>
   )
+}
+
+// Component to render comment content with mentions highlighted
+function CommentContentWithMentions({ content, mentions }: { content: string; mentions?: CommentMention[] }) {
+  const [userCache, setUserCache] = useState<Map<string, UserMetadata>>(new Map())
+
+  // Fetch user metadata for all mentions
+  useEffect(() => {
+    if (!mentions || mentions.length === 0) return
+
+    const fetchUserMetadata = async () => {
+      // Get unique user IDs that we haven't fetched yet
+      const userIdsToFetch = mentions
+        .map(m => m.userId)
+        .filter((userId, index, self) => self.indexOf(userId) === index)
+        .filter(userId => !userCache.has(userId))
+
+      if (userIdsToFetch.length === 0) {
+        return
+      }
+
+      try {
+        // Fetch all user metadata in parallel
+        const userPromises = userIdsToFetch.map(async (userId) => {
+          try {
+            const metadata = await UserService.getUserMetadata(userId)
+            return { userId, metadata }
+          } catch (error) {
+            console.error('Failed to fetch user metadata for mention:', error)
+            return {
+              userId,
+              metadata: {
+                userId,
+                firstName: 'User',
+                lastName: userId.slice(0, 8),
+                avtUrl: null
+              }
+            }
+          }
+        })
+
+        const results = await Promise.all(userPromises)
+        
+        // Update cache with all results
+        setUserCache(prevCache => {
+          const updatedCache = new Map(prevCache)
+          results.forEach(({ userId, metadata }) => {
+            updatedCache.set(userId, metadata)
+          })
+          return updatedCache
+        })
+      } catch (error) {
+        console.error('Error fetching user metadata:', error)
+      }
+    }
+
+    fetchUserMetadata()
+  }, [mentions]) // Only depend on mentions
+
+  // Render content with highlighted mentions
+  const renderContent = () => {
+    if (!mentions || mentions.length === 0) {
+      return <span className="text-sm text-foreground bg-background rounded-lg p-3 whitespace-pre-wrap break-words block">{content}</span>
+    }
+
+    // Sort mentions by startIndex to process them in order
+    const sortedMentions = [...mentions].sort((a, b) => a.startIndex - b.startIndex)
+    
+    const parts: Array<{
+      type: 'text' | 'mention'
+      content: string
+      startIndex: number
+      endIndex: number
+      userId?: string
+    }> = []
+    let lastIndex = 0
+
+    sortedMentions.forEach((mention) => {
+      // Add text before mention
+      if (mention.startIndex > lastIndex) {
+        parts.push({
+          type: 'text',
+          content: content.slice(lastIndex, mention.startIndex),
+          startIndex: lastIndex,
+          endIndex: mention.startIndex
+        })
+      }
+
+      // Add mention
+      const userMetadata = userCache.get(mention.userId)
+      const displayName = userMetadata 
+        ? `${userMetadata.firstName} ${userMetadata.lastName}`.trim()
+        : `@user${mention.userId.slice(0, 8)}`
+
+      parts.push({
+        type: 'mention',
+        content: `@${displayName}`,
+        userId: mention.userId,
+        startIndex: mention.startIndex,
+        endIndex: mention.endIndex
+      })
+
+      lastIndex = mention.endIndex
+    })
+
+    // Add remaining text after last mention
+    if (lastIndex < content.length) {
+      parts.push({
+        type: 'text',
+        content: content.slice(lastIndex),
+        startIndex: lastIndex,
+        endIndex: content.length
+      })
+    }
+
+    return (
+      <span className="text-sm text-foreground bg-background rounded-lg p-3 whitespace-pre-wrap break-words block">
+        {parts.map((part, index) => {
+          if (part.type === 'mention') {
+            return (
+              <span
+                key={index}
+                className="text-blue-600 dark:text-blue-400 font-medium cursor-pointer hover:underline"
+                onClick={() => {
+                  // Navigate to user profile
+                  console.log('Navigate to user profile:', part.userId)
+                }}
+              >
+                {part.content}
+              </span>
+            )
+          }
+          return <span key={index}>{part.content}</span>
+        })}
+      </span>
+    )
+  }
+
+  return renderContent()
 }
