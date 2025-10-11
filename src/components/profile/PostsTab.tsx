@@ -8,9 +8,13 @@ import type { PostFullDto } from "@/lib/types/posts/PostFullDto"
 import { MessageCircle } from "lucide-react"
 import { ImageModal } from "./ImageModal"
 import { PostList } from "@/components/posts/PostList" 
-import { usePostsReactions } from "@/lib/hooks/usePostReaction" // 👈 THÊM HOOK NÀY
+import { usePostsReactions } from "@/lib/hooks/usePostReaction" 
 
-export function PostsTab() {
+interface PostsTabProps {
+  userId: string
+}
+
+export function PostsTab({ userId }: PostsTabProps) {
   const [posts, setPosts] = useState<PostFullDto[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -24,7 +28,6 @@ export function PostsTab() {
   const loadMoreRef = useRef<HTMLDivElement>(null)
   const observerRef = useRef<IntersectionObserver | null>(null)
 
-  // 👈 THÊM HOOK REACTIONS GIỐNG IMAGESTAB
   const postIds = posts.map(post => post.postId)
   const { reactions, react, removeReaction, loading: reactionsLoading } = usePostsReactions(postIds)
 
@@ -32,7 +35,7 @@ export function PostsTab() {
     const fetchPosts = async () => {
       try {
         setLoading(true)
-        const res = await getPostsByUser(5)
+        const res = await getPostsByUser(userId, 5)
         const nextCursorValue = res.meta?.nextCursor || res.nextCursor
         
         setPosts(res.data || res)
@@ -46,7 +49,7 @@ export function PostsTab() {
     }
 
     fetchPosts()
-  }, [])
+  }, [userId])
 
   const loadMorePosts = useCallback(async () => {
     if (!nextCursor || loadingMore || !hasMore) {
@@ -57,7 +60,7 @@ export function PostsTab() {
       setLoadingMore(true)
       
       const [res] = await Promise.all([
-        getPostsByUser(5, nextCursor),
+        getPostsByUser(userId, 5, nextCursor),
         new Promise(resolve => setTimeout(resolve, 500))
       ]);
 
@@ -72,7 +75,7 @@ export function PostsTab() {
     } finally {
       setLoadingMore(false)
     }
-  }, [nextCursor, loadingMore, hasMore])
+  }, [nextCursor, loadingMore, hasMore, userId])
 
   useEffect(() => {
     if (!hasMore || !loadMoreRef.current) {
@@ -102,7 +105,6 @@ export function PostsTab() {
     }
   }, [hasMore, loadingMore, loadMorePosts])
 
-  // Handle delete post
   const handleDeletePost = async (postId: string) => {
     try {
       await deleteApi.deletePost(postId)
@@ -118,7 +120,6 @@ export function PostsTab() {
     const allMedias: { url: string; post: PostFullDto }[] = []
     posts.forEach((post) => {
       post.medias?.forEach((media) => {
-        // 👈 THÊM FILTER GIỐNG IMAGESTAB
         if (media.mediaUrl && (media.mediaUrl.includes('.jpg') || media.mediaUrl.includes('.jpeg') || 
             media.mediaUrl.includes('.png') || media.mediaUrl.includes('.webp'))) {
           allMedias.push({
@@ -185,7 +186,6 @@ export function PostsTab() {
     })
   }
 
-  // 👈 SỬA LẠI HANDLE REACT ĐỂ DÙNG HOOK
   const handleReact = async (reactionType: string) => {
     if (!selectedImage) return
     console.log('React to post:', selectedImage.post.postId, reactionType)
@@ -248,7 +248,6 @@ export function PostsTab() {
             hasNext={allMedias.length > 1 || hasMore}
             hasPrev={allMedias.length > 1}
             isLoading={loadingMore}
-            // 👈 TRUYỀN REACTIONS DATA GIỐNG IMAGESTAB
             reactions={reactions[selectedImage.post.postId]}
             onReact={handleReact}
             onRemoveReaction={handleRemoveReaction}

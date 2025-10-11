@@ -1,7 +1,4 @@
-import { getUserId } from '@/lib/utils/Jwt'
-
-export const getPostsByUser = async (limit?: number, cursor?: string) => {
-  const userId = getUserId() || ''
+export const getPostsByUser = async (userId: string, limit?: number, cursor?: string) => {
   const params: Record<string, any> = {}
   
   if (limit) params.fetchSize = limit  
@@ -22,8 +19,7 @@ export const getPostsByUser = async (limit?: number, cursor?: string) => {
   return await res.json()
 }
 
-export const getPostsCount = async () => {
-  const userId = getUserId() || ''
+export const getPostsCount = async (userId: string) => {
   const res = await fetch(`/posts/user/${userId}/count`, {
     method: 'GET',
     headers: {

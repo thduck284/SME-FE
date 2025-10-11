@@ -21,6 +21,14 @@ export function SearchModal({ isOpen, onClose }: SearchModalProps) {
     clearSearch
   } = useUserSearch()
 
+  // Hàm xử lý thêm bạn bè
+  const handleAddFriend = (userId: string, event: React.MouseEvent) => {
+    event.preventDefault()
+    event.stopPropagation()
+    console.log(`Add friend: ${userId}`)
+    // TODO: Implement add friend logic here
+  }
+
   if (!isOpen) return null
 
   return (
@@ -92,27 +100,51 @@ export function SearchModal({ isOpen, onClose }: SearchModalProps) {
           {users.length > 0 && (
             <div className="p-4 space-y-2">
               {users.map((user) => (
-                <Link
+                <div
                   key={user.userId}
-                  to={`/profile/${user.userId}`}
-                  onClick={onClose}
                   className="flex items-center gap-4 p-3 hover:bg-orange-50 rounded-xl transition-all duration-200 group"
                 >
-                  <img
-                    src={user.avtUrl || "/default-avatar.png"}
-                    alt={`${user.firstName} ${user.lastName}`}
-                    className="w-12 h-12 rounded-full object-cover border-2 border-orange-200 group-hover:border-orange-300 transition-colors"
-                  />
-                  <div className="flex-1 min-w-0">
-                    <p className="font-semibold text-gray-900 truncate">
-                      {user.firstName} {user.lastName}
-                    </p>
-                    <p className="text-gray-500 text-sm truncate">
-                      @{user.username}
-                    </p>
+                  {/* Avatar và User Info */}
+                  <Link
+                    to={`/profile-other/${user.userId}`}
+                    onClick={onClose}
+                    className="flex items-center gap-4 flex-1 min-w-0"
+                  >
+                    <img
+                      src={user.avtUrl || "/default.png"}
+                      alt={`${user.firstName} ${user.lastName}`}
+                      className="w-12 h-12 rounded-full object-cover border-2 border-orange-200 group-hover:border-orange-300 transition-colors"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold text-gray-900 truncate">
+                        {user.firstName} {user.lastName}
+                      </p>
+                      <p className="text-gray-500 text-sm truncate">
+                        @{user.username}
+                      </p>
+                    </div>
+                  </Link>
+
+                  {/* Action Buttons */}
+                  <div className="flex items-center gap-2">
+                    {/* Add Friend Button */}
+                    <button
+                      onClick={(e) => handleAddFriend(user.userId, e)}
+                      className="px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors font-medium text-sm whitespace-nowrap"
+                    >
+                      Add Friend
+                    </button>
+                    
+                    {/* Profile Link */}
+                    <Link
+                      to={`/profile/${user.userId}`}
+                      onClick={onClose}
+                      className="p-2 text-gray-400 hover:text-orange-500 transition-colors rounded-lg hover:bg-orange-100"
+                    >
+                      <User className="h-5 w-5" />
+                    </Link>
                   </div>
-                  <User className="h-5 w-5 text-gray-400 group-hover:text-orange-500 transition-colors" />
-                </Link>
+                </div>
               ))}
 
               {/* Load More */}

@@ -7,7 +7,11 @@ import { PostFullDto } from "@/lib/types/posts/PostFullDto"
 import { ImageModal } from "./ImageModal"
 import { usePostsReactions } from "@/lib/hooks/usePostReaction"
 
-export function ImagesTab() {
+interface ImagesTabProps {
+  userId: string
+}
+
+export function ImagesTab({ userId }: ImagesTabProps) {
   const [posts, setPosts] = useState<PostFullDto[]>([])
   const [loading, setLoading] = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
@@ -27,7 +31,7 @@ export function ImagesTab() {
     const fetchPosts = async () => {
       try {
         setLoading(true)
-        const res = await getPostsByUser(5) 
+        const res = await getPostsByUser(userId, 5) 
         const nextCursorValue = res.meta?.nextCursor || res.nextCursor
         setPosts(res.data || res)
         setNextCursor(nextCursorValue)
@@ -40,7 +44,7 @@ export function ImagesTab() {
     }
 
     fetchPosts()
-  }, [])
+  }, [userId])
 
   // Load more posts
   const loadMorePosts = useCallback(async () => {
@@ -50,7 +54,7 @@ export function ImagesTab() {
       setLoadingMore(true)
       
       const [res] = await Promise.all([
-        getPostsByUser(5, nextCursor),
+        getPostsByUser(userId, 5, nextCursor),
         new Promise(resolve => setTimeout(resolve, 500))
       ])
 
@@ -64,7 +68,7 @@ export function ImagesTab() {
     } finally {
       setLoadingMore(false)
     }
-  }, [nextCursor, loadingMore, hasMore])
+  }, [nextCursor, loadingMore, hasMore, userId])
 
   // Infinite scroll với Intersection Observer
   useEffect(() => {

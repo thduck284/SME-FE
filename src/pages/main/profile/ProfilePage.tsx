@@ -1,19 +1,73 @@
 "use client"
 
 import { useState, useRef, useEffect } from "react"
-import { useParams } from "react-router-dom"
-import { Badge, Button, Card, Avatar } from "@/components/ui" 
+import { Badge, Button, Card } from "@/components/ui" 
 import { User, FileText, ImageIcon, MapPin, LinkIcon, Calendar, Mail, Camera } from "lucide-react"
 import { LeftBar, RightBar } from "@/components/layouts"
 import { PostsTab } from "@/components/profile/PostsTab"
 import { ImagesTab } from "@/components/profile/ImagesTab"
 import { useUserRelationship } from "@/lib/hooks/useRelationship"
 import { getPostsCount } from "@/lib/api/posts/GetPostsByUser" 
+import { useUsers } from "@/lib/hooks/useUsers"
+import { getUserId } from "@/lib/utils/Jwt" // Import getUserId
+
+const removeVietnameseTones = (str: string): string => {
+  return str
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/đ/g, 'd')
+    .replace(/Đ/g, 'D')
+    .toLowerCase()
+}
+
+const generateUsernameFromName = (firstName: string, lastName: string): string => {
+  const cleanFirstName = removeVietnameseTones(firstName)
+  const cleanLastName = removeVietnameseTones(lastName)
+  
+  const fullName = `${cleanFirstName} ${cleanLastName}`.trim()
+  
+  let hash = 0
+  for (let i = 0; i < fullName.length; i++) {
+    const char = fullName.charCodeAt(i)
+    hash = ((hash << 5) - hash) + char
+    hash = hash & hash
+  }
+  
+  const numericCode = Math.abs(hash).toString().substring(0, 6)
+  
+  const firstNames = cleanFirstName.split(' ').filter(name => name.length > 0)
+  const lastNames = cleanLastName.split(' ').filter(name => name.length > 0)
+  
+  const firstPart = firstNames[0] || ''
+  const lastPart = lastNames[0] || ''
+  
+  const middleInitials = [
+    ...firstNames.slice(1).map(name => name.charAt(0)),
+    ...lastNames.slice(1).map(name => name.charAt(0))
+  ].filter(char => char.length > 0)
+  
+  let baseUsername = firstPart
+  if (middleInitials.length > 0) {
+    baseUsername += '.' + middleInitials.join('')
+  }
+  if (lastPart) {
+    baseUsername += '.' + lastPart
+  }
+  
+  return `${baseUsername}.${numericCode}`
+}
+
+const getAvatarUrl = (avtUrl: string | null): string => {
+  if (avtUrl && avtUrl.trim() !== '') {
+    return avtUrl
+  }
+  return "/default.png"
+}
 
 export function ProfilePage() {
-  const { userId } = useParams()
+  const [userId, setUserId] = useState<string | null>(null) // State để lưu userId từ JWT
   const [activeTab, setActiveTab] = useState<"profile" | "posts" | "images">("profile")
-  const [avatarUrl, setAvatarUrl] = useState("/image.png?height=128&width=128")
+  const [avatarUrl, setAvatarUrl] = useState("/default.png")
   const [isHoveringAvatar, setIsHoveringAvatar] = useState(false)
   const [postsCount, setPostsCount] = useState(0) 
   const [loadingPostsCount, setLoadingPostsCount] = useState(true) 
@@ -34,18 +88,27 @@ export function ProfilePage() {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const mainContentRef = useRef<HTMLDivElement>(null)
 
-  // Sử dụng hook để lấy dữ liệu followers và following
+  const { uploadAvatar, isUploading, error: uploadError } = useUsers()
+
   const { 
     followers, 
     following, 
     loading: loadingRelationships
   } = useUserRelationship()
 
+  // Lấy userId từ JWT khi component mount
+  useEffect(() => {
+    const currentUserId = getUserId()
+    setUserId(currentUserId)
+  }, [])
+
   useEffect(() => {
     const fetchPostsCount = async () => {
+      if (!userId) return // Chỉ fetch khi có userId
+      
       try {
         setLoadingPostsCount(true)
-        const response = await getPostsCount()
+        const response = await getPostsCount(userId) // Truyền userId vào hàm
         setPostsCount(response.data.count)
       } catch (error) {
         console.error("Error fetching posts count:", error)
@@ -55,16 +118,17 @@ export function ProfilePage() {
     }
 
     fetchPostsCount()
-  }, [])
+  }, [userId]) // Thêm userId vào dependency
 
   useEffect(() => {
     const controller = new AbortController()
     const fetchProfile = async () => {
-      if (!userId) return
+      if (!userId) return // Chỉ fetch khi có userId
+      
       try {
         setLoadingProfile(true)
         setErrorProfile(null)
-        const res = await fetch(`/users/${userId}/`, {
+        const res = await fetch(`/users/${userId}/metadata`, {
           method: 'GET',
           headers: { 'Content-Type': 'application/json' },
           signal: controller.signal,
@@ -75,8 +139,10 @@ export function ProfilePage() {
         }
         const json = await res.json()
         setProfile(json.data)
-        if (json.data?.avtUrl) {
-          setAvatarUrl(json.data.avtUrl)
+        
+        if (json.data) {
+          const avatarUrlToSet = getAvatarUrl(json.data.avtUrl)
+          setAvatarUrl(avatarUrlToSet)
         }
       } catch (e: any) {
         if (e.name !== 'AbortError') {
@@ -89,10 +155,13 @@ export function ProfilePage() {
 
     fetchProfile()
     return () => controller.abort()
-  }, [userId])
+  }, [userId]) // Thêm userId vào dependency
+
+  const displayUsername = profile 
+    ? `@${generateUsernameFromName(profile.firstName, profile.lastName)}`
+    : ''
 
   const displayName = profile ? `${profile.firstName} ${profile.lastName}`.trim() : '—'
-  const displayUsername = profile ? `@${profile.username}` : ''
   const displayEmail = profile?.email || '—'
   const displayPhone = profile?.phone || '—'
   const joinedDate = profile ? new Date(profile.createdAt).toLocaleDateString() : '—'
@@ -103,7 +172,6 @@ export function ProfilePage() {
     { key: "images" as const, label: "Images", icon: ImageIcon },
   ]
 
-  // Tính toán stats từ API thực tế - sử dụng postsCount
   const stats = [
     { 
       label: "Posts", 
@@ -121,58 +189,107 @@ export function ProfilePage() {
 
   const interests = ["Photography", "Design", "Travel", "Technology", "Art"]
 
-  // (đã bỏ theo dõi scroll do không dùng đến isScrolled)
-
   const handleAvatarClick = () => {
     fileInputRef.current?.click()
   }
 
-  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
-    if (file) {
-      const imageUrl = URL.createObjectURL(file)
-      setAvatarUrl(imageUrl)
-      console.log("Selected file:", file)
+    if (file && userId) {
+      try {
+        const imageUrl = URL.createObjectURL(file)
+        setAvatarUrl(imageUrl)
+        
+        const response = await uploadAvatar(userId, file)
+        
+        if (response.avtUrl) {
+          setAvatarUrl(response.avtUrl)
+        }
+        
+        URL.revokeObjectURL(imageUrl)
+        
+      } catch (error) {
+        console.error("Failed to upload avatar:", error)
+        if (profile?.avtUrl) {
+          setAvatarUrl(profile.avtUrl)
+        } else {
+          setAvatarUrl("/default.png")
+        }
+      }
     }
+  }
+
+  const handleAvatarError = () => {
+    setAvatarUrl("/default.png")
+  }
+
+  // Hiển thị loading nếu chưa có userId
+  if (!userId) {
+    return (
+      <div className="min-h-screen flex bg-gray-100 text-gray-900 relative">
+        <div className="fixed left-0 top-0 bottom-0 w-64 z-30">
+          <div className="h-full overflow-y-auto">
+            <LeftBar />
+          </div>
+        </div>
+        <main className="flex-1 overflow-y-auto h-screen p-8 ml-64 mr-64 bg-gray-100 text-gray-900 flex items-center justify-center">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+            <p className="text-gray-600">Loading profile...</p>
+          </div>
+        </main>
+        <div className="fixed right-0 top-0 bottom-0 w-64 z-30">
+          <div className="h-full overflow-y-auto">
+            <RightBar />
+          </div>
+        </div>
+      </div>
+    )
   }
 
   return (
     <div className="min-h-screen flex bg-gray-100 text-gray-900 relative">
-      {/* Left Sidebar - Fixed với full height */}
       <div className="fixed left-0 top-0 bottom-0 w-64 z-30">
         <div className="h-full overflow-y-auto">
           <LeftBar />
         </div>
       </div>
 
-      {/* Main Content */}
       <main
         ref={mainContentRef}
         className="flex-1 overflow-y-auto h-screen p-8 ml-64 mr-64 bg-gray-100 text-gray-900"
       >
-        {/* Profile Header */}
+        {uploadError && (
+          <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700">
+            {uploadError}
+          </div>
+        )}
+
         <div className="flex flex-col gap-10 md:flex-row md:items-start">
-          {/* Avatar với upload functionality */}
           <div 
             className="relative"
             onMouseEnter={() => setIsHoveringAvatar(true)}
             onMouseLeave={() => setIsHoveringAvatar(false)}
           >
             <div className="relative cursor-pointer" onClick={handleAvatarClick}>
-              <Avatar 
-                src={avatarUrl} 
+              <img
+                src={avatarUrl}
                 alt="User Avatar"
-                fallback="UN"
-                className="h-32 w-32 border-2 border-primary/20 transition-all duration-200"
+                className="h-32 w-32 rounded-full object-cover border-2 border-primary/20 transition-all duration-200"
+                onError={handleAvatarError}
               />
 
-              {/* Overlay icon camera khi hover */}
               <div className={`absolute inset-0 bg-black/40 rounded-full flex items-center justify-center transition-all duration-200 ${isHoveringAvatar ? 'opacity-100' : 'opacity-0'}`}>
                 <Camera className="h-8 w-8 text-white" />
               </div>
+
+              {isUploading && (
+                <div className="absolute inset-0 bg-black/50 rounded-full flex items-center justify-center">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div>
+                </div>
+              )}
             </div>
 
-            {/* Hidden file input */}
             <input
               type="file"
               ref={fileInputRef}
@@ -181,28 +298,28 @@ export function ProfilePage() {
               className="hidden"
             />
 
-            {/* Edit button nhỏ */}
             <button
               onClick={handleAvatarClick}
-              className={`absolute -bottom-2 -right-2 h-8 w-8 rounded-full bg-primary text-white flex items-center justify-center shadow-lg transition-all duration-200 hover:bg-primary/90 hover:scale-110 ${isHoveringAvatar ? 'opacity-100 scale-100' : 'opacity-0 scale-90'}`}
+              disabled={isUploading}
+              className={`absolute -bottom-2 -right-2 h-8 w-8 rounded-full bg-primary text-white flex items-center justify-center shadow-lg transition-all duration-200 hover:bg-primary/90 hover:scale-110 ${isHoveringAvatar ? 'opacity-100 scale-100' : 'opacity-0 scale-90'} ${isUploading ? 'opacity-50 cursor-not-allowed' : ''}`}
             >
               <Camera className="h-4 w-4" />
             </button>
           </div>
 
-          {/* Profile Info */}
           <div className="flex-1 space-y-8">
             <div className="flex flex-col gap-6 md:flex-row md:items-start md:justify-between">
               <div className="space-y-3">
                 <h1 className="text-4xl font-bold tracking-tight text-gray-900">
-                  {loadingProfile ? 'Đang tải...' : errorProfile ? 'Lỗi tải hồ sơ' : displayName}
+                  {loadingProfile ? 'Loading...' : errorProfile ? 'Error loading profile' : displayName}
                 </h1>
-                <p className="text-lg text-gray-600">{loadingProfile ? '' : displayUsername}</p>
+                <p className="text-lg text-gray-600">
+                  {loadingProfile ? '' : displayUsername}
+                </p>
               </div>
               <Button className="w-full md:w-auto">Edit Profile</Button>
             </div>
 
-            {/* Stats */}
             <div className="flex gap-10">
               {stats.map((stat) => (
                 <div key={stat.label} className="space-y-2">
@@ -212,7 +329,6 @@ export function ProfilePage() {
               ))}
             </div>
 
-            {/* Bio & Interests */}
             <div className="space-y-6">
               <p className="text-pretty leading-relaxed text-gray-900">
                 {loadingProfile ? ' ' : ''}
@@ -235,7 +351,6 @@ export function ProfilePage() {
           </div>
         </div>
 
-        {/* Tabs Navigation */}
         <div className="mt-16 mb-12 border-b border-gray-300">
           <nav className="flex gap-12 ml-4">
             {tabs.map(({ key, label, icon: Icon }) => {
@@ -258,7 +373,6 @@ export function ProfilePage() {
           </nav>
         </div>
 
-        {/* Tab Content */}
         <div className="space-y-8 ml-4">
           {activeTab === "profile" && (
             <div className="grid gap-8 md:grid-cols-2">
@@ -293,16 +407,15 @@ export function ProfilePage() {
           )}
 
           {activeTab === "posts" && (
-            <PostsTab />
+            <PostsTab userId={userId} />
           )}
 
           {activeTab === "images" && (
-            <ImagesTab />
+            <ImagesTab userId={userId} />
           )}
         </div>
       </main>
 
-      {/* Right Sidebar - Fixed với full height */}
       <div className="fixed right-0 top-0 bottom-0 w-64 z-30">
         <div className="h-full overflow-y-auto">
           <RightBar />

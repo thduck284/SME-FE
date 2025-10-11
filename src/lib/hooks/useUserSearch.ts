@@ -11,7 +11,7 @@ export function useUserSearch() {
     if (searchTimeoutRef.current) {
       clearTimeout(searchTimeoutRef.current)
     }
-
+    
     searchTimeoutRef.current = setTimeout(async () => {
       if (keyword.trim()) {
         await searchUsers({ keyword: keyword.trim(), limit: 20 })
