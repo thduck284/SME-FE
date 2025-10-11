@@ -60,6 +60,20 @@ export function useMention({ currentUserId, onMentionAdd, onTextChange, currentT
     const beforeCursor = text.slice(0, cursorPosition)
     const mentionMatch = beforeCursor.match(/@(\w*)$/)
     
+    // Clean up mentions that are no longer in the text
+    const validMentions = mentions.filter(mention => {
+      const mentionText = text.slice(mention.startIndex, mention.endIndex)
+      return mentionText === mention.displayName && 
+             mention.startIndex < text.length && 
+             mention.endIndex <= text.length
+    })
+    
+    // Update mentions if any were removed
+    if (validMentions.length !== mentions.length) {
+      setMentions(validMentions)
+      onMentionAdd?.(validMentions)
+    }
+    
     if (mentionMatch) {
       const query = mentionMatch[1]
       setMentionQuery(query)
@@ -82,7 +96,7 @@ export function useMention({ currentUserId, onMentionAdd, onTextChange, currentT
       setMentionQuery('')
       setMentionStartIndex(-1)
     }
-  }, [searchUsers])
+  }, [searchUsers, mentions, onMentionAdd])
 
   const selectUser = useCallback((user: MentionUser) => {
     // Use currentText from props or fallback to textarea value
@@ -132,8 +146,22 @@ export function useMention({ currentUserId, onMentionAdd, onTextChange, currentT
       text: newText.slice(newMention.startIndex, newMention.endIndex)
     })
     
-    // Update mentions state
-    const updatedMentions = [...mentions, newMention]
+    // Recalculate positions for existing mentions that come after the new mention
+    const recalculatedMentions = mentions.map(mention => {
+      if (mention.startIndex >= actualStart) {
+        // This mention comes after the new mention, adjust its position
+        const positionShift = mentionText.length - (end - actualStart)
+        return {
+          ...mention,
+          startIndex: mention.startIndex + positionShift,
+          endIndex: mention.endIndex + positionShift
+        }
+      }
+      return mention
+    })
+    
+    // Update mentions state with the new mention and recalculated positions
+    const updatedMentions = [...recalculatedMentions, newMention]
     setMentions(updatedMentions)
     onMentionAdd?.(updatedMentions)
     
@@ -187,6 +215,11 @@ export function useMention({ currentUserId, onMentionAdd, onTextChange, currentT
     setSelectedIndex(0)
   }, [])
 
+  const clearMentions = useCallback(() => {
+    setMentions([])
+    onMentionAdd?.([])
+  }, [onMentionAdd])
+
   useEffect(() => {
     return () => {
       if (searchTimeoutRef.current) {
@@ -206,6 +239,7 @@ export function useMention({ currentUserId, onMentionAdd, onTextChange, currentT
     handleKeyDown,
     selectUser,
     closeDropdown,
-    setMentions
+    setMentions,
+    clearMentions
   }
 }

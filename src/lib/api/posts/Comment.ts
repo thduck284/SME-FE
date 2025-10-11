@@ -17,38 +17,76 @@ export const commentApi = {
   },
 
   createComment: async (data: CreateCommentRequest): Promise<Comment> => {
-    console.log('📤 Sending comment as JSON:', data)
-    
-    const requestData: any = {
-      postId: data.postId,
+    const { postId, parentCommentId, content, mentions, files } = data
+
+    if (!content?.trim() && (!files || files.length === 0)) {
+      throw new Error("Comment cannot be empty")
     }
 
-    // Content là optional nhưng nên luôn gửi
-    if (data.content) {
-      requestData.content = data.content
-    } else {
-      requestData.content = "" // Gửi empty string thay vì undefined
-    }
+    try {
+      // Send as JSON if no files, FormData if files present
+      if (!files || files.length === 0) {
+        const requestData: any = {
+          postId: postId,
+        }
 
-    // Chỉ gửi mentions khi có items
-    if (data.mentions && data.mentions.length > 0) {
-      requestData.mentions = data.mentions.map(mention => ({
-        userId: mention.userId,
-        startIndex: mention.startIndex,
-        endIndex: mention.endIndex
-      }))
+        // Content là optional nhưng nên luôn gửi
+        if (content) {
+          requestData.content = content
+        } else {
+          requestData.content = "" // Gửi empty string thay vì undefined
+        }
+
+        // Chỉ gửi mentions khi có items
+        if (mentions && mentions.length > 0) {
+          requestData.mentions = mentions.map(mention => ({
+            userId: mention.userId,
+            startIndex: mention.startIndex,
+            endIndex: mention.endIndex
+          }))
+        }
+        
+        if (parentCommentId) {
+          requestData.parentCommentId = parentCommentId
+        }
+        
+        const res = await apiClient.post('/comments', requestData, {
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        })
+        
+        return res.data
+      } else {
+        // Use FormData for file uploads
+        const formData = new FormData()
+        formData.append('postId', postId)
+        
+        if (content) formData.append('content', content)
+        if (parentCommentId) formData.append('parentCommentId', parentCommentId)
+        
+        files.forEach((file) => formData.append('mediaFiles', file))
+        
+        if (mentions && Array.isArray(mentions) && mentions.length > 0) {
+          mentions.forEach((mention, index) => {
+            formData.append(`mentions[${index}][userId]`, mention.userId)
+            formData.append(`mentions[${index}][startIndex]`, mention.startIndex.toString())
+            formData.append(`mentions[${index}][endIndex]`, mention.endIndex.toString())
+          })
+        }
+        
+        const res = await apiClient.post('/comments', formData, {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+          },
+        })
+        
+        return res.data
+      }
+    } catch (error: any) {
+      const message = error.response?.data?.message || "Failed to create comment"
+      throw new Error(message)
     }
-    // KHÔNG gửi mentions array rỗng
-    
-    console.log('📤 Final request data:', requestData)
-    
-    const res = await apiClient.post('/comments', requestData, {
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    })
-    
-    return res.data
   },
 
   likeComment: async (commentId: string): Promise<{ likes: number; isLiked: boolean }> => {

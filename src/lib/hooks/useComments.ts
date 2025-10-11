@@ -63,9 +63,9 @@ export function useComments(postId: string) {
   }, [pagination, fetchComments])
 
   // Thêm comment mới - ĐẢM BẢO CONTENT LUÔN CÓ GIÁ TRỊ
-  const addComment = useCallback(async (content: string, mentions?: CommentMention[]) => {
-    if (!content.trim()) {
-      throw new Error('Comment content cannot be empty')
+  const addComment = useCallback(async (content: string, mentions?: CommentMention[], files?: File[]) => {
+    if (!content.trim() && (!files || files.length === 0)) {
+      throw new Error('Comment cannot be empty')
     }
 
     if (!isValidPostId()) {
@@ -77,7 +77,8 @@ export function useComments(postId: string) {
       const createData: CreateCommentRequest = {
         postId: postId,
         content: content.trim(),
-        ...(mentions && mentions.length > 0 ? { mentions } : {})
+        ...(mentions && mentions.length > 0 ? { mentions } : {}),
+        ...(files && files.length > 0 ? { files } : {})
       }
       
       console.log('📤 Creating comment with data:', createData)

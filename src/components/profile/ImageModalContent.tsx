@@ -7,6 +7,7 @@ import { useState, useRef, useEffect } from "react"
 import { ReactionType, reactionIcons } from "@/lib/constants/reactions"
 import { CommentsSection } from "@/components/posts/CommentsSection"
 import { ShareModal } from "@/components/posts/ShareModal"
+import type { PostStats } from "@/lib/api/posts/PostStats"
 
 interface ImageModalContentProps {
   post: PostFullDto
@@ -16,9 +17,10 @@ interface ImageModalContentProps {
   }
   onReact?: (reactionType: string) => Promise<void>
   onShareSuccess?: () => void
+  postStats?: PostStats
 }
 
-export function ImageModalContent({ post, reactions, onReact, onShareSuccess }: ImageModalContentProps) {
+export function ImageModalContent({ post, reactions, onReact, onShareSuccess, postStats }: ImageModalContentProps) {
   const [showReactionPicker, setShowReactionPicker] = useState(false)
   const [isReacting, setIsReacting] = useState(false)
   const [showShareModal, setShowShareModal] = useState(false)
@@ -75,8 +77,8 @@ export function ImageModalContent({ post, reactions, onReact, onShareSuccess }: 
     : []
 
     
-  const totalComments = 9999
-  const totalShares = 1233
+  const totalComments = postStats?.commentCount || 0
+  const totalShares = postStats?.shareCount || 0
 
   return (
     <div className="w-96 flex flex-col h-full bg-gray-50 dark:bg-gray-900">

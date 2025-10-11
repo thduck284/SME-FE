@@ -5,6 +5,7 @@ import { X, ChevronLeft, ChevronRight } from "lucide-react"
 import { PostFullDto } from "@/lib/types/posts/PostFullDto"
 import { ImageModalContent } from "./ImageModalContent"
 import { useState, useCallback } from "react"
+import type { PostStats } from "@/lib/api/posts/PostStats"
 
 interface ImageModalProps {
   imageUrl: string | null
@@ -22,6 +23,7 @@ interface ImageModalProps {
   onReact: (reactionType: string) => void
   onRemoveReaction: () => void
   reactionsLoading: boolean
+  postStats?: PostStats
 }
 
 export function ImageModal({ 
@@ -35,8 +37,9 @@ export function ImageModal({
   isLoading = false,
   reactions,
   onReact,
-  onRemoveReaction,
-  reactionsLoading 
+  onRemoveReaction: _onRemoveReaction,
+  reactionsLoading: _reactionsLoading,
+  postStats
 }: ImageModalProps) {
   if (!imageUrl || !post) return null
 
@@ -180,6 +183,7 @@ export function ImageModal({
           // Handle share success if needed
           console.log('Share success')
         }}
+        postStats={postStats}
       />
     </div>
   )

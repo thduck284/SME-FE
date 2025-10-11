@@ -200,6 +200,12 @@ export function useCreatePostModal(onClose: () => void, onPostCreated?: () => vo
     handleMentionKeyDown(e)
   }, [content, mentions, handleMentionKeyDown])
 
+  const resetForm = useCallback(() => {
+    setContent("")
+    setFiles([])
+    setMentions([])
+  }, [])
+
   const handleSubmit = useCallback(async () => {
     setLoading(true)
     try {
@@ -216,9 +222,7 @@ export function useCreatePostModal(onClose: () => void, onPostCreated?: () => vo
         files, 
         mentions: mentionData.length > 0 ? mentionData : undefined 
       })
-      setContent("")
-      setFiles([])
-      setMentions([])
+      resetForm()
       onPostCreated?.()
       onClose()
     } catch (err) {
@@ -227,7 +231,7 @@ export function useCreatePostModal(onClose: () => void, onPostCreated?: () => vo
     } finally {
       setLoading(false)
     }
-  }, [content, files, mentions, onClose, onPostCreated, type, visibility])
+  }, [content, files, mentions, onClose, onPostCreated, type, visibility, resetForm])
 
   return {
     content,
@@ -255,6 +259,7 @@ export function useCreatePostModal(onClose: () => void, onPostCreated?: () => vo
     handleAddEmoji,
     
     handleSubmit,
+    resetForm,
     
     mentions,
     mentionUsers,

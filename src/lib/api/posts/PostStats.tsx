@@ -1,3 +1,5 @@
+import apiClient from "@/lib/services/ApiClient"
+
 export interface PostStats {
   commentCount: number
   shareCount: number
@@ -11,20 +13,9 @@ export interface PostStatsResponse {
 
 export const postStatsApi = {
   getPostStats: async (postId: string): Promise<PostStats> => {
-    const res = await fetch(`/posts/${postId}/stats`, {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    })
-
-    if (!res.ok) {
-      const errorText = await res.text()
-      throw new Error(`Failed to fetch post stats: ${res.statusText} - ${errorText}`)
-    }
-
-    const data: PostStatsResponse = await res.json()
-    return data.data
+    const res = await apiClient.get(`/posts/${postId}/stats`)
+    // API response structure: { success: true, message: "OK", data: { commentCount: 1, shareCount: 0 } }
+    return res.data.data
   },
 
   getMultiplePostsStats: async (postIds: string[]): Promise<Record<string, PostStats>> => {

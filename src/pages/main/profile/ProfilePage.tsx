@@ -1,15 +1,16 @@
 "use client"
 
 import { useState, useRef, useEffect } from "react"
-import { Badge, Button, Card } from "@/components/ui" 
+import { useParams, useSearchParams } from "react-router-dom"
+import { Badge, Button, Card } from "@/components/ui"
 import { User, FileText, ImageIcon, MapPin, LinkIcon, Calendar, Mail, Camera } from "lucide-react"
 import { LeftBar, RightBar } from "@/components/layouts"
 import { PostsTab } from "@/components/profile/PostsTab"
 import { ImagesTab } from "@/components/profile/ImagesTab"
 import { useUserRelationship } from "@/lib/hooks/useRelationship"
-import { getPostsCount } from "@/lib/api/posts/GetPostsByUser" 
+import { getPostsCount } from "@/lib/api/posts/GetPostsByUser"
 import { useUsers } from "@/lib/hooks/useUsers"
-import { getUserId } from "@/lib/utils/Jwt" // Import getUserId
+import { getUserId } from "@/lib/utils/Jwt"
 
 const removeVietnameseTones = (str: string): string => {
   return str
@@ -65,12 +66,15 @@ const getAvatarUrl = (avtUrl: string | null): string => {
 }
 
 export function ProfilePage() {
-  const [userId, setUserId] = useState<string | null>(null) // State để lưu userId từ JWT
+  const { userId: userIdFromParams } = useParams()
+  const [searchParams, setSearchParams] = useSearchParams()
+  
+  const [userId, setUserId] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<"profile" | "posts" | "images">("profile")
   const [avatarUrl, setAvatarUrl] = useState("/default.png")
   const [isHoveringAvatar, setIsHoveringAvatar] = useState(false)
-  const [postsCount, setPostsCount] = useState(0) 
-  const [loadingPostsCount, setLoadingPostsCount] = useState(true) 
+  const [postsCount, setPostsCount] = useState(0)
+  const [loadingPostsCount, setLoadingPostsCount] = useState(true)
   const [profile, setProfile] = useState<{
     userId: string
     username: string
@@ -89,7 +93,6 @@ export function ProfilePage() {
   const mainContentRef = useRef<HTMLDivElement>(null)
 
   const { uploadAvatar, isUploading, error: uploadError } = useUsers()
-
   const { 
     followers, 
     following, 
@@ -102,13 +105,28 @@ export function ProfilePage() {
     setUserId(currentUserId)
   }, [])
 
+  // Sync tab state với URL
+  useEffect(() => {
+    const tabFromUrl = searchParams.get('tab') as "profile" | "posts" | "images" | null
+    if (tabFromUrl && tabFromUrl !== activeTab) {
+      setActiveTab(tabFromUrl)
+    }
+  }, [searchParams, activeTab])
+
+  // Handle tab change và update URL
+  const handleTabChange = (tab: "profile" | "posts" | "images") => {
+    setActiveTab(tab)
+    setSearchParams({ tab })
+  }
+
+  // Fetch posts count
   useEffect(() => {
     const fetchPostsCount = async () => {
-      if (!userId) return // Chỉ fetch khi có userId
+      if (!userId) return
       
       try {
         setLoadingPostsCount(true)
-        const response = await getPostsCount(userId) // Truyền userId vào hàm
+        const response = await getPostsCount(userId)
         setPostsCount(response.data.count)
       } catch (error) {
         console.error("Error fetching posts count:", error)
@@ -118,12 +136,13 @@ export function ProfilePage() {
     }
 
     fetchPostsCount()
-  }, [userId]) // Thêm userId vào dependency
+  }, [userId])
 
+  // Fetch user profile
   useEffect(() => {
     const controller = new AbortController()
     const fetchProfile = async () => {
-      if (!userId) return // Chỉ fetch khi có userId
+      if (!userId) return
       
       try {
         setLoadingProfile(true)
@@ -139,7 +158,6 @@ export function ProfilePage() {
         }
         const json = await res.json()
         setProfile(json.data)
-        
         if (json.data) {
           const avatarUrlToSet = getAvatarUrl(json.data.avtUrl)
           setAvatarUrl(avatarUrlToSet)
@@ -155,13 +173,12 @@ export function ProfilePage() {
 
     fetchProfile()
     return () => controller.abort()
-  }, [userId]) // Thêm userId vào dependency
+  }, [userId])
 
+  const displayName = profile ? `${profile.firstName} ${profile.lastName}`.trim() : '—'
   const displayUsername = profile 
     ? `@${generateUsernameFromName(profile.firstName, profile.lastName)}`
     : ''
-
-  const displayName = profile ? `${profile.firstName} ${profile.lastName}`.trim() : '—'
   const displayEmail = profile?.email || '—'
   const displayPhone = profile?.phone || '—'
   const joinedDate = profile ? new Date(profile.createdAt).toLocaleDateString() : '—'
@@ -249,23 +266,28 @@ export function ProfilePage() {
 
   return (
     <div className="min-h-screen flex bg-gray-100 text-gray-900 relative">
+      {/* Left Sidebar - Fixed với full height */}
       <div className="fixed left-0 top-0 bottom-0 w-64 z-30">
         <div className="h-full overflow-y-auto">
           <LeftBar />
         </div>
       </div>
 
+      {/* Main Content */}
       <main
         ref={mainContentRef}
         className="flex-1 overflow-y-auto h-screen p-8 ml-64 mr-64 bg-gray-100 text-gray-900"
       >
+        {/* Upload Error Alert */}
         {uploadError && (
           <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700">
             {uploadError}
           </div>
         )}
 
+        {/* Profile Header */}
         <div className="flex flex-col gap-10 md:flex-row md:items-start">
+          {/* Avatar với upload functionality */}
           <div 
             className="relative"
             onMouseEnter={() => setIsHoveringAvatar(true)}
@@ -279,6 +301,7 @@ export function ProfilePage() {
                 onError={handleAvatarError}
               />
 
+              {/* Overlay icon camera khi hover */}
               <div className={`absolute inset-0 bg-black/40 rounded-full flex items-center justify-center transition-all duration-200 ${isHoveringAvatar ? 'opacity-100' : 'opacity-0'}`}>
                 <Camera className="h-8 w-8 text-white" />
               </div>
@@ -290,6 +313,7 @@ export function ProfilePage() {
               )}
             </div>
 
+            {/* Hidden file input */}
             <input
               type="file"
               ref={fileInputRef}
@@ -298,6 +322,7 @@ export function ProfilePage() {
               className="hidden"
             />
 
+            {/* Edit button */}
             <button
               onClick={handleAvatarClick}
               disabled={isUploading}
@@ -307,6 +332,7 @@ export function ProfilePage() {
             </button>
           </div>
 
+          {/* Profile Info */}
           <div className="flex-1 space-y-8">
             <div className="flex flex-col gap-6 md:flex-row md:items-start md:justify-between">
               <div className="space-y-3">
@@ -320,6 +346,7 @@ export function ProfilePage() {
               <Button className="w-full md:w-auto">Edit Profile</Button>
             </div>
 
+            {/* Stats */}
             <div className="flex gap-10">
               {stats.map((stat) => (
                 <div key={stat.label} className="space-y-2">
@@ -329,6 +356,7 @@ export function ProfilePage() {
               ))}
             </div>
 
+            {/* Bio & Interests */}
             <div className="space-y-6">
               <p className="text-pretty leading-relaxed text-gray-900">
                 {loadingProfile ? ' ' : ''}
@@ -351,6 +379,7 @@ export function ProfilePage() {
           </div>
         </div>
 
+        {/* Tabs Navigation */}
         <div className="mt-16 mb-12 border-b border-gray-300">
           <nav className="flex gap-12 ml-4">
             {tabs.map(({ key, label, icon: Icon }) => {
@@ -358,7 +387,7 @@ export function ProfilePage() {
               return (
                 <button
                   key={key}
-                  onClick={() => setActiveTab(key)}
+                  onClick={() => handleTabChange(key)}
                   className={`group flex items-center gap-4 border-b-2 pb-5 text-base font-semibold transition-colors ${
                     isActive 
                       ? "border-primary text-gray-900" 
@@ -373,6 +402,7 @@ export function ProfilePage() {
           </nav>
         </div>
 
+        {/* Tab Content */}
         <div className="space-y-8 ml-4">
           {activeTab === "profile" && (
             <div className="grid gap-8 md:grid-cols-2">
@@ -416,6 +446,7 @@ export function ProfilePage() {
         </div>
       </main>
 
+      {/* Right Sidebar - Fixed với full height */}
       <div className="fixed right-0 top-0 bottom-0 w-64 z-30">
         <div className="h-full overflow-y-auto">
           <RightBar />

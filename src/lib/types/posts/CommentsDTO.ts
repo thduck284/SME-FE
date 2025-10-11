@@ -23,7 +23,6 @@ export interface CommentMention {
   userId: string
   startIndex: number
   endIndex: number
-  userName?: string
 }
 
 export interface CommentsResponse {
@@ -37,4 +36,5 @@ export interface CreateCommentRequest {
   parentCommentId?: string
   content?: string
   mentions?: CommentMention[]
+  files?: File[]
 }

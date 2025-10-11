@@ -1,13 +1,15 @@
 "use client"
 
 import { useState, useEffect, useCallback, useRef, useMemo } from "react"
+import { useNavigate } from "react-router-dom"
 import { Button, MentionPortal } from "@/components/ui"
-import { Send, Heart, Trash2, Loader2, AlertCircle } from "lucide-react"
+import { Send, Heart, Trash2, Loader2, AlertCircle, ImageIcon, FileText } from "lucide-react"
+import { FilePreviewGrid } from "./FilePreviewGrid"
 import { useComments } from "@/lib/hooks/useComments"
 import { useMention } from "@/lib/hooks/useMention"
 import { UserService } from "@/lib/api/users/UserService"
 import { formatTimeAgo } from "@/lib/utils/PostUtils"
-import type { Comment as CommentType, CommentMention } from "@/lib/types/posts/CommentsDTO"
+import type { Comment as CommentType, CommentMention, CommentMedia } from "@/lib/types/posts/CommentsDTO"
 import type { UserMetadata } from "@/lib/types/User"
 import type { MentionData } from "@/lib/types/users/MentionDto"
 
@@ -19,11 +21,14 @@ interface CommentsSectionProps {
 }
 
 export function CommentsSection({ postId, isOpen, currentUserId }: CommentsSectionProps) {
+  const navigate = useNavigate()
   const [comment, setComment] = useState("")
   const [error, setError] = useState<string | null>(null)
   const [optimisticComments, setOptimisticComments] = useState<CommentType[]>([])
   const [userCache, setUserCache] = useState<Map<string, UserMetadata>>(new Map())
+  const [files, setFiles] = useState<File[]>([])
   const inputRef = useRef<HTMLInputElement>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   // Mention functionality
   const {
@@ -161,6 +166,19 @@ export function CommentsSection({ postId, isOpen, currentUserId }: CommentsSecti
   const isTempComment = useCallback((comment: CommentType): boolean => 
     comment?.id?.startsWith?.('temp-') || false, [])
 
+  // File upload handlers
+  const handleFileChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) {
+      const newFiles = Array.from(e.target.files)
+      setFiles((prev) => [...prev, ...newFiles])
+    }
+  }, [])
+
+  const handleRemoveFile = useCallback((index: number) => {
+    setFiles((prev) => prev.filter((_, i) => i !== index))
+  }, [])
+
+
   const getDisplayInfo = useCallback((comment: CommentType) => {
     // Handle current-user case - show "You" for current user
     if (comment.authorId === 'current-user') {
@@ -188,7 +206,7 @@ export function CommentsSection({ postId, isOpen, currentUserId }: CommentsSecti
   const handleSubmitComment = useCallback(async (e: React.FormEvent) => {
     e.preventDefault()
     
-    if (!comment.trim()) {
+    if (!comment.trim() && files.length === 0) {
       setError('Comment cannot be empty')
       return
     }
@@ -209,7 +227,9 @@ export function CommentsSection({ postId, isOpen, currentUserId }: CommentsSecti
 
     setOptimisticComments(prev => [tempComment, ...prev])
     const currentComment = comment
+    const currentFiles = [...files]
     setComment("")
+    setFiles([])
 
     try {
       // Convert mentions from MentionData format to CommentMention format
@@ -219,7 +239,7 @@ export function CommentsSection({ postId, isOpen, currentUserId }: CommentsSecti
         endIndex: mention.endIndex
       }))
       
-      await addComment(currentComment, commentMentions)
+      await addComment(currentComment, commentMentions, currentFiles)
       
       // Clear mentions after successful submission
       setMentions([])
@@ -235,11 +255,12 @@ export function CommentsSection({ postId, isOpen, currentUserId }: CommentsSecti
       
       setOptimisticComments(prev => prev.filter(c => c.id !== tempComment.id))
       setComment(currentComment)
+      setFiles(currentFiles)
       
       const errorMessage = error.response?.data?.message || error.message || 'Failed to post comment'
       setError(errorMessage)
     }
-  }, [comment, currentUserId, postId, addComment, fetchComments])
+  }, [comment, files, currentUserId, postId, addComment, fetchComments, mentions])
 
   // Other comment handlers with memoization
   const handleLikeComment = useCallback(async (commentId: string) => {
@@ -314,6 +335,7 @@ export function CommentsSection({ postId, isOpen, currentUserId }: CommentsSecti
                 isLiking={isLiking}
                 onLike={handleLikeComment}
                 onDelete={handleDeleteComment}
+                onMentionClick={navigate}
               />
             )
           })
@@ -338,6 +360,10 @@ export function CommentsSection({ postId, isOpen, currentUserId }: CommentsSecti
         inputRef={inputRef}
         mentions={mentions as MentionData[]}
         setMentions={(next) => setMentions(next)}
+        files={files}
+        onFileChange={handleFileChange}
+        onRemoveFile={handleRemoveFile}
+        fileInputRef={fileInputRef}
       />
     </div>
   )
@@ -353,6 +379,7 @@ interface CommentItemProps {
   isLiking: string | null
   onLike: (commentId: string) => void
   onDelete: (commentId: string) => void
+  onMentionClick?: (path: string) => void
 }
 
 function CommentItem({ 
@@ -363,7 +390,8 @@ function CommentItem({
   fullName, 
   isLiking, 
   onLike, 
-  onDelete 
+  onDelete,
+  onMentionClick
 }: CommentItemProps) {
   return (
     <div className={`flex gap-3 ${isTemp ? 'opacity-70' : ''}`}>
@@ -417,7 +445,15 @@ function CommentItem({
             <CommentContentWithMentions 
               content={comment.content}
               mentions={comment.mentions}
+              onMentionClick={onMentionClick}
             />
+            
+            {/* Comment Media */}
+            {comment.medias && comment.medias.length > 0 && (
+              <div className="mt-2">
+                <CommentMediaGrid medias={comment.medias} />
+              </div>
+            )}
           </div>
           
           {!isTemp && (
@@ -486,6 +522,11 @@ interface CommentInputProps {
   inputRef: React.RefObject<HTMLInputElement>
   mentions: MentionData[]
   setMentions: (next: MentionData[]) => void
+  // File upload props
+  files: File[]
+  onFileChange: (e: React.ChangeEvent<HTMLInputElement>) => void
+  onRemoveFile: (index: number) => void
+  fileInputRef: React.RefObject<HTMLInputElement>
 }
 
 function CommentInput({ 
@@ -504,7 +545,11 @@ function CommentInput({
   onCloseMentionDropdown,
   inputRef,
   mentions,
-  setMentions
+  setMentions,
+  files,
+  onFileChange,
+  onRemoveFile,
+  fileInputRef
 }: CommentInputProps) {
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value
@@ -610,6 +655,35 @@ function CommentInput({
 
   return (
     <form onSubmit={onSubmit} className="p-4 border-t border-border/50">
+      {/* File Preview */}
+      {files.length > 0 && (
+        <div className="mb-3">
+          <FilePreviewGrid files={files} onRemoveFile={onRemoveFile} />
+        </div>
+      )}
+
+      {/* File Upload Button */}
+      <div className="mb-3 flex justify-start">
+        <Button
+          type="button"
+          variant="secondary"
+          size="sm"
+          onClick={() => fileInputRef.current?.click()}
+          className="flex items-center gap-2 text-gray-600 hover:text-gray-700 border border-gray-300 hover:border-gray-400"
+        >
+          <ImageIcon className="w-4 h-4" />
+          <span>Chọn ảnh</span>
+        </Button>
+        <input
+          ref={fileInputRef}
+          type="file"
+          multiple
+          accept="image/*,video/*"
+          onChange={onFileChange}
+          className="hidden"
+        />
+      </div>
+
       <div className="flex gap-2 relative">
         <input
           ref={inputRef}
@@ -635,7 +709,7 @@ function CommentInput({
         <Button 
           type="submit" 
           size="sm" 
-          disabled={!comment.trim() || isAdding}
+          disabled={(!comment.trim() && files.length === 0) || isAdding}
           className="flex items-center gap-1 min-w-20 transition-colors"
         >
           {isAdding ? (
@@ -662,7 +736,7 @@ function CommentInput({
 }
 
 // Component to render comment content with mentions highlighted
-function CommentContentWithMentions({ content, mentions }: { content: string; mentions?: CommentMention[] }) {
+function CommentContentWithMentions({ content, mentions, onMentionClick }: { content: string; mentions?: CommentMention[]; onMentionClick?: (path: string) => void }) {
   const [userCache, setUserCache] = useState<Map<string, UserMetadata>>(new Map())
 
   // Fetch user metadata for all mentions
@@ -783,8 +857,9 @@ function CommentContentWithMentions({ content, mentions }: { content: string; me
                 key={index}
                 className="text-blue-600 dark:text-blue-400 font-medium cursor-pointer hover:underline"
                 onClick={() => {
-                  // Navigate to user profile
-                  console.log('Navigate to user profile:', part.userId)
+                  if (onMentionClick && part.userId) {
+                    onMentionClick(`/profile/${part.userId}`)
+                  }
                 }}
               >
                 {part.content}
@@ -798,4 +873,45 @@ function CommentContentWithMentions({ content, mentions }: { content: string; me
   }
 
   return renderContent()
+}
+
+// Component to display comment media
+function CommentMediaGrid({ medias }: { medias: CommentMedia[] }) {
+  return (
+    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+      {medias.map((media, idx) => {
+        const isImage = media.mediaUrl.includes('image') || 
+                       media.mediaUrl.match(/\.(jpg|jpeg|png|gif|webp)$/i)
+        const isVideo = media.mediaUrl.includes('video') || 
+                       media.mediaUrl.match(/\.(mp4|webm|ogg)$/i)
+
+        return (
+          <div
+            key={idx}
+            className="relative group rounded-lg overflow-hidden border border-gray-200 bg-white shadow-sm"
+          >
+            {isImage ? (
+              <img
+                src={media.mediaUrl}
+                alt={`Media ${idx + 1}`}
+                className="w-full h-24 object-contain select-none rounded-lg bg-gray-100"
+              />
+            ) : isVideo ? (
+              <video
+                src={media.mediaUrl}
+                className="w-full h-24 object-contain rounded-lg bg-gray-100"
+                controls
+                preload="metadata"
+                muted
+              />
+            ) : (
+              <div className="w-full h-24 bg-gray-100 flex items-center justify-center rounded-lg select-none">
+                <FileText className="w-6 h-6 text-gray-400" />
+              </div>
+            )}
+          </div>
+        )
+      })}
+    </div>
+  )
 }

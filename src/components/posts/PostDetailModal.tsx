@@ -10,14 +10,15 @@ import { formatTimeAgo, getVisibilityIcon } from "@/lib/utils/PostUtils"
 import { CommentsSection } from "./CommentsSection"
 import { ShareModal } from "./ShareModal"
 import { PostOptionsMenu } from "./PostOptionsMenu"
-import { PostDetailModal } from "./PostDetailModal"
-import { MessageCircle, Share, Repeat2, Lock, ThumbsUp } from "lucide-react"
+import { MessageCircle, Share, Repeat2, Lock, ThumbsUp, X } from "lucide-react"
 import { UserService } from "@/lib/api/users/UserService"
 import type { PostStats } from "@/lib/api/posts/PostStats"
 import type { UserMetadata } from "@/lib/types/User"
 
-interface PostItemProps {
+interface PostDetailModalProps {
   post: PostFullDto
+  isOpen: boolean
+  onClose: () => void
   onOpenImage: (imageUrl: string, post: PostFullDto) => void
   reaction?: { userReaction: string | null; counters: Record<string, number> }
   loading?: boolean
@@ -33,8 +34,10 @@ interface PostItemProps {
   postStats?: PostStats
 }
 
-export function PostItem({ 
+export function PostDetailModal({ 
   post, 
+  isOpen,
+  onClose,
   onOpenImage, 
   reaction, 
   loading, 
@@ -48,15 +51,11 @@ export function PostItem({
   onHide = () => {},
   onReport = () => {},
   postStats
-}: PostItemProps) {
+}: PostDetailModalProps) {
   const navigate = useNavigate()
-  const [showComments, setShowComments] = useState(false)
-  const [showPostDetailModal, setShowPostDetailModal] = useState(false)
   const [isReacting, setIsReacting] = useState(false)
   const [showReactionPicker, setShowReactionPicker] = useState(false)
   const [showShareModal, setShowShareModal] = useState(false)
-  
-  // Debug log
   
   const hideTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
@@ -89,7 +88,6 @@ export function PostItem({
 
   const totalReactions = reaction?.counters 
     ? Object.values(reaction.counters).reduce((sum, count) => sum + count, 0) : 0
-  // Chuẩn hóa về chữ hoa để khớp enum ReactionType khi hiển thị UI
   const currentReaction = reaction?.userReaction 
     ? (reaction.userReaction.toUpperCase() as ReactionType) 
     : null
@@ -180,203 +178,216 @@ export function PostItem({
   const isSharePost = post.type === 'SHARE'
   const hasRootPost = post.rootPost !== undefined
 
+  if (!isOpen) return null
+
   return (
     <>
-      <Card className="rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 overflow-hidden">
-        {/* Header với thông tin người share (nếu là bài share) */}
-        {isSharePost && (
-          <div className="px-4 pt-3 pb-0">
-            <div className="flex items-center gap-2 text-[13px] text-gray-500 dark:text-gray-400">
-              <Repeat2 className="h-3.5 w-3.5" />
-              <span className="font-normal">Sarah Anderson shared a post</span>
-            </div>
+      {/* Backdrop */}
+      <div 
+        className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+        onClick={onClose}
+      >
+        {/* Modal Content */}
+        <div 
+          className="bg-white dark:bg-gray-900 rounded-lg shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {/* Header */}
+          <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Post Details</h2>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onClose}
+              className="h-8 w-8 p-0 hover:bg-gray-100 dark:hover:bg-gray-800"
+            >
+              <X className="h-4 w-4" />
+            </Button>
           </div>
-        )}
 
-        {/* Thông tin tác giả */}
-        <div className="flex items-start justify-between px-4 pt-3 pb-2">
-          <div className="flex items-start gap-3 flex-1">
-            <Avatar src="/image.png?height=40&width=40" alt="User avatar" className="h-10 w-10 cursor-pointer hover:opacity-90 transition-opacity" />
-            <div className="flex-1 min-w-0">
-              <h4 className="font-semibold text-[15px] text-gray-900 dark:text-gray-100 hover:underline cursor-pointer">Sarah Anderson</h4>
-              <div className="flex items-center gap-1 text-[13px] text-gray-500 dark:text-gray-400">
-                <span className="hover:underline cursor-pointer">{formatTimeAgo(post.createdAt)}</span>
-                <span>·</span>
-                {React.cloneElement(getVisibilityIcon(post.visibility as CreateSharePostDto["visibility"]), { className: "h-4 w-4 text-muted-foreground" })}
-              </div>
-            </div>
-          </div>
-          <div className="relative">
-            <PostOptionsMenu
-              postId={post.postId}
-              isOwnPost={isOwnPost}
-              onEdit={onEdit}
-              onDelete={onDelete}
-              onSave={onSave}
-              onPin={onPin}
-              onHide={onHide}
-              onReport={onReport}
-            />
-          </div>
-        </div>
-
-        {/* Nội dung của người share (nếu có) */}
-        {isSharePost && post.content && (
-          <div className="px-4 pt-0.5 pb-0">
-            <PostContentWithMentions content={post.content} mentions={post.mentions} onMentionClick={navigate} />
-          </div>
-        )}
-
-        {/* Media của người share (nếu có) */}
-        {isSharePost && post.medias && post.medias.length > 0 && (
-          <div className={post.content ? 'mt-3' : ''}><MediaGrid medias={post.medias} /></div>
-        )}
-
-        {/* TRƯỜNG HỢP 1: Bài viết ORIGINAL */}
-        {!isSharePost && (
-          <>
-            {post.content && (
-              <div className="px-4 pt-0.5 pb-0">
-                <PostContentWithMentions content={post.content} mentions={post.mentions} onMentionClick={navigate} />
-              </div>
-            )}
-            {post.medias && post.medias.length > 0 && (
-              <div className={post.content ? 'mt-3' : ''}><MediaGrid medias={post.medias} /></div>
-            )}
-          </>
-        )}
-
-        {/* TRƯỜNG HỢP 2: Bài viết SHARE có rootPost */}
-        {isSharePost && hasRootPost && post.rootPost && (
-          <div className="mx-4 my-3 border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden bg-gray-50 dark:bg-gray-800/50 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors cursor-pointer">
-            <div className="flex items-center gap-2.5 px-3 py-2.5 border-b border-gray-200 dark:border-gray-700">
-              <Avatar src="/image.png?height=32&width=32" alt="Original author" className="h-8 w-8" />
-              <div className="flex-1 min-w-0">
-                <p className="font-semibold text-[15px] text-gray-900 dark:text-gray-100 hover:underline">Original Author</p>
-                <p className="text-[13px] text-gray-500 dark:text-gray-400">{formatTimeAgo(post.rootPost.createdAt)}</p>
-              </div>
-            </div>
-            {post.rootPost.content && (
-              <div className="px-3 py-2.5">
-                <p className="text-[15px] text-gray-900 dark:text-gray-100 leading-[1.3333] line-clamp-4">{post.rootPost.content}</p>
-              </div>
-            )}
-            {post.rootPost.medias && post.rootPost.medias.length > 0 && (
-              <div className="pb-0">
-                <div className="grid grid-cols-2 gap-0.5 overflow-hidden">
-                  {post.rootPost.medias.slice(0, 4).map((media, idx) => (
-                    <div key={media.mediaId} className="relative aspect-square bg-gray-200 dark:bg-gray-700 group cursor-pointer"
-                      onClick={(e) => { e.stopPropagation(); onOpenImage(media.mediaUrl, post) }}>
-                      <img src={media.mediaUrl} alt={`Root media ${idx + 1}`} className="w-full h-full object-cover group-hover:brightness-95 transition-all" />
-                      {idx === 3 && post.rootPost!.medias && post.rootPost!.medias.length > 4 && (
-                        <div className="absolute inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center">
-                          <span className="text-white text-2xl font-bold">+{post.rootPost!.medias.length - 4}</span>
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* TRƯỜNG HỢP 3: Bài viết SHARE KHÔNG có rootPost (bị xóa) */}
-        {isSharePost && !hasRootPost && (
-          <div className="mx-4 my-3 border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden bg-gray-50 dark:bg-gray-800/50">
-            <div className="px-4 py-6">
-              <div className="flex items-start gap-3">
-                <div className="flex-shrink-0 mt-0.5">
-                  <div className="w-10 h-10 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center">
-                    <Lock className="w-5 h-5 text-gray-400 dark:text-gray-500" />
+          {/* Scrollable Content */}
+          <div className="flex-1 overflow-y-auto">
+            <Card className="rounded-none shadow-none border-0 bg-transparent">
+              {/* Header với thông tin người share (nếu là bài share) */}
+              {isSharePost && (
+                <div className="px-4 pt-3 pb-0">
+                  <div className="flex items-center gap-2 text-[13px] text-gray-500 dark:text-gray-400">
+                    <Repeat2 className="h-3.5 w-3.5" />
+                    <span className="font-normal">Sarah Anderson shared a post</span>
                   </div>
-                </div>
-                <div className="flex-1">
-                  <p className="font-semibold text-[15px] text-gray-900 dark:text-gray-100 mb-1">
-                    This content is currently unavailable
-                  </p>
-                  <p className="text-[13px] text-gray-500 dark:text-gray-400 leading-relaxed">
-                    This error is usually because the owner only shared the content with a small group, changed who can see it, or deleted the content.
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-
-        {/* Reactions summary */}
-        {totalReactions > 0 && (
-          <div className="px-4 py-2 flex items-center justify-between text-[15px] text-gray-500 dark:text-gray-400 border-t border-gray-200 dark:border-gray-700 mt-3">
-            <div className="flex items-center gap-1">
-              {loading ? <span className="text-sm">Loading...</span> : (
-                <div className="flex items-center gap-1.5 hover:underline cursor-pointer">
-                  <div className="flex items-center -space-x-1">
-                    {topReactions.map(([type], idx) => (
-                      <div key={type} style={{ zIndex: topReactions.length - idx }}
-                        className="w-[18px] h-[18px] rounded-full bg-white dark:bg-gray-900 border border-white dark:border-gray-900 flex items-center justify-center">
-                        {(() => { const cfg = reactionIcons[(type.toUpperCase() as ReactionType)]; return cfg ? React.createElement(cfg.icon, { className: "h-[14px] w-[14px]" }) : null })()}
-                      </div>
-                    ))}
-                  </div>
-                  <span className="text-[15px]">{totalReactions}</span>
                 </div>
               )}
-            </div>
-            <div className="flex items-center gap-3">
-              <span className="hover:underline cursor-pointer">
-                {postStats ? `${postStats.commentCount || 0} comments` : '... comments'}
-              </span>
-              <span className="hover:underline cursor-pointer">
-                {postStats ? `${postStats.shareCount || 0} shares` : '... shares'}
-              </span>
-            </div>
-          </div>
-        )}
 
-        {/* Action buttons */}
-        <div className="px-2 py-1 border-t border-gray-200 dark:border-gray-700">
-          <div className="flex items-center gap-1">
-            <ReactionButton />
-            <ActionBtn 
-              icon={MessageCircle} 
-              label={`Comment${postStats ? ` (${postStats.commentCount || 0})` : ''}`} 
-              onClick={() => setShowPostDetailModal(true)} 
-            />
-            <ActionBtn 
-              icon={Share} 
-              label={`Share${postStats ? ` (${postStats.shareCount || 0})` : ''}`} 
-              onClick={() => setShowShareModal(true)} 
-            />
+              {/* Thông tin tác giả */}
+              <div className="flex items-start justify-between px-4 pt-3 pb-2">
+                <div className="flex items-start gap-3 flex-1">
+                  <Avatar src="/image.png?height=40&width=40" alt="User avatar" className="h-10 w-10 cursor-pointer hover:opacity-90 transition-opacity" />
+                  <div className="flex-1 min-w-0">
+                    <h4 className="font-semibold text-[15px] text-gray-900 dark:text-gray-100 hover:underline cursor-pointer">Sarah Anderson</h4>
+                    <div className="flex items-center gap-1 text-[13px] text-gray-500 dark:text-gray-400">
+                      <span className="hover:underline cursor-pointer">{formatTimeAgo(post.createdAt)}</span>
+                      <span>·</span>
+                      {React.cloneElement(getVisibilityIcon(post.visibility as CreateSharePostDto["visibility"]), { className: "h-4 w-4 text-muted-foreground" })}
+                    </div>
+                  </div>
+                </div>
+                <div className="relative">
+                  <PostOptionsMenu
+                    postId={post.postId}
+                    isOwnPost={isOwnPost}
+                    onEdit={onEdit}
+                    onDelete={onDelete}
+                    onSave={onSave}
+                    onPin={onPin}
+                    onHide={onHide}
+                    onReport={onReport}
+                  />
+                </div>
+              </div>
+
+              {/* Nội dung của người share (nếu có) */}
+              {isSharePost && post.content && (
+                <div className="px-4 pt-0.5 pb-0">
+                  <PostContentWithMentions content={post.content} mentions={post.mentions} onMentionClick={navigate} />
+                </div>
+              )}
+
+              {/* Media của người share (nếu có) */}
+              {isSharePost && post.medias && post.medias.length > 0 && (
+                <div className={post.content ? 'mt-3' : ''}><MediaGrid medias={post.medias} /></div>
+              )}
+
+              {/* TRƯỜNG HỢP 1: Bài viết ORIGINAL */}
+              {!isSharePost && (
+                <>
+                  {post.content && (
+                    <div className="px-4 pt-0.5 pb-0">
+                      <PostContentWithMentions content={post.content} mentions={post.mentions} onMentionClick={navigate} />
+                    </div>
+                  )}
+                  {post.medias && post.medias.length > 0 && (
+                    <div className={post.content ? 'mt-3' : ''}><MediaGrid medias={post.medias} /></div>
+                  )}
+                </>
+              )}
+
+              {/* TRƯỜNG HỢP 2: Bài viết SHARE có rootPost */}
+              {isSharePost && hasRootPost && post.rootPost && (
+                <div className="mx-4 my-3 border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden bg-gray-50 dark:bg-gray-800/50 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors cursor-pointer">
+                  <div className="flex items-center gap-2.5 px-3 py-2.5 border-b border-gray-200 dark:border-gray-700">
+                    <Avatar src="/image.png?height=32&width=32" alt="Original author" className="h-8 w-8" />
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold text-[15px] text-gray-900 dark:text-gray-100 hover:underline">Original Author</p>
+                      <p className="text-[13px] text-gray-500 dark:text-gray-400">{formatTimeAgo(post.rootPost.createdAt)}</p>
+                    </div>
+                  </div>
+                  {post.rootPost.content && (
+                    <div className="px-3 py-2.5">
+                      <p className="text-[15px] text-gray-900 dark:text-gray-100 leading-[1.3333] line-clamp-4">{post.rootPost.content}</p>
+                    </div>
+                  )}
+                  {post.rootPost.medias && post.rootPost.medias.length > 0 && (
+                    <div className="pb-0">
+                      <div className="grid grid-cols-2 gap-0.5 overflow-hidden">
+                        {post.rootPost.medias.slice(0, 4).map((media, idx) => (
+                          <div key={media.mediaId} className="relative aspect-square bg-gray-200 dark:bg-gray-700 group cursor-pointer"
+                            onClick={(e) => { e.stopPropagation(); onOpenImage(media.mediaUrl, post) }}>
+                            <img src={media.mediaUrl} alt={`Root media ${idx + 1}`} className="w-full h-full object-cover group-hover:brightness-95 transition-all" />
+                            {idx === 3 && post.rootPost!.medias && post.rootPost!.medias.length > 4 && (
+                              <div className="absolute inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center">
+                                <span className="text-white text-2xl font-bold">+{post.rootPost!.medias.length - 4}</span>
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* TRƯỜNG HỢP 3: Bài viết SHARE KHÔNG có rootPost (bị xóa) */}
+              {isSharePost && !hasRootPost && (
+                <div className="mx-4 my-3 border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden bg-gray-50 dark:bg-gray-800/50">
+                  <div className="px-4 py-6">
+                    <div className="flex items-start gap-3">
+                      <div className="flex-shrink-0 mt-0.5">
+                        <div className="w-10 h-10 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center">
+                          <Lock className="w-5 h-5 text-gray-400 dark:text-gray-500" />
+                        </div>
+                      </div>
+                      <div className="flex-1">
+                        <p className="font-semibold text-[15px] text-gray-900 dark:text-gray-100 mb-1">
+                          This content is currently unavailable
+                        </p>
+                        <p className="text-[13px] text-gray-500 dark:text-gray-400 leading-relaxed">
+                          This error is usually because the owner only shared the content with a small group, changed who can see it, or deleted the content.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Reactions summary */}
+              {totalReactions > 0 && (
+                <div className="px-4 py-2 flex items-center justify-between text-[15px] text-gray-500 dark:text-gray-400 border-t border-gray-200 dark:border-gray-700 mt-3">
+                  <div className="flex items-center gap-1">
+                    {loading ? <span className="text-sm">Loading...</span> : (
+                      <div className="flex items-center gap-1.5 hover:underline cursor-pointer">
+                        <div className="flex items-center -space-x-1">
+                          {topReactions.map(([type], idx) => (
+                            <div key={type} style={{ zIndex: topReactions.length - idx }}
+                              className="w-[18px] h-[18px] rounded-full bg-white dark:bg-gray-900 border border-white dark:border-gray-900 flex items-center justify-center">
+                              {(() => { const cfg = reactionIcons[(type.toUpperCase() as ReactionType)]; return cfg ? React.createElement(cfg.icon, { className: "h-[14px] w-[14px]" }) : null })()}
+                            </div>
+                          ))}
+                        </div>
+                        <span className="text-[15px]">{totalReactions}</span>
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className="hover:underline cursor-pointer">
+                      {postStats ? `${postStats.commentCount || 0} comments` : '... comments'}
+                    </span>
+                    <span className="hover:underline cursor-pointer">
+                      {postStats ? `${postStats.shareCount || 0} shares` : '... shares'}
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              {/* Action buttons */}
+              <div className="px-2 py-1 border-t border-gray-200 dark:border-gray-700">
+                <div className="flex items-center gap-1">
+                  <ReactionButton />
+                  <ActionBtn 
+                    icon={MessageCircle} 
+                    label={`Comment${postStats ? ` (${postStats.commentCount || 0})` : ''}`} 
+                    onClick={() => {}} 
+                  />
+                  <ActionBtn 
+                    icon={Share} 
+                    label={`Share${postStats ? ` (${postStats.shareCount || 0})` : ''}`} 
+                    onClick={() => setShowShareModal(true)} 
+                  />
+                </div>
+              </div>
+            </Card>
+
+            {/* Comments Section */}
+            <div className="border-t border-gray-200 dark:border-gray-700">
+              <CommentsSection 
+                postId={post.postId} 
+                isOpen={true} 
+                onClose={() => {}} 
+                currentUserId="572a51cc-38a3-4225-a7f2-203a514293f5" // TODO: Get from auth context
+              />
+            </div>
           </div>
         </div>
-
-        <CommentsSection 
-          postId={post.postId} 
-          isOpen={showComments} 
-          onClose={() => setShowComments(false)} 
-          currentUserId="572a51cc-38a3-4225-a7f2-203a514293f5" // TODO: Get from auth context
-        />
-      </Card>
-
-      <PostDetailModal
-        post={post}
-        isOpen={showPostDetailModal}
-        onClose={() => setShowPostDetailModal(false)}
-        onOpenImage={onOpenImage}
-        reaction={reaction}
-        loading={loading}
-        onReact={onReact}
-        onShareSuccess={onShareSuccess}
-        isOwnPost={isOwnPost}
-        onEdit={onEdit}
-        onDelete={onDelete}
-        onSave={onSave}
-        onPin={onPin}
-        onHide={onHide}
-        onReport={onReport}
-        postStats={postStats}
-      />
+      </div>
 
       <ShareModal isOpen={showShareModal} onClose={() => setShowShareModal(false)}
         post={{ postId: post.postId, content: post.content, medias: post.medias || [], authorName: "Sarah Anderson", authorAvatar: "/image.png?height=40&width=40" }}
