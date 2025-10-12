@@ -2,15 +2,13 @@
 
 import React, { useState, useRef, useEffect } from "react"
 import { Button } from "@/components/ui"
-import { MoreHorizontal, Edit2, Trash2, BookmarkPlus, Pin, Flag, EyeOff, Loader2 } from "lucide-react"
+import { MoreHorizontal, Edit2, Trash2, Flag, EyeOff, Loader2 } from "lucide-react"
 
 interface PostOptionsMenuProps {
   postId: string
   isOwnPost?: boolean
   onEdit?: (postId: string) => void
   onDelete?: (postId: string) => Promise<void> | void // Cho phép async
-  onSave?: (postId: string) => void
-  onPin?: (postId: string) => void
   onHide?: (postId: string) => void
   onReport?: (postId: string) => void
   isDeleting?: boolean 
@@ -21,8 +19,6 @@ export function PostOptionsMenu({
   isOwnPost = true,
   onEdit,
   onDelete,
-  onSave,
-  onPin,
   onHide,
   onReport,
   isDeleting = false // Default value
@@ -144,24 +140,8 @@ export function PostOptionsMenu({
                   />
                 )}
 
-                {onPin && (
-                  <MenuItem
-                    icon={Pin}
-                    label="Pin to profile"
-                    onClick={() => handleAction(() => onPin?.(postId))}
-                  />
-                )}
-
-                {onSave && (
-                  <MenuItem
-                    icon={BookmarkPlus}
-                    label="Save post"
-                    onClick={() => handleAction(() => onSave?.(postId))}
-                  />
-                )}
-
-                {/* Hiển thị divider nếu có các action khác và có delete */}
-                {(onEdit || onPin || onSave) && onDelete && <Divider />}
+                {/* Hiển thị divider nếu có edit và có delete */}
+                {onEdit && onDelete && <Divider />}
 
                 {/* Delete button - CHỈ hiển thị khi có onDelete từ props */}
                 {onDelete && (
@@ -179,14 +159,6 @@ export function PostOptionsMenu({
             {/* Other user's post actions */}
             {!isOwnPost && (
               <>
-                {onSave && (
-                  <MenuItem
-                    icon={BookmarkPlus}
-                    label="Save post"
-                    onClick={() => handleAction(() => onSave?.(postId))}
-                  />
-                )}
-
                 {onHide && (
                   <MenuItem
                     icon={EyeOff}
@@ -195,7 +167,7 @@ export function PostOptionsMenu({
                   />
                 )}
 
-                {(onSave || onHide) && onReport && <Divider />}
+                {onHide && onReport && <Divider />}
 
                 {onReport && (
                   <MenuItem

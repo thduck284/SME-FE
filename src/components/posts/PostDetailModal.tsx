@@ -28,8 +28,6 @@ interface PostDetailModalProps {
   isOwnPost?: boolean
   onEdit?: (postId: string) => void
   onDelete?: (postId: string) => void
-  onSave?: (postId: string) => void
-  onPin?: (postId: string) => void
   onHide?: (postId: string) => void
   onReport?: (postId: string) => void
   postStats?: PostStats
@@ -47,8 +45,6 @@ export function PostDetailModal({
   isOwnPost = true,
   onEdit = () => {},
   onDelete,
-  onSave = () => {},
-  onPin = () => {},
   onHide = () => {},
   onReport = () => {},
   postStats
@@ -314,8 +310,6 @@ export function PostDetailModal({
                       isOwnPost={isOwnPost}
                       onEdit={onEdit}
                       onDelete={onDelete}
-                      onSave={onSave}
-                      onPin={onPin}
                       onHide={onHide}
                       onReport={onReport}
                     />

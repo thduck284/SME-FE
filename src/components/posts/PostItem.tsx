@@ -289,8 +289,6 @@ export function PostItem({
                 isOwnPost={isOwnPost}
                 onEdit={onEdit}
                 onDelete={onDelete}
-                onSave={onSave}
-                onPin={onPin}
                 onHide={onHide}
                 onReport={onReport}
               />
@@ -469,8 +467,6 @@ export function PostItem({
         isOwnPost={isOwnPost}
         onEdit={onEdit}
         onDelete={onDelete}
-        onSave={onSave}
-        onPin={onPin}
         onHide={onHide}
         onReport={onReport}
         postStats={postStats}
