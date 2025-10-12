@@ -12,10 +12,9 @@ interface CreatePostModalProps {
   isOpen: boolean
   onClose: () => void
   onPostCreated?: () => void
-  currentUserId?: string
 }
 
-export function CreatePostModal({ isOpen, onClose, onPostCreated, currentUserId }: CreatePostModalProps) {
+export function CreatePostModal({ isOpen, onClose, onPostCreated }: CreatePostModalProps) {
   const preventClose = () => {}
 
   const {
@@ -45,7 +44,7 @@ export function CreatePostModal({ isOpen, onClose, onPostCreated, currentUserId 
     handleTextareaKeyDown,
     selectMentionUser,
     closeMentionDropdown,
-  } = useCreatePostModal(preventClose, onPostCreated, currentUserId)
+  } = useCreatePostModal(preventClose, onPostCreated)
 
   const [visibilityDropdownOpen, setVisibilityDropdownOpen] = useState(false)
 

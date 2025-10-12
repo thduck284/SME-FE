@@ -43,7 +43,6 @@ export function CommentsSection({ postId, isOpen, currentUserId }: CommentsSecti
     mentions,
     setMentions,
   } = useMention({
-    currentUserId: currentUserId || '',
     onMentionAdd: () => {}, // We don't need to track mentions in comments for now
     currentText: comment,
     onTextChange: (newText, cursorPosition) => {
@@ -273,6 +272,12 @@ export function CommentsSection({ postId, isOpen, currentUserId }: CommentsSecti
   }, [toggleLikeComment])
 
   const handleDeleteComment = useCallback(async (commentId: string) => {
+    if (!commentId || commentId === 'undefined') {
+      console.error('Invalid comment ID:', commentId)
+      setError('Invalid comment ID')
+      return
+    }
+    
     if (!confirm("Are you sure you want to delete this comment?")) return
     
     try {
@@ -336,6 +341,7 @@ export function CommentsSection({ postId, isOpen, currentUserId }: CommentsSecti
                 onLike={handleLikeComment}
                 onDelete={handleDeleteComment}
                 onMentionClick={navigate}
+                currentUserId={currentUserId}
               />
             )
           })
@@ -380,6 +386,7 @@ interface CommentItemProps {
   onLike: (commentId: string) => void
   onDelete: (commentId: string) => void
   onMentionClick?: (path: string) => void
+  currentUserId?: string
 }
 
 function CommentItem({ 
@@ -391,7 +398,8 @@ function CommentItem({
   isLiking, 
   onLike, 
   onDelete,
-  onMentionClick
+  onMentionClick,
+  currentUserId
 }: CommentItemProps) {
   return (
     <div className={`flex gap-3 ${isTemp ? 'opacity-70' : ''}`}>
@@ -456,7 +464,7 @@ function CommentItem({
             )}
           </div>
           
-          {!isTemp && (
+          {!isTemp && currentUserId && comment.authorId === currentUserId && comment.id && (
             <Button
               variant="ghost"
               size="sm"

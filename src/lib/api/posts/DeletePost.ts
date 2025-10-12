@@ -1,24 +1,12 @@
+import apiClient from "@/lib/services/ApiClient"
+
 export const deleteApi = {
   deletePost: async (postId: string): Promise<void> => {
     try {
-      const res = await fetch(`/posts/${postId}`, {
-        method: 'DELETE',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      })
-      
-      if (!res.ok) {
-        const errorText = await res.text()
-        throw new Error(`Delete post failed: ${res.statusText} - ${errorText}`)
-      }
-      
-      if (res.status !== 204) {
-        return await res.json()
-      }
+      await apiClient.delete(`/posts/${postId}`)
     } catch (error: any) {
-      console.error('Error message:', error.message)
-      throw error
+      const message = error.response?.data?.message || "Failed to delete post"
+      throw new Error(message)
     }
   },
 }

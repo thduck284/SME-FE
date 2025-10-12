@@ -3,7 +3,6 @@ import { mentionApi } from '@/lib/api/users/Mention'
 import type { MentionUser, MentionData } from '@/lib/types/users/MentionDto'
 
 interface UseMentionProps {
-  currentUserId: string
   onMentionAdd?: (mentions: MentionData[]) => void
   onTextChange?: (newText: string, cursorPosition: number) => void
   currentText?: string // Current text content from parent component
@@ -11,7 +10,7 @@ interface UseMentionProps {
 
 const DEBOUNCE_DELAY = 300
 
-export function useMention({ currentUserId, onMentionAdd, onTextChange, currentText }: UseMentionProps) {
+export function useMention({ onMentionAdd, onTextChange, currentText }: UseMentionProps) {
   const [users, setUsers] = useState<MentionUser[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [showDropdown, setShowDropdown] = useState(false)
@@ -27,7 +26,7 @@ export function useMention({ currentUserId, onMentionAdd, onTextChange, currentT
     if (!query.trim()) {
       setIsLoading(true)
       try {
-        const response = await mentionApi.searchUsers(currentUserId, "")
+        const response = await mentionApi.searchUsers("")
         setUsers(response.data)
         setShowDropdown(true)
         setSelectedIndex(0)
@@ -43,7 +42,7 @@ export function useMention({ currentUserId, onMentionAdd, onTextChange, currentT
 
     setIsLoading(true)
     try {
-      const response = await mentionApi.searchUsers(currentUserId, query)
+      const response = await mentionApi.searchUsers(query)
       setUsers(response.data)
       setShowDropdown(true)
       setSelectedIndex(0)
@@ -54,7 +53,7 @@ export function useMention({ currentUserId, onMentionAdd, onTextChange, currentT
     } finally {
       setIsLoading(false)
     }
-  }, [currentUserId])
+  }, [])
 
   const handleTextChange = useCallback((text: string, cursorPosition: number) => {
     const beforeCursor = text.slice(0, cursorPosition)

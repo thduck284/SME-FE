@@ -4,7 +4,7 @@ import { useMention } from "./useMention"
 import type { CreatePostDto } from "@/lib/types/posts/CreatePostDto"
 import type { MentionData } from "@/lib/types/users/MentionDto"
 
-export function useCreatePostModal(onClose: () => void, onPostCreated?: () => void, currentUserId?: string) {
+export function useCreatePostModal(onClose: () => void, onPostCreated?: () => void) {
   const [content, setContent] = useState("")
   const type: CreatePostDto["type"] = "ORIGINAL"
   const [visibility, setVisibility] = useState<CreatePostDto["visibility"]>("PUBLIC")
@@ -27,7 +27,6 @@ export function useCreatePostModal(onClose: () => void, onPostCreated?: () => vo
     selectUser: selectMentionUser,
     closeDropdown: closeMentionDropdown,
   } = useMention({
-    currentUserId: currentUserId || '',
     onMentionAdd: setMentions,
     currentText: content,
     onTextChange: (newText, cursorPosition) => {

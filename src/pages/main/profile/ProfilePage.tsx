@@ -1,9 +1,9 @@
 "use client"
 
 import { useState, useRef, useEffect } from "react"
-import { useSearchParams } from "react-router-dom"
+import { useParams, useSearchParams } from "react-router-dom"
 import { Badge, Button, Card } from "@/components/ui"
-import { User, FileText, ImageIcon, MapPin, LinkIcon, Calendar, Mail, Camera } from "lucide-react"
+import { User, FileText, ImageIcon, MapPin, LinkIcon, Calendar, Mail, Camera, MoreVertical } from "lucide-react"
 import { LeftBar, RightBar } from "@/components/layouts"
 import { PostsTab } from "@/components/profile/PostsTab"
 import { ImagesTab } from "@/components/profile/ImagesTab"
@@ -11,6 +11,7 @@ import { RelationshipModal } from "@/components/profile/RelationshipModal"
 import { useUserRelationship } from "@/lib/hooks/useRelationship"
 import { getPostsCount } from "@/lib/api/posts/GetPostsByUser"
 import { useUsers } from "@/lib/hooks/useUsers"
+import { UserService } from "@/lib/api/users/UserService"
 import { getUserId } from "@/lib/utils/Jwt"
 
 const removeVietnameseTones = (str: string): string => {
@@ -67,9 +68,18 @@ const getAvatarUrl = (avtUrl: string | null): string => {
 }
 
 export function ProfilePage() {
+  const { userId: userIdFromParams } = useParams()
   const [searchParams, setSearchParams] = useSearchParams()
   
   const [userId, setUserId] = useState<string | null>(null)
+  const [isOwnProfile, setIsOwnProfile] = useState(true)
+  const [relationshipData, setRelationshipData] = useState<{
+    fromUser: { userId: string; relationshipTypes: string[] }
+    toUser: { userId: string; relationshipTypes: string[] }
+    mutualRelationships: string[]
+  } | null>(null)
+  const [loadingRelationship, setLoadingRelationship] = useState(false)
+  const [showDropdown, setShowDropdown] = useState(false)
   const [activeTab, setActiveTab] = useState<"profile" | "posts" | "images">("profile")
   const [avatarUrl, setAvatarUrl] = useState("/default.png")
   const [isHoveringAvatar, setIsHoveringAvatar] = useState(false)
@@ -98,6 +108,7 @@ export function ProfilePage() {
 
   const fileInputRef = useRef<HTMLInputElement>(null)
   const mainContentRef = useRef<HTMLDivElement>(null)
+  const dropdownRef = useRef<HTMLDivElement>(null)
 
   const { uploadAvatar, isUploading, error: uploadError } = useUsers()
   const { 
@@ -106,11 +117,59 @@ export function ProfilePage() {
     loading: loadingRelationships
   } = useUserRelationship(userId || undefined)
 
-  // Lấy userId từ JWT khi component mount
+  // Lấy userId từ URL params hoặc JWT
   useEffect(() => {
     const currentUserId = getUserId()
-    setUserId(currentUserId)
-  }, [])
+    
+    if (userIdFromParams) {
+      // Nếu có userId trong URL params, sử dụng userId đó
+      setUserId(userIdFromParams)
+      setIsOwnProfile(userIdFromParams === currentUserId)
+    } else {
+      // Nếu không có userId trong URL, sử dụng userId của user hiện tại
+      setUserId(currentUserId)
+      setIsOwnProfile(true)
+    }
+  }, [userIdFromParams])
+
+  // Fetch relationship data khi không phải profile của mình
+  useEffect(() => {
+    const fetchRelationshipData = async () => {
+      if (isOwnProfile || !userId) return
+      
+      try {
+        setLoadingRelationship(true)
+        const currentUserId = getUserId()
+        if (!currentUserId) return
+        
+        const data = await UserService.getRelationship(currentUserId, userId)
+        setRelationshipData(data)
+      } catch (error) {
+        console.error('Error fetching relationship data:', error)
+      } finally {
+        setLoadingRelationship(false)
+      }
+    }
+
+    fetchRelationshipData()
+  }, [isOwnProfile, userId])
+
+  // Đóng dropdown khi click outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setShowDropdown(false)
+      }
+    }
+
+    if (showDropdown) {
+      document.addEventListener('mousedown', handleClickOutside)
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [showDropdown])
 
   // Sync tab state với URL
   useEffect(() => {
@@ -262,6 +321,142 @@ export function ProfilePage() {
     })
   }
 
+  const getRelationshipButton = () => {
+    if (isOwnProfile || !relationshipData) return null
+
+    const { fromUser, toUser, mutualRelationships } = relationshipData
+    console.log("relationshipData", relationshipData)
+    
+    // Kiểm tra các relationship types
+    const isBlocked = fromUser.relationshipTypes.includes('BLOCKED') || toUser.relationshipTypes.includes('BLOCKED')
+    const isFriend = mutualRelationships.includes('FRIEND')
+    const isFollowing = fromUser.relationshipTypes.includes('FOLLOWER')
+    const isFollowedBy = toUser.relationshipTypes.includes('FOLLOWING')
+    
+    // Nếu bị block thì hiển thị button "Bỏ chặn"
+    if (isBlocked) {
+      return {
+        text: 'Bỏ chặn',
+        variant: 'primary' as const,
+        disabled: false,
+        action: 'unblock'
+      }
+    }
+    
+    // Nếu đã là bạn
+    if (isFriend) {
+      return {
+        text: 'Bạn bè',
+        variant: 'secondary' as const,
+        disabled: true
+      }
+    }
+    
+    // Nếu mình đã follow họ
+    if (isFollowing) {
+      return {
+        text: 'Đang theo dõi',
+        variant: 'secondary' as const,
+        disabled: false,
+        action: 'unfollow'
+      }
+    }
+    
+    // Nếu họ follow mình nhưng mình chưa follow họ
+    if (isFollowedBy) {
+      return {
+        text: 'Theo dõi lại',
+        variant: 'primary' as const,
+        disabled: false,
+        action: 'follow'
+      }
+    }
+    
+    // Chưa có quan hệ gì
+    return {
+      text: 'Theo dõi',
+      variant: 'primary' as const,
+      disabled: false,
+      action: 'follow'
+    }
+  }
+
+  const getDropdownActions = () => {
+    if (isOwnProfile || !relationshipData) return []
+
+    const { fromUser, toUser, mutualRelationships } = relationshipData
+    const isBlocked = fromUser.relationshipTypes.includes('BLOCKED') || toUser.relationshipTypes.includes('BLOCKED')
+    const isMuted = fromUser.relationshipTypes.includes('MUTED')
+    const isFriend = mutualRelationships.includes('FRIEND')
+    const isFollowing = fromUser.relationshipTypes.includes('FOLLOWER')
+    
+    const actions: Array<{
+      text: string
+      action: string
+      danger: boolean
+    }> = []
+    
+    // Nếu bị block thì không có dropdown actions (chỉ có button "Bỏ chặn")
+    if (isBlocked) return actions
+    
+    // Mute/Unmute action
+    if (isFriend || isFollowing) {
+      actions.push({
+        text: isMuted ? 'Bỏ im lặng' : 'Im lặng',
+        action: isMuted ? 'unmute' : 'mute',
+        danger: false
+      })
+    }
+    
+    // Block action (luôn có)
+    actions.push({
+      text: 'Chặn',
+      action: 'block',
+      danger: true
+    })
+    
+    return actions
+  }
+
+  const handleRelationshipAction = async (action: string) => {
+    if (!userId) return
+    
+    try {
+      const currentUserId = getUserId()
+      if (!currentUserId) return
+      
+      switch (action) {
+        case 'follow':
+          await UserService.followUser(currentUserId, userId)
+          break
+        case 'unfollow':
+          await UserService.unfollowUser(currentUserId, userId)
+          break
+        case 'mute':
+          await UserService.muteUser(currentUserId, userId)
+          break
+        case 'unmute':
+          await UserService.unmuteUser(currentUserId, userId)
+          break
+        case 'block':
+          await UserService.blockUser(currentUserId, userId)
+          break
+        case 'unblock':
+          await UserService.unblockUser(currentUserId, userId)
+          break
+        default:
+          console.warn('Unknown action:', action)
+          return
+      }
+      
+      // Refresh relationship data
+      const data = await UserService.getRelationship(currentUserId, userId)
+      setRelationshipData(data)
+    } catch (error) {
+      console.error('Error handling relationship action:', error)
+    }
+  }
+
   // Hiển thị loading nếu chưa có userId
   if (!userId) {
     return (
@@ -312,10 +507,10 @@ export function ProfilePage() {
           {/* Avatar với upload functionality */}
           <div 
             className="relative"
-            onMouseEnter={() => setIsHoveringAvatar(true)}
-            onMouseLeave={() => setIsHoveringAvatar(false)}
+            onMouseEnter={() => isOwnProfile && setIsHoveringAvatar(true)}
+            onMouseLeave={() => isOwnProfile && setIsHoveringAvatar(false)}
           >
-            <div className="relative cursor-pointer" onClick={handleAvatarClick}>
+            <div className={`relative ${isOwnProfile ? 'cursor-pointer' : ''}`} onClick={isOwnProfile ? handleAvatarClick : undefined}>
               <img
                 src={avatarUrl}
                 alt="User Avatar"
@@ -344,14 +539,16 @@ export function ProfilePage() {
               className="hidden"
             />
 
-            {/* Edit button */}
-            <button
-              onClick={handleAvatarClick}
-              disabled={isUploading}
-              className={`absolute -bottom-2 -right-2 h-8 w-8 rounded-full bg-primary text-white flex items-center justify-center shadow-lg transition-all duration-200 hover:bg-primary/90 hover:scale-110 ${isHoveringAvatar ? 'opacity-100 scale-100' : 'opacity-0 scale-90'} ${isUploading ? 'opacity-50 cursor-not-allowed' : ''}`}
-            >
-              <Camera className="h-4 w-4" />
-            </button>
+            {/* Edit button - chỉ hiển thị cho profile của mình */}
+            {isOwnProfile && (
+              <button
+                onClick={handleAvatarClick}
+                disabled={isUploading}
+                className={`absolute -bottom-2 -right-2 h-8 w-8 rounded-full bg-primary text-white flex items-center justify-center shadow-lg transition-all duration-200 hover:bg-primary/90 hover:scale-110 ${isHoveringAvatar ? 'opacity-100 scale-100' : 'opacity-0 scale-90'} ${isUploading ? 'opacity-50 cursor-not-allowed' : ''}`}
+              >
+                <Camera className="h-4 w-4" />
+              </button>
+            )}
           </div>
 
           {/* Profile Info */}
@@ -365,7 +562,59 @@ export function ProfilePage() {
                   {loadingProfile ? '' : displayUsername}
                 </p>
               </div>
-              <Button className="w-full md:w-auto">Edit Profile</Button>
+              {isOwnProfile ? (
+                <Button className="w-full md:w-auto">Edit Profile</Button>
+              ) : (
+                (() => {
+                  const buttonConfig = getRelationshipButton()
+                  const dropdownActions = getDropdownActions()
+                  
+                  if (!buttonConfig) return null
+                  
+                  return (
+                    <div className="flex gap-2 w-full md:w-auto">
+                      <Button 
+                        className="flex-1 md:flex-none"
+                        variant={buttonConfig.variant}
+                        disabled={buttonConfig.disabled || loadingRelationship}
+                        onClick={() => buttonConfig.action && handleRelationshipAction(buttonConfig.action)}
+                      >
+                        {loadingRelationship ? 'Loading...' : buttonConfig.text}
+                      </Button>
+                      {dropdownActions.length > 0 && (
+                        <div className="relative" ref={dropdownRef}>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="px-2"
+                            onClick={() => setShowDropdown(!showDropdown)}
+                          >
+                            <MoreVertical className="h-4 w-4" />
+                          </Button>
+                          {showDropdown && (
+                            <div className="absolute right-0 top-full mt-1 w-48 bg-white rounded-md shadow-lg border border-gray-200 z-10">
+                              {dropdownActions.map((action, index) => (
+                                <button
+                                  key={index}
+                                  className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-100 first:rounded-t-md last:rounded-b-md ${
+                                    action.danger ? 'text-red-600 hover:bg-red-50' : 'text-gray-700'
+                                  }`}
+                                  onClick={() => {
+                                    handleRelationshipAction(action.action)
+                                    setShowDropdown(false)
+                                  }}
+                                >
+                                  {action.text}
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )
+                })()
+              )}
             </div>
 
             {/* Stats */}

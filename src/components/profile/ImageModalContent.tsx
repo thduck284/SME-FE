@@ -7,6 +7,7 @@ import { useState, useRef, useEffect } from "react"
 import { ReactionType, reactionIcons } from "@/lib/constants/reactions"
 import { CommentsSection } from "@/components/posts/CommentsSection"
 import { ShareModal } from "@/components/posts/ShareModal"
+import { getUserId } from "@/lib/utils/Jwt"
 import type { PostStats } from "@/lib/api/posts/PostStats"
 
 interface ImageModalContentProps {
@@ -220,6 +221,7 @@ export function ImageModalContent({ post, reactions, onReact, onShareSuccess, po
           postId={post.postId} 
           isOpen={showComments} 
           onClose={() => setShowComments(false)} 
+          currentUserId={getUserId() || ''}
         />
       </div>
 

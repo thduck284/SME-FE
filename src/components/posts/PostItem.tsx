@@ -15,6 +15,7 @@ import { MessageCircle, Share, Repeat2, Lock, ThumbsUp } from "lucide-react"
 import { UserService } from "@/lib/api/users/UserService"
 import type { PostStats } from "@/lib/api/posts/PostStats"
 import type { UserMetadata } from "@/lib/types/User"
+import { getUserId } from "@/lib/utils/Jwt"
 
 interface PostItemProps {
   post: PostFullDto
@@ -282,16 +283,18 @@ export function PostItem({
             </div>
           </div>
           <div className="relative">
-            <PostOptionsMenu
-              postId={post.postId}
-              isOwnPost={isOwnPost}
-              onEdit={onEdit}
-              onDelete={onDelete}
-              onSave={onSave}
-              onPin={onPin}
-              onHide={onHide}
-              onReport={onReport}
-            />
+            {getUserId() && post.authorId === getUserId() && (
+              <PostOptionsMenu
+                postId={post.postId}
+                isOwnPost={isOwnPost}
+                onEdit={onEdit}
+                onDelete={onDelete}
+                onSave={onSave}
+                onPin={onPin}
+                onHide={onHide}
+                onReport={onReport}
+              />
+            )}
           </div>
         </div>
 
@@ -450,7 +453,7 @@ export function PostItem({
           postId={post.postId} 
           isOpen={showComments} 
           onClose={() => setShowComments(false)} 
-          currentUserId="572a51cc-38a3-4225-a7f2-203a514293f5" // TODO: Get from auth context
+          currentUserId={getUserId() || ''}
         />
       </Card>
 

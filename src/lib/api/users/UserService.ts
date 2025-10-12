@@ -140,4 +140,126 @@ export class UserService {
       throw error
     }
   }
+
+  /**
+   * Lấy relationship giữa hai users
+   */
+  static async getRelationship(fromUserId: string, toUserId: string): Promise<{
+    fromUser: { userId: string; relationshipTypes: string[] }
+    toUser: { userId: string; relationshipTypes: string[] }
+    mutualRelationships: string[]
+  }> {
+    try {
+      const response = await fetch(`${this.RELATIONSHIPS_BASE_URL}/${fromUserId}/relationship/${toUserId}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        mode: 'cors'
+      })
+
+      if (!response.ok) {
+        throw new Error('Get relationship API request failed')
+      }
+
+      return await response.json()
+    } catch (error) {
+      console.error('Error getting relationship:', error)
+      throw error
+    }
+  }
+
+  /**
+   * Mute một user
+   */
+  static async muteUser(fromUserId: string, toUserId: string): Promise<RelationshipDto> {
+    try {
+      const response = await fetch(`${this.RELATIONSHIPS_BASE_URL}/${fromUserId}/mute`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        mode: 'cors',
+        body: JSON.stringify({ toUserId })
+      })
+
+      if (!response.ok) {
+        throw new Error('Mute user API request failed')
+      }
+
+      return await response.json()
+    } catch (error) {
+      console.error('Error muting user:', error)
+      throw error
+    }
+  }
+
+  /**
+   * Unmute một user
+   */
+  static async unmuteUser(fromUserId: string, toUserId: string): Promise<void> {
+    try {
+      const response = await fetch(`${this.RELATIONSHIPS_BASE_URL}/${fromUserId}/unmute`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        mode: 'cors',
+        body: JSON.stringify({ toUserId })
+      })
+
+      if (!response.ok) {
+        throw new Error('Unmute user API request failed')
+      }
+    } catch (error) {
+      console.error('Error unmuting user:', error)
+      throw error
+    }
+  }
+
+  /**
+   * Block một user
+   */
+  static async blockUser(fromUserId: string, toUserId: string): Promise<void> {
+    try {
+      const response = await fetch(`${this.RELATIONSHIPS_BASE_URL}/${fromUserId}/block`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        mode: 'cors',
+        body: JSON.stringify({ toUserId })
+      })
+
+      if (!response.ok) {
+        throw new Error('Block user API request failed')
+      }
+    } catch (error) {
+      console.error('Error blocking user:', error)
+      throw error
+    }
+  }
+
+  /**
+   * Unblock một user
+   */
+  static async unblockUser(fromUserId: string, toUserId: string): Promise<void> {
+    try {
+      const response = await fetch(`${this.RELATIONSHIPS_BASE_URL}/${fromUserId}/unblock`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        mode: 'cors',
+        body: JSON.stringify({ toUserId })
+      })
+
+      if (!response.ok) {
+        throw new Error('Unblock user API request failed')
+      }
+    } catch (error) {
+      console.error('Error unblocking user:', error)
+      throw error
+    }
+  }
 }

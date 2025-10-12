@@ -7,6 +7,7 @@ import { RefreshCw, Users, AlertCircle } from "lucide-react"
 
 import { RelationshipSuggestion } from "@/lib/types/Relationship"
 import { UserMetadata } from "@/lib/types/User"
+import { getUserId } from "@/lib/utils/Jwt"
 
 interface SuggestedUser extends RelationshipSuggestion {
   userInfo: UserMetadata
@@ -18,8 +19,8 @@ export function SuggestedUsersPage() {
   const [error, setError] = useState<string | null>(null)
   const [refreshing, setRefreshing] = useState(false)
 
-  // Mock current user ID - trong thực tế sẽ lấy từ auth context
-  const currentUserId = "cb2c1edc-5a38-432e-8ba4-b80f29954883"
+  // Lấy current user ID từ auth context
+  const currentUserId = getUserId() || ''
 
   const fetchSuggestedUsers = async () => {
     try {

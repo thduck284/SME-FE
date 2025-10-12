@@ -1,3 +1,4 @@
+import apiClient from "@/lib/services/ApiClient"
 import type { PostFullDto } from "@/lib/types/posts/PostFullDto"
 import type { CreatePostDto } from "@/lib/types/posts/CreatePostDto"
 
@@ -25,17 +26,16 @@ export const shareApi = {
       formData.append('mentions', JSON.stringify(data.mentions))
     }
 
-    const res = await fetch(`/posts/${rootPostId}/share`, {
-      method: 'POST',
-      body: formData,
-    })
-    
-    if (!res.ok) {
-      const errorText = await res.text()
-      throw new Error(`Share post failed: ${res.statusText} - ${errorText}`)
+    try {
+      const response = await apiClient.post(`/posts/${rootPostId}/share`, formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      })
+      return response.data
+    } catch (error: any) {
+      const message = error.response?.data?.message || "Failed to share post"
+      throw new Error(message)
     }
-    
-    const response = await res.json()
-    return response.data
   },
 }
