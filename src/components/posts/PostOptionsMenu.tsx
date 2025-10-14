@@ -3,27 +3,32 @@
 import React, { useState, useRef, useEffect } from "react"
 import { Button } from "@/components/ui"
 import { MoreHorizontal, Edit2, Trash2, Flag, EyeOff, Loader2 } from "lucide-react"
+import { PostFullDto } from "@/lib/types/posts/PostFullDto"
+import { UpdatePostModal } from "@/components/posts/UpdatePostModal"
 
 interface PostOptionsMenuProps {
   postId: string
+  post: PostFullDto  
   isOwnPost?: boolean
-  onEdit?: (postId: string) => void
-  onDelete?: (postId: string) => Promise<void> | void // Cho phép async
+  onDelete?: (postId: string) => Promise<void> | void
   onHide?: (postId: string) => void
   onReport?: (postId: string) => void
+  onPostUpdated?: () => void  
   isDeleting?: boolean 
 }
 
 export function PostOptionsMenu({
   postId,
+  post,
   isOwnPost = true,
-  onEdit,
   onDelete,
   onHide,
   onReport,
-  isDeleting = false // Default value
+  onPostUpdated,
+  isDeleting = false
 }: PostOptionsMenuProps) {
   const [isOpen, setIsOpen] = useState(false)
+  const [showUpdateModal, setShowUpdateModal] = useState(false)  
   const [localDeleting, setLocalDeleting] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
     
@@ -61,7 +66,6 @@ export function PostOptionsMenu({
 
     setLocalDeleting(true)
     try {
-      // CHỈ gọi onDelete từ props (không dùng hook ở đây nữa)
       await onDelete?.(postId)
       setIsOpen(false)
     } catch (error) {
@@ -69,6 +73,20 @@ export function PostOptionsMenu({
     } finally {
       setLocalDeleting(false)
     }
+  }
+
+  const handleEdit = () => {
+    setShowUpdateModal(true)
+    setIsOpen(false)
+  }
+
+  const handleUpdateModalClose = () => {
+    setShowUpdateModal(false)
+  }
+
+  const handleUpdateSuccess = () => {
+    setShowUpdateModal(false)
+    onPostUpdated?.()
   }
 
   const MenuItem = ({ 
@@ -104,84 +122,88 @@ export function PostOptionsMenu({
 
   const Divider = () => <div className="my-1 border-t border-gray-200 dark:border-gray-700" />
 
-  // Tính toán trạng thái loading (từ component cha hoặc local)
   const deleting = isDeleting || localDeleting
 
   return (
-    <div ref={menuRef} className="relative">
-      <Button
-        variant="ghost"
-        size="sm"
-        onClick={() => setIsOpen(!isOpen)}
-        className="h-9 w-9 p-0 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 dark:text-gray-400 transition-colors"
-        aria-label="Post options"
-      >
-        <MoreHorizontal className="h-5 w-5" />
-      </Button>
+    <>
+      {/* Menu button */}
+      <div ref={menuRef} className="relative">
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => setIsOpen(!isOpen)}
+          className="h-9 w-9 p-0 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 dark:text-gray-400 transition-colors"
+          aria-label="Post options"
+        >
+          <MoreHorizontal className="h-5 w-5" />
+        </Button>
 
-      {isOpen && (
-        <>
-          {/* Backdrop for mobile */}
-          <div 
-            className="fixed inset-0 z-40 md:hidden" 
-            onClick={() => setIsOpen(false)}
-          />
-          
-          {/* Dropdown Menu */}
-          <div className="absolute right-0 top-full mt-1 w-56 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl z-50 py-1">
-            {/* Own Post Actions */}
-            {isOwnPost && (
-              <>
-                {onEdit && (
+        {isOpen && (
+          <>
+            <div 
+              className="fixed inset-0 z-40 md:hidden" 
+              onClick={() => setIsOpen(false)}
+            />
+            
+            <div className="absolute right-0 top-full mt-1 w-56 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl z-50 py-1">
+              {/* Own Post Actions */}
+              {isOwnPost && (
+                <>
                   <MenuItem
                     icon={Edit2}
                     label="Edit post"
-                    onClick={() => handleAction(() => onEdit?.(postId))}
+                    onClick={handleEdit} 
                   />
-                )}
 
-                {/* Hiển thị divider nếu có edit và có delete */}
-                {onEdit && onDelete && <Divider />}
+                  {onDelete && <Divider />}
 
-                {/* Delete button - CHỈ hiển thị khi có onDelete từ props */}
-                {onDelete && (
-                  <MenuItem
-                    icon={Trash2}
-                    label={deleting ? "Deleting..." : "Delete post"}
-                    onClick={handleDelete}
-                    danger
-                    loading={deleting}
-                  />
-                )}
-              </>
-            )}
+                  {onDelete && (
+                    <MenuItem
+                      icon={Trash2}
+                      label={deleting ? "Deleting..." : "Delete post"}
+                      onClick={handleDelete}
+                      danger
+                      loading={deleting}
+                    />
+                  )}
+                </>
+              )}
 
-            {/* Other user's post actions */}
-            {!isOwnPost && (
-              <>
-                {onHide && (
-                  <MenuItem
-                    icon={EyeOff}
-                    label="Hide post"
-                    onClick={() => handleAction(() => onHide?.(postId))}
-                  />
-                )}
+              {/* Other user's post actions */}
+              {!isOwnPost && (
+                <>
+                  {onHide && (
+                    <MenuItem
+                      icon={EyeOff}
+                      label="Hide post"
+                      onClick={() => handleAction(() => onHide?.(postId))}
+                    />
+                  )}
 
-                {onHide && onReport && <Divider />}
+                  {onHide && onReport && <Divider />}
 
-                {onReport && (
-                  <MenuItem
-                    icon={Flag}
-                    label="Report post"
-                    onClick={() => handleAction(() => onReport?.(postId))}
-                    danger
-                  />
-                )}
-              </>
-            )}
-          </div>
-        </>
-      )}
-    </div>
+                  {onReport && (
+                    <MenuItem
+                      icon={Flag}
+                      label="Report post"
+                      onClick={() => handleAction(() => onReport?.(postId))}
+                      danger
+                    />
+                  )}
+                </>
+              )}
+            </div>
+          </>
+        )}
+      </div>
+
+      {/* UpdatePostModal được render từ PostOptionsMenu */}
+      <UpdatePostModal
+        isOpen={showUpdateModal}
+        post={post}
+        onClose={handleUpdateModalClose}
+        onPostUpdated={handleUpdateSuccess}
+      />
+    </>
   )
 }

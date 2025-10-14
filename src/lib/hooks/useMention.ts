@@ -5,22 +5,33 @@ import type { MentionUser, MentionData } from '@/lib/types/users/MentionDto'
 interface UseMentionProps {
   onMentionAdd?: (mentions: MentionData[]) => void
   onTextChange?: (newText: string, cursorPosition: number) => void
-  currentText?: string // Current text content from parent component
+  currentText?: string
+  initialMentions?: MentionData[]
 }
 
 const DEBOUNCE_DELAY = 300
 
-export function useMention({ onMentionAdd, onTextChange, currentText }: UseMentionProps) {
+export function useMention({ onMentionAdd, onTextChange, currentText, initialMentions = [] }: UseMentionProps) {
   const [users, setUsers] = useState<MentionUser[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [showDropdown, setShowDropdown] = useState(false)
   const [mentionQuery, setMentionQuery] = useState('')
   const [mentionStartIndex, setMentionStartIndex] = useState(-1)
   const [selectedIndex, setSelectedIndex] = useState(0)
-  const [mentions, setMentions] = useState<MentionData[]>([])
+  const [mentions, setMentions] = useState<MentionData[]>(initialMentions)
   
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const searchTimeoutRef = useRef<NodeJS.Timeout>()
+
+  // ✅ FIX: Sử dụng useRef để track initialMentions, không trigger re-render
+  const initialMentionsRef = useRef(initialMentions)
+
+  useEffect(() => {
+    if (JSON.stringify(initialMentionsRef.current) !== JSON.stringify(initialMentions)) {
+      initialMentionsRef.current = initialMentions
+      setMentions(initialMentions)
+    }
+  }, [initialMentions])
 
   const searchUsers = useCallback(async (query: string) => {
     if (!query.trim()) {
@@ -59,26 +70,33 @@ export function useMention({ onMentionAdd, onTextChange, currentText }: UseMenti
     const beforeCursor = text.slice(0, cursorPosition)
     const mentionMatch = beforeCursor.match(/@(\w*)$/)
     
-    // Clean up mentions that are no longer in the text
-    const validMentions = mentions.filter(mention => {
-      const mentionText = text.slice(mention.startIndex, mention.endIndex)
-      return mentionText === mention.displayName && 
-             mention.startIndex < text.length && 
-             mention.endIndex <= text.length
+    // ✅ FIX: Dùng hàm cập nhật để tránh dependency trên mentions
+    setMentions(prevMentions => {
+      const validMentions = prevMentions.filter(mention => {
+        const isValid = mention.startIndex >= 0 && 
+                       mention.endIndex > mention.startIndex && 
+                       mention.endIndex <= text.length &&
+                       mention.userId
+        
+        const mentionTextInContent = text.slice(mention.startIndex, mention.endIndex)
+        const isTextMatched = mentionTextInContent === mention.displayName
+        
+        return isValid && isTextMatched
+      })
+      
+      if (validMentions.length !== prevMentions.length) {
+        onMentionAdd?.(validMentions)
+      }
+      
+      return validMentions
     })
-    
-    // Update mentions if any were removed
-    if (validMentions.length !== mentions.length) {
-      setMentions(validMentions)
-      onMentionAdd?.(validMentions)
-    }
     
     if (mentionMatch) {
       const query = mentionMatch[1]
       setMentionQuery(query)
-      // Find the actual position of @ in the text
       const atPosition = beforeCursor.lastIndexOf('@')
       setMentionStartIndex(atPosition)
+      
       if (query === '') {
         searchUsers('')
       } else {
@@ -95,13 +113,11 @@ export function useMention({ onMentionAdd, onTextChange, currentText }: UseMenti
       setMentionQuery('')
       setMentionStartIndex(-1)
     }
-  }, [searchUsers, mentions, onMentionAdd])
+  }, [searchUsers, onMentionAdd])
 
   const selectUser = useCallback((user: MentionUser) => {
-    // Use currentText from props or fallback to textarea value
     const textToUse = currentText || textareaRef.current?.value || ''
     
-    // Find the actual @ position in the text by searching backwards
     let actualStart = mentionStartIndex
     for (let i = mentionStartIndex; i >= 0; i--) {
       if (textToUse[i] === '@') {
@@ -110,26 +126,21 @@ export function useMention({ onMentionAdd, onTextChange, currentText }: UseMenti
       }
     }
     
-    // Calculate positions for text replacement
     const end = actualStart + mentionQuery.length + 1
     const beforeMention = textToUse.slice(0, actualStart)
     const afterMention = textToUse.slice(end)
     const mentionText = `@${user.firstName} ${user.lastName}`
     
-    // Build the new text with mention inserted
     const newText = beforeMention + mentionText + afterMention
     const newCursorPosition = actualStart + mentionText.length
 
-    // Update textarea directly first to avoid race conditions
     if (textareaRef.current) {
       textareaRef.current.value = newText
       textareaRef.current.setSelectionRange(newCursorPosition, newCursorPosition)
     }
     
-    // Update parent component's state
     onTextChange?.(newText, newCursorPosition)
 
-    // Create mention data for tracking
     const newMention: MentionData = {
       userId: user.userId,
       startIndex: actualStart,
@@ -145,44 +156,43 @@ export function useMention({ onMentionAdd, onTextChange, currentText }: UseMenti
       text: newText.slice(newMention.startIndex, newMention.endIndex)
     })
     
-    // Recalculate positions for existing mentions that come after the new mention
-    const recalculatedMentions = mentions.map(mention => {
-      if (mention.startIndex >= actualStart) {
-        // This mention comes after the new mention, adjust its position
-        const positionShift = mentionText.length - (end - actualStart)
-        return {
-          ...mention,
-          startIndex: mention.startIndex + positionShift,
-          endIndex: mention.endIndex + positionShift
+    // ✅ FIX: Dùng hàm cập nhật để lấy mentions hiện tại
+    setMentions(prevMentions => {
+      const recalculatedMentions = prevMentions.map(mention => {
+        if (mention.startIndex >= actualStart) {
+          const positionShift = mentionText.length - (end - actualStart)
+          return {
+            ...mention,
+            startIndex: mention.startIndex + positionShift,
+            endIndex: mention.endIndex + positionShift
+          }
         }
-      }
-      return mention
+        return mention
+      })
+      
+      const updatedMentions = [...recalculatedMentions, newMention]
+      onMentionAdd?.(updatedMentions)
+      
+      console.log('📝 All mentions:', updatedMentions.map(m => ({
+        userId: m.userId,
+        startIndex: m.startIndex,
+        endIndex: m.endIndex,
+        displayName: m.displayName
+      })))
+      
+      return updatedMentions
     })
     
-    // Update mentions state with the new mention and recalculated positions
-    const updatedMentions = [...recalculatedMentions, newMention]
-    setMentions(updatedMentions)
-    onMentionAdd?.(updatedMentions)
-    
-    console.log('📝 All mentions:', updatedMentions.map(m => ({
-      userId: m.userId,
-      startIndex: m.startIndex,
-      endIndex: m.endIndex,
-      displayName: m.displayName
-    })))
-    
-    // Reset mention state
     setShowDropdown(false)
     setMentionQuery('')
     setMentionStartIndex(-1)
     setSelectedIndex(0)
     
-    // Ensure focus and cursor position after state updates
     setTimeout(() => {
       textareaRef.current?.focus()
       textareaRef.current?.setSelectionRange(newCursorPosition, newCursorPosition)
     }, 0)
-  }, [mentionQuery, mentionStartIndex, mentions, onMentionAdd, onTextChange, currentText])
+  }, [mentionQuery, mentionStartIndex, onMentionAdd, onTextChange, currentText])
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (!showDropdown || users.length === 0) return

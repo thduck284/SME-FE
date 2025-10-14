@@ -286,11 +286,12 @@ export function PostItem({
             {getUserId() && post.authorId === getUserId() && (
               <PostOptionsMenu
                 postId={post.postId}
+                post={post}  
                 isOwnPost={isOwnPost}
-                onEdit={onEdit}
                 onDelete={onDelete}
                 onHide={onHide}
                 onReport={onReport}
+                onPostUpdated={onShareSuccess}  
               />
             )}
           </div>
