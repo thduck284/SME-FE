@@ -1,12 +1,14 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { X, ImageIcon, Video, Smile, MapPin } from "lucide-react"
 import toast from "react-hot-toast"
 import { EmojiPicker, MentionPortal } from "@/components/ui"
 import { FilePreviewGrid } from "./FilePreviewGrid"
 import { getVisibilityIcon, VISIBILITY_OPTIONS } from "@/lib/utils/PostUtils"
 import { useCreatePostModal } from "@/lib/hooks/useCreatePostModal"
+import { UserService } from "@/lib/api/users/UserService"
+import { getUserId } from "@/lib/utils/Jwt"
 
 interface CreatePostModalProps {
   isOpen: boolean
@@ -14,8 +16,47 @@ interface CreatePostModalProps {
   onPostCreated?: () => void
 }
 
+// Helper function từ ProfilePage
+const getAvatarUrl = (avtUrl: string | null): string => {
+  if (avtUrl && avtUrl.trim() !== '') {
+    return avtUrl
+  }
+  return "/default.png"
+}
+
 export function CreatePostModal({ isOpen, onClose, onPostCreated }: CreatePostModalProps) {
   const preventClose = () => {}
+
+  const [currentUser, setCurrentUser] = useState<{
+    userId: string
+    firstName: string
+    lastName: string
+    avtUrl: string | null
+  } | null>(null)
+
+  // Fetch current user info
+  useEffect(() => {
+    const fetchCurrentUser = async () => {
+      try {
+        const userId = getUserId()
+        if (!userId) return
+
+        const userData = await UserService.getUserMetadata(userId)
+        setCurrentUser({
+          userId: userData.userId,
+          firstName: userData.firstName,
+          lastName: userData.lastName,
+          avtUrl: userData.avtUrl
+        })
+      } catch (error) {
+        console.error("Failed to fetch current user:", error)
+      }
+    }
+
+    if (isOpen) {
+      fetchCurrentUser()
+    }
+  }, [isOpen])
 
   const {
     content,
@@ -62,6 +103,9 @@ export function CreatePostModal({ isOpen, onClose, onPostCreated }: CreatePostMo
     }
   }
 
+  const displayName = currentUser ? `${currentUser.firstName} ${currentUser.lastName}`.trim() : "You"
+  const avatarUrl = getAvatarUrl(currentUser?.avtUrl ?? null)
+
   return (
     <div
       className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4"
@@ -84,8 +128,20 @@ export function CreatePostModal({ isOpen, onClose, onPostCreated }: CreatePostMo
         {/* Content */}
         <div className="p-6 overflow-y-auto flex-grow flex flex-col gap-6 relative">
           <div className="flex items-center gap-4">
-            <div className="w-12 h-12 bg-gradient-to-r from-orange-400 to-orange-500 rounded-full flex items-center justify-center text-white font-extrabold text-xl select-none">
-              Y
+            {/* User Info - Thay thế chữ "Y" bằng avatar và tên */}
+            <div className="flex items-center gap-3">
+              <img
+                src={avatarUrl}
+                alt="User Avatar"
+                className="h-12 w-12 rounded-full object-cover border-2 border-orange-200"
+                onError={(e) => {
+                  e.currentTarget.src = "/default.png"
+                }}
+              />
+              <div>
+                <p className="font-semibold text-gray-900 text-sm">{displayName}</p>
+                <p className="text-xs text-gray-500">Creating new post</p>
+              </div>
             </div>
 
             {/* Visibility dropdown */}
@@ -139,24 +195,24 @@ export function CreatePostModal({ isOpen, onClose, onPostCreated }: CreatePostMo
               onChange={handleContentChange}
               onKeyDown={handleTextareaKeyDown}
               maxLength={1000}
-          />
+            />
 
-          {/* Mention Portal - Renders outside modal container */}
-          <MentionPortal
-            users={mentionUsers}
-            selectedIndex={mentionSelectedIndex}
-            onSelect={selectMentionUser}
-            onClose={closeMentionDropdown}
-            isLoading={isMentionLoading}
-            inputRef={textareaRef}
-            show={showMentionDropdown}
-          />
+            {/* Mention Portal - Renders outside modal container */}
+            <MentionPortal
+              users={mentionUsers}
+              selectedIndex={mentionSelectedIndex}
+              onSelect={selectMentionUser}
+              onClose={closeMentionDropdown}
+              isLoading={isMentionLoading}
+              inputRef={textareaRef}
+              show={showMentionDropdown}
+            />
 
-          {showEmojiPicker && (
-            <div className="absolute bottom-[110px] right-8 z-50">
-              <EmojiPicker onSelect={handleAddEmoji} />
-            </div>
-          )}
+            {showEmojiPicker && (
+              <div className="absolute bottom-[110px] right-8 z-50">
+                <EmojiPicker onSelect={handleAddEmoji} />
+              </div>
+            )}
           </div>
 
           {files.length > 0 && <FilePreviewGrid files={files} onRemoveFile={handleRemoveFile} />}

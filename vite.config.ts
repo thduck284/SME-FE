@@ -33,7 +33,7 @@ export default defineConfig({
         changeOrigin: true,
       },
       '/auth': {
-        target: 'http://localhost:3011',
+        target: 'http://localhost:3010',
         changeOrigin: true,
       },
     },
