@@ -1,8 +1,9 @@
+"use client"
+
 import { useState, useCallback } from 'react'
 import { commentApi } from "@/lib/api/posts/Comment"
 import type { Comment, CommentMention, CreateCommentRequest } from "@/lib/types/posts/CommentsDTO"
 
-// Interface cho API response (có commentId thay vì id)
 interface ApiComment {
   commentId: string
   content: string
@@ -25,35 +26,27 @@ export function useComments(postId: string) {
   const [isLoading, setIsLoading] = useState(false)
   const [isAdding, setIsAdding] = useState(false)
   const [isLiking, setIsLiking] = useState<string | null>(null)
+  const [isEditing, setIsEditing] = useState<string | null>(null)
+  const [isDeleting, setIsDeleting] = useState<string | null>(null)
   const [pagination, setPagination] = useState<{
     nextCursor?: string
     hasMore: boolean
   }>({ hasMore: false })
 
-  // Validate postId
   const isValidPostId = useCallback(() => {
     return postId && typeof postId === 'string' && postId.trim().length > 0
   }, [postId])
 
-  // Lấy comments từ API
   const fetchComments = useCallback(async (limit?: number, cursor?: string) => {
     if (!isValidPostId()) {
       throw new Error('Invalid post ID')
     }
-    
-    console.log('📡 Fetching comments from API:', { postId, limit, cursor })
+  
     setIsLoading(true)
     try {
       const response = await commentApi.getCommentsByPost(postId, limit, cursor)
-      console.log('📡 API Response:', {
-        commentsCount: response.comments?.length || 0,
-        comments: response.comments?.map(c => ({ id: c.id, content: c.content?.substring(0, 50) })) || [],
-        hasMore: response.hasMore,
-        nextCursor: response.nextCursor
-      })
-      
+  
       setComments(prev => {
-        // Map API response to Comment interface (commentId -> id)
         const mappedComments: Comment[] = (response.comments as unknown as ApiComment[]).map((comment: ApiComment) => ({
           id: comment.commentId,
           content: comment.content,
@@ -90,13 +83,11 @@ export function useComments(postId: string) {
     }
   }, [postId, isValidPostId])
 
-  // Load more comments
   const loadMoreComments = useCallback(async () => {
     if (!pagination.hasMore || !pagination.nextCursor) return
     await fetchComments(10, pagination.nextCursor)
   }, [pagination, fetchComments])
 
-  // Thêm comment mới - ĐẢM BẢO CONTENT LUÔN CÓ GIÁ TRỊ
   const addComment = useCallback(async (content: string, mentions?: CommentMention[], files?: File[]) => {
     if (!content.trim() && (!files || files.length === 0)) {
       throw new Error('Comment cannot be empty')
@@ -115,11 +106,8 @@ export function useComments(postId: string) {
         ...(files && files.length > 0 ? { files } : {})
       }
       
-      console.log('📤 Creating comment with data:', createData)
-      
       const newComment = await commentApi.createComment(createData)
-      
-      // Đảm bảo comment mới có đầy đủ thông tin và map commentId -> id
+
       const enrichedComment: Comment = {
         id: (newComment as any).commentId || newComment.id,
         content: newComment.content || content.trim(),
@@ -143,6 +131,49 @@ export function useComments(postId: string) {
       setIsAdding(false)
     }
   }, [postId, isValidPostId])
+
+  // Edit comment
+  const editComment = useCallback(async (commentId: string, content: string, mentions?: CommentMention[], files?: File[]) => {
+    if (!content.trim() && (!files || files.length === 0)) {
+      throw new Error('Comment cannot be empty')
+    }
+
+    setIsEditing(commentId)
+    try {
+      const updateData = {
+        content: content.trim(),
+        ...(mentions && mentions.length > 0 ? { mentions } : {}),
+        ...(files && files.length > 0 ? { files } : {})
+      }
+      
+      const updatedComment = await commentApi.updateComment(commentId, updateData)
+      
+      const enrichedComment: Comment = {
+        id: (updatedComment as any).commentId || updatedComment.id,
+        content: updatedComment.content || content.trim(),
+        authorName: updatedComment.authorName,
+        authorId: updatedComment.authorId,
+        authorAvatar: updatedComment.authorAvatar || undefined,
+        createdAt: updatedComment.createdAt,
+        likes: updatedComment.likes || 0,
+        isLiked: updatedComment.isLiked || false,
+        postId: updatedComment.postId,
+        parentCommentId: updatedComment.parentCommentId || undefined,
+        mentions: updatedComment.mentions || [],
+        medias: updatedComment.medias || []
+      }
+      
+      setComments(prev => prev.map(comment => 
+        comment.id === commentId ? enrichedComment : comment
+      ))
+      
+      return enrichedComment
+    } catch (error) {
+      throw error
+    } finally {
+      setIsEditing(null)
+    }
+  }, [])
 
   // Like/unlike comment
   const toggleLikeComment = useCallback(async (commentId: string) => {
@@ -172,11 +203,14 @@ export function useComments(postId: string) {
 
   // Xóa comment
   const deleteComment = useCallback(async (commentId: string) => {
+    setIsDeleting(commentId)
     try {
       await commentApi.deleteComment(commentId)
       setComments(prev => prev.filter(comment => comment.id !== commentId))
     } catch (error) {
       throw error
+    } finally {
+      setIsDeleting(null)
     }
   }, [])
 
@@ -198,10 +232,13 @@ export function useComments(postId: string) {
     isLoading,
     isAdding,
     isLiking,
+    isEditing,
+    isDeleting,
     pagination,
     fetchComments,
     loadMoreComments,
     addComment,
+    editComment,
     toggleLikeComment,
     deleteComment,
     refreshComments,

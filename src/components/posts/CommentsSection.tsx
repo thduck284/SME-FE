@@ -2,16 +2,15 @@
 
 import { useState, useEffect, useCallback, useRef, useMemo } from "react"
 import { useNavigate } from "react-router-dom"
-import { Button, MentionPortal } from "@/components/ui"
-import { Send, Heart, Trash2, Loader2, AlertCircle, ImageIcon, FileText } from "lucide-react"
-import { FilePreviewGrid } from "./FilePreviewGrid"
 import { useComments } from "@/lib/hooks/useComments"
 import { useMention } from "@/lib/hooks/useMention"
 import { UserService } from "@/lib/api/users/UserService"
-import { formatTimeAgo } from "@/lib/utils/PostUtils"
-import type { Comment as CommentType, CommentMention, CommentMedia } from "@/lib/types/posts/CommentsDTO"
+import type { Comment as CommentType, CommentMention } from "@/lib/types/posts/CommentsDTO"
 import type { UserMetadata } from "@/lib/types/User"
 import type { MentionData } from "@/lib/types/users/MentionDto"
+import { CommentsList } from "./CommentsList"
+import { CommentInput } from "./CommentInput"
+import { ErrorMessage } from "../ui/ErrorMessage"
 
 interface CommentsSectionProps {
   postId: string
@@ -27,6 +26,7 @@ export function CommentsSection({ postId, isOpen, currentUserId }: CommentsSecti
   const [optimisticComments, setOptimisticComments] = useState<CommentType[]>([])
   const [userCache, setUserCache] = useState<Map<string, UserMetadata>>(new Map())
   const [files, setFiles] = useState<File[]>([])
+  const [editingComment, setEditingComment] = useState<CommentType | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -43,11 +43,10 @@ export function CommentsSection({ postId, isOpen, currentUserId }: CommentsSecti
     mentions,
     setMentions,
   } = useMention({
-    onMentionAdd: () => {}, // We don't need to track mentions in comments for now
+    onMentionAdd: () => {},
     currentText: comment,
     onTextChange: (newText, cursorPosition) => {
       setComment(newText)
-      // Update cursor position after state update
       setTimeout(() => {
         if (inputRef.current) {
           inputRef.current.setSelectionRange(cursorPosition, cursorPosition)
@@ -61,21 +60,19 @@ export function CommentsSection({ postId, isOpen, currentUserId }: CommentsSecti
     isLoading,
     isAdding,
     isLiking,
+    isEditing,
+    isDeleting,
     fetchComments,
     addComment,
+    editComment,
     toggleLikeComment,
     deleteComment
   } = useComments(postId)
 
-  // Sử dụng UserService.getUserMetadata thay vì useUsers hook
-
-  // Combine comments from API and optimistic updates, ensuring unique IDs
+  // Combine comments from API and optimistic updates
   const displayComments = useMemo(() => {
-    
-    // Start with real comments from API
     const allComments = [...comments]
     
-    // Add optimistic comments that don't exist in real comments
     optimisticComments.forEach(optimisticComment => {
       const exists = allComments.find(c => c.id === optimisticComment.id)
       if (!exists) {
@@ -83,14 +80,10 @@ export function CommentsSection({ postId, isOpen, currentUserId }: CommentsSecti
       }
     })
     
-    // Filter out any null/undefined comments
     const validComments = allComments.filter(Boolean)
-    
-    // Sort by creation time (newest first)
     const sortedComments = validComments.sort((a, b) => 
       new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
     )
-    
     
     return sortedComments
   }, [optimisticComments, comments])
@@ -103,19 +96,18 @@ export function CommentsSection({ postId, isOpen, currentUserId }: CommentsSecti
       setOptimisticComments([])
       fetchComments(10)
     }
-  }, [isOpen, postId]) // Removed fetchComments from dependencies to prevent infinite loop
+  }, [isOpen, postId])
 
   // Fetch user metadata for comments with debouncing
   useEffect(() => {
     const fetchUserMetadata = async () => {
       const commentsToFetch = displayComments
         .filter(comment => comment && !userCache.has(comment.authorId))
-        .filter(comment => comment.authorId && comment.authorId !== 'current-user') // Skip current-user
-        .slice(0, 5) // Reduced limit to prevent blocking
+        .filter(comment => comment.authorId && comment.authorId !== 'current-user')
+        .slice(0, 5)
 
       if (commentsToFetch.length === 0) return
 
-      // Process in batches to prevent blocking
       const batchSize = 3
       for (let i = 0; i < commentsToFetch.length; i += batchSize) {
         const batch = commentsToFetch.slice(i, i + batchSize)
@@ -141,22 +133,20 @@ export function CommentsSection({ postId, isOpen, currentUserId }: CommentsSecti
         
         setUserCache(newCache)
         
-        // Small delay between batches to prevent blocking
         if (i + batchSize < commentsToFetch.length) {
           await new Promise(resolve => setTimeout(resolve, 100))
         }
       }
     }
 
-    // Debounce user metadata fetching
     const timeoutId = setTimeout(() => {
       if (displayComments.length > 0) {
         fetchUserMetadata()
       }
-    }, 300) // 300ms debounce
+    }, 300)
 
     return () => clearTimeout(timeoutId)
-  }, [displayComments.length]) // Only depend on comment count, not userCache
+  }, [displayComments.length])
 
   // Helper functions with memoization
   const getUserFromCache = useCallback((authorId: string): UserMetadata | undefined => 
@@ -177,9 +167,7 @@ export function CommentsSection({ postId, isOpen, currentUserId }: CommentsSecti
     setFiles((prev) => prev.filter((_, i) => i !== index))
   }, [])
 
-
   const getDisplayInfo = useCallback((comment: CommentType) => {
-    // Handle current-user case - show "You" for current user
     if (comment.authorId === 'current-user') {
       return {
         displayName: 'You',
@@ -188,18 +176,22 @@ export function CommentsSection({ postId, isOpen, currentUserId }: CommentsSecti
       }
     }
 
-    // Fetch real user metadata for other users
     const userMetadata = getUserFromCache(comment.authorId)
-    
-    // Ưu tiên metadata thật, không dùng authorName từ comment
-    const displayName = userMetadata ? `${userMetadata.firstName} ${userMetadata.lastName}`.trim() : 
-                       'Loading...' // Hiển thị loading khi chưa fetch xong
+    const displayName = userMetadata ? `${userMetadata.firstName} ${userMetadata.lastName}`.trim() : 'Loading...'
     const avatarUrl = userMetadata?.avtUrl || comment.authorAvatar
-    const fullName = userMetadata ? `${userMetadata.firstName} ${userMetadata.lastName}`.trim() : 
-                    'Loading...'
+    const fullName = userMetadata ? `${userMetadata.firstName} ${userMetadata.lastName}`.trim() : 'Loading...'
 
     return { displayName, avatarUrl, fullName }
   }, [getUserFromCache])
+
+  // Convert MentionData to CommentMention
+  const convertToCommentMentions = useCallback((mentionsData: MentionData[]): CommentMention[] => {
+    return mentionsData.map(mention => ({
+      userId: mention.userId,
+      startIndex: mention.startIndex,
+      endIndex: mention.endIndex
+    }))
+  }, [])
 
   // Memoized comment submission handler
   const handleSubmitComment = useCallback(async (e: React.FormEvent) => {
@@ -211,12 +203,32 @@ export function CommentsSection({ postId, isOpen, currentUserId }: CommentsSecti
     }
     
     setError(null)
-    
+
+    // If editing existing comment
+    if (editingComment) {
+      try {
+        const commentMentions = convertToCommentMentions(mentions)
+        
+        await editComment(editingComment.id, comment, commentMentions, files)
+        setEditingComment(null)
+        setComment("")
+        setFiles([])
+        setMentions([])
+        
+      } catch (error: any) {
+        console.error('Failed to edit comment:', error)
+        const errorMessage = error.response?.data?.message || error.message || 'Failed to edit comment'
+        setError(errorMessage)
+      }
+      return
+    }
+
+    // If adding new comment
     const tempComment: CommentType = {
       id: `temp-${Date.now()}`,
       content: comment,
       authorId: currentUserId || 'current-user',
-      authorName: '', // Empty để fetch metadata thật
+      authorName: '',
       authorAvatar: undefined,
       createdAt: new Date().toISOString(),
       likes: 0,
@@ -231,22 +243,11 @@ export function CommentsSection({ postId, isOpen, currentUserId }: CommentsSecti
     setFiles([])
 
     try {
-      // Convert mentions from MentionData format to CommentMention format
-      const commentMentions = mentions.map(mention => ({
-        userId: mention.userId,
-        startIndex: mention.startIndex,
-        endIndex: mention.endIndex
-      }))
+      const commentMentions = convertToCommentMentions(mentions)
       
       await addComment(currentComment, commentMentions, currentFiles)
-      
-      // Clear mentions after successful submission
       setMentions([])
-      
-      // Load lại tất cả comments sau khi comment xong
       setOptimisticComments(prev => prev.filter(c => c.id !== tempComment.id))
-      
-      // Refresh tất cả comments
       await fetchComments(10)
       
     } catch (error: any) {
@@ -259,7 +260,7 @@ export function CommentsSection({ postId, isOpen, currentUserId }: CommentsSecti
       const errorMessage = error.response?.data?.message || error.message || 'Failed to post comment'
       setError(errorMessage)
     }
-  }, [comment, files, currentUserId, postId, addComment, fetchComments, mentions])
+  }, [comment, files, currentUserId, postId, addComment, fetchComments, mentions, editingComment, editComment, convertToCommentMentions])
 
   // Other comment handlers with memoization
   const handleLikeComment = useCallback(async (commentId: string) => {
@@ -291,70 +292,59 @@ export function CommentsSection({ postId, isOpen, currentUserId }: CommentsSecti
     }
   }, [deleteComment])
 
+  const handleEditComment = useCallback((comment: CommentType) => {
+    setEditingComment(comment)
+    setComment(comment.content)
+    // Set mentions if needed
+    if (comment.mentions) {
+      // Convert CommentMention to MentionData
+      const mentionData: MentionData[] = comment.mentions.map(mention => ({
+        userId: mention.userId,
+        startIndex: mention.startIndex,
+        endIndex: mention.endIndex,
+        displayName: '' // Add default displayName
+      }))
+      setMentions(mentionData)
+    }
+  }, [])
+
+  const handleCancelEdit = useCallback(() => {
+    setEditingComment(null)
+    setComment("")
+    setFiles([])
+    setMentions([])
+  }, [])
+
   if (!isOpen) return null
 
   return (
     <div className="border-t border-border/50 bg-muted/30">
-      {/* Error Message */}
-      {error && (
-        <div className="mx-4 mt-3 p-3 bg-red-50 border border-red-200 rounded-lg flex items-center gap-2 text-red-700 text-sm">
-          <AlertCircle className="h-4 w-4 flex-shrink-0" />
-          <span>{error}</span>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="ml-auto h-6 w-6 p-0 text-red-700 hover:bg-red-100"
-            onClick={() => setError(null)}
-          >
-            ×
-          </Button>
-        </div>
-      )}
+      <ErrorMessage error={error} onClose={() => setError(null)} />
+      
+      <CommentsList
+        comments={displayComments}
+        isLoading={isLoading}
+        isLiking={isLiking}
+        isEditing={isEditing}
+        isDeleting={isDeleting}
+        currentUserId={currentUserId}
+        onLike={handleLikeComment}
+        onDelete={handleDeleteComment}
+        onEdit={handleEditComment}
+        onMentionClick={navigate}
+        getDisplayInfo={getDisplayInfo}
+        isTempComment={isTempComment}
+      />
 
-      {/* Comments List */}
-      <div className="max-h-60 overflow-y-auto p-4 space-y-3">
-        {isLoading && displayComments.length === 0 ? (
-          <div className="flex justify-center items-center py-8">
-            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-            <span className="ml-2 text-sm text-muted-foreground">Loading comments...</span>
-          </div>
-        ) : displayComments.length === 0 ? (
-          <div className="text-center text-muted-foreground text-sm py-8">
-            No comments yet. Be the first to comment!
-          </div>
-        ) : (
-          displayComments.map((comment, index) => {
-            if (!comment) return null
-            
-            const tempComment = isTempComment(comment)
-            const { displayName, avatarUrl, fullName } = getDisplayInfo(comment)
-            
-            return (
-              <CommentItem
-                key={comment.id || `comment-${index}-${comment.authorId}`}
-                comment={comment}
-                isTemp={tempComment}
-                displayName={displayName}
-                avatarUrl={avatarUrl}
-                fullName={fullName}
-                isLiking={isLiking}
-                onLike={handleLikeComment}
-                onDelete={handleDeleteComment}
-                onMentionClick={navigate}
-                currentUserId={currentUserId}
-              />
-            )
-          })
-        )}
-      </div>
-
-      {/* Comment Input */}
       <CommentInput
         comment={comment}
         isAdding={isAdding}
+        isEditing={isEditing}
+        editingComment={editingComment}
         onChange={setComment}
         onClearError={() => setError(null)}
         onSubmit={handleSubmitComment}
+        onCancelEdit={handleCancelEdit}
         mentionUsers={mentionUsers}
         isMentionLoading={isMentionLoading}
         showMentionDropdown={showMentionDropdown}
@@ -364,562 +354,13 @@ export function CommentsSection({ postId, isOpen, currentUserId }: CommentsSecti
         onSelectMentionUser={selectMentionUser}
         onCloseMentionDropdown={closeMentionDropdown}
         inputRef={inputRef}
-        mentions={mentions as MentionData[]}
-        setMentions={(next) => setMentions(next)}
+        mentions={mentions}
+        setMentions={setMentions}
         files={files}
         onFileChange={handleFileChange}
         onRemoveFile={handleRemoveFile}
         fileInputRef={fileInputRef}
       />
-    </div>
-  )
-}
-
-// Sub-components for better organization
-interface CommentItemProps {
-  comment: CommentType
-  isTemp: boolean
-  displayName: string
-  avatarUrl?: string
-  fullName?: string
-  isLiking: string | null
-  onLike: (commentId: string) => void
-  onDelete: (commentId: string) => void
-  onMentionClick?: (path: string) => void
-  currentUserId?: string
-}
-
-function CommentItem({ 
-  comment, 
-  isTemp, 
-  displayName, 
-  avatarUrl, 
-  fullName, 
-  isLiking, 
-  onLike, 
-  onDelete,
-  onMentionClick,
-  currentUserId
-}: CommentItemProps) {
-  return (
-    <div className={`flex gap-3 ${isTemp ? 'opacity-70' : ''}`}>
-      {/* Avatar */}
-      <div className="flex-shrink-0">
-        {avatarUrl ? (
-          <img
-            src={avatarUrl}
-            alt={displayName}
-            className="w-8 h-8 rounded-full object-cover border-2 border-primary/10"
-          />
-        ) : (
-          <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-xs font-medium text-primary">
-            {displayName?.charAt(0)?.toUpperCase() || 'U'}
-          </div>
-        )}
-      </div>
-      
-      {/* Content */}
-      <div className="flex-1 min-w-0">
-        <div className="flex items-start justify-between gap-2">
-          <div className="flex-1">
-            <div className="flex items-center gap-2 mb-1">
-              {/* Name with tooltip */}
-              {fullName ? (
-                <div className="group relative">
-                  <span className="font-medium text-sm text-foreground cursor-help">
-                    {displayName}
-                  </span>
-                  <div className="absolute bottom-full left-0 mb-2 hidden group-hover:block bg-gray-900 text-white text-xs rounded py-1 px-2 whitespace-nowrap z-10">
-                    {fullName}
-                  </div>
-                </div>
-              ) : (
-                <span className="font-medium text-sm text-foreground">
-                  {displayName}
-                </span>
-              )}
-              
-              {isTemp && (
-                <span className="ml-2 text-xs text-muted-foreground">
-                  (Posting...)
-                </span>
-              )}
-              
-              <span className="text-xs text-muted-foreground">
-                {isTemp ? 'Just now' : formatTimeAgo(comment.createdAt)}
-              </span>
-            </div>
-            
-            <CommentContentWithMentions 
-              content={comment.content}
-              mentions={comment.mentions}
-              onMentionClick={onMentionClick}
-            />
-            
-            {/* Comment Media */}
-            {comment.medias && comment.medias.length > 0 && (
-              <div className="mt-2">
-                <CommentMediaGrid medias={comment.medias} />
-              </div>
-            )}
-          </div>
-          
-          {!isTemp && currentUserId && comment.authorId === currentUserId && comment.id && (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-8 w-8 p-0 text-muted-foreground hover:text-red-500 flex-shrink-0"
-              onClick={() => onDelete(comment.id)}
-              title="Delete comment"
-            >
-              <Trash2 className="h-3 w-3" />
-            </Button>
-          )}
-        </div>
-        
-        {/* Actions */}
-        {!isTemp && (
-          <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
-            <button 
-              className={`flex items-center gap-1 transition-colors ${
-                comment.isLiked ? 'text-red-500 hover:text-red-600' : 'hover:text-foreground'
-              }`}
-              onClick={() => onLike(comment.id)}
-              disabled={isLiking === comment.id}
-            >
-              {isLiking === comment.id ? (
-                <Loader2 className="h-3 w-3 animate-spin" />
-              ) : (
-                <Heart className={`h-3 w-3 ${comment.isLiked ? 'fill-current' : ''}`} />
-              )}
-              <span>{comment.likes || 0}</span>
-            </button>
-            <button className="hover:text-foreground transition-colors">
-              Reply
-            </button>
-          </div>
-        )}
-        
-        {/* Loading for temp comments */}
-        {isTemp && (
-          <div className="flex items-center gap-2 mt-2 text-xs text-muted-foreground">
-            <Loader2 className="h-3 w-3 animate-spin" />
-            <span>Posting...</span>
-          </div>
-        )}
-      </div>
-    </div>
-  )
-}
-
-interface CommentInputProps {
-  comment: string
-  isAdding: boolean
-  onChange: (value: string) => void
-  onClearError: () => void
-  onSubmit: (e: React.FormEvent) => void
-  // Mention props
-  mentionUsers: any[]
-  isMentionLoading: boolean
-  showMentionDropdown: boolean
-  mentionSelectedIndex: number
-  onMentionTextChange: (text: string, cursorPosition: number) => void
-  onMentionKeyDown: (e: React.KeyboardEvent) => void
-  onSelectMentionUser: (user: any) => void
-  onCloseMentionDropdown: () => void
-  inputRef: React.RefObject<HTMLInputElement>
-  mentions: MentionData[]
-  setMentions: (next: MentionData[]) => void
-  // File upload props
-  files: File[]
-  onFileChange: (e: React.ChangeEvent<HTMLInputElement>) => void
-  onRemoveFile: (index: number) => void
-  fileInputRef: React.RefObject<HTMLInputElement>
-}
-
-function CommentInput({ 
-  comment, 
-  isAdding, 
-  onChange, 
-  onClearError, 
-  onSubmit,
-  mentionUsers,
-  isMentionLoading,
-  showMentionDropdown,
-  mentionSelectedIndex,
-  onMentionTextChange,
-  onMentionKeyDown,
-  onSelectMentionUser,
-  onCloseMentionDropdown,
-  inputRef,
-  mentions,
-  setMentions,
-  files,
-  onFileChange,
-  onRemoveFile,
-  fileInputRef
-}: CommentInputProps) {
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value
-    onChange(value)
-    onClearError()
-    onMentionTextChange(value, e.target.selectionStart || 0)
-  }
-
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    const input = inputRef.current || (e.currentTarget as HTMLInputElement | null)
-    if (!input) {
-      onMentionKeyDown(e)
-      return
-    }
-
-    const selectionStart = input.selectionStart || 0
-    const selectionEnd = input.selectionEnd || 0
-
-    const expandDeletionToMentions = (deleteStart: number, deleteEnd: number) => {
-      const overlapped = mentions.filter(m => !(m.endIndex <= deleteStart || m.startIndex >= deleteEnd))
-      if (overlapped.length === 0) return { start: deleteStart, end: deleteEnd }
-      const mentionStart = Math.min(...overlapped.map(m => m.startIndex))
-      const mentionEnd = Math.max(...overlapped.map(m => m.endIndex))
-      const start = Math.min(deleteStart, mentionStart)
-      const end = Math.max(deleteEnd, mentionEnd)
-      return { start, end }
-    }
-
-    const deleteRange = (start: number, end: number) => {
-      const safeStart = Math.max(0, Math.min(start, comment.length))
-      const safeEnd = Math.max(safeStart, Math.min(end, comment.length))
-      const newText = comment.slice(0, safeStart) + comment.slice(safeEnd)
-      const delta = safeEnd - safeStart
-
-      const updatedMentions = mentions
-        .filter(m => !(m.endIndex > safeStart && m.startIndex < safeEnd))
-        .map(m => {
-          if (m.startIndex >= safeEnd) {
-            return {
-              ...m,
-              startIndex: m.startIndex - delta,
-              endIndex: m.endIndex - delta,
-            }
-          }
-          return m
-        })
-
-      e.preventDefault()
-      onChange(newText)
-      setMentions(updatedMentions)
-
-      setTimeout(() => {
-        if (inputRef.current) {
-          inputRef.current.focus()
-          inputRef.current.setSelectionRange(safeStart, safeStart)
-        }
-      }, 0)
-    }
-
-    if (e.key === 'Backspace') {
-      if (selectionStart === selectionEnd) {
-        const mentionAtCursor = mentions.find(m => selectionStart >= m.startIndex && selectionStart < m.endIndex)
-        if (mentionAtCursor) {
-          deleteRange(mentionAtCursor.startIndex, mentionAtCursor.endIndex)
-          return
-        }
-        const pos = selectionStart - 1
-        if (pos >= 0) {
-          const mentionLeft = mentions.find(m => pos >= m.startIndex && pos < m.endIndex)
-          if (mentionLeft) {
-            deleteRange(mentionLeft.startIndex, mentionLeft.endIndex)
-            return
-          }
-        }
-      } else {
-        const { start, end } = expandDeletionToMentions(selectionStart, selectionEnd)
-        if (start !== selectionStart || end !== selectionEnd) {
-          deleteRange(start, end)
-          return
-        }
-      }
-    }
-
-    if (e.key === 'Delete') {
-      if (selectionStart === selectionEnd) {
-        const pos = selectionStart
-        const mention = mentions.find(m => pos >= m.startIndex && pos < m.endIndex)
-        if (mention) {
-          deleteRange(mention.startIndex, mention.endIndex)
-          return
-        }
-      } else {
-        const { start, end } = expandDeletionToMentions(selectionStart, selectionEnd)
-        if (start !== selectionStart || end !== selectionEnd) {
-          deleteRange(start, end)
-          return
-        }
-      }
-    }
-
-    onMentionKeyDown(e)
-  }
-
-  return (
-    <form onSubmit={onSubmit} className="p-4 border-t border-border/50">
-      {/* File Preview */}
-      {files.length > 0 && (
-        <div className="mb-3">
-          <FilePreviewGrid files={files} onRemoveFile={onRemoveFile} />
-        </div>
-      )}
-
-      {/* File Upload Button */}
-      <div className="mb-3 flex justify-start">
-        <Button
-          type="button"
-          variant="secondary"
-          size="sm"
-          onClick={() => fileInputRef.current?.click()}
-          className="flex items-center gap-2 text-gray-600 hover:text-gray-700 border border-gray-300 hover:border-gray-400"
-        >
-          <ImageIcon className="w-4 h-4" />
-          <span>Chọn ảnh</span>
-        </Button>
-        <input
-          ref={fileInputRef}
-          type="file"
-          multiple
-          accept="image/*,video/*"
-          onChange={onFileChange}
-          className="hidden"
-        />
-      </div>
-
-      <div className="flex gap-2 relative">
-        <input
-          ref={inputRef}
-          type="text"
-          value={comment}
-          onChange={handleInputChange}
-          onKeyDown={handleKeyDown}
-          placeholder="Write a comment... Type @ to see all users"
-          disabled={isAdding}
-          className="flex-1 px-3 py-2 text-sm bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:opacity-50 transition-colors"
-        />
-        
-        {/* Mention Portal - Renders outside post container */}
-        <MentionPortal
-          users={mentionUsers}
-          selectedIndex={mentionSelectedIndex}
-          onSelect={onSelectMentionUser}
-          onClose={onCloseMentionDropdown}
-          isLoading={isMentionLoading}
-          inputRef={inputRef}
-          show={showMentionDropdown}
-        />
-        <Button 
-          type="submit" 
-          size="sm" 
-          disabled={(!comment.trim() && files.length === 0) || isAdding}
-          className="flex items-center gap-1 min-w-20 transition-colors"
-        >
-          {isAdding ? (
-            <>
-              <Loader2 className="h-4 w-4 animate-spin" />
-              <span>Posting...</span>
-            </>
-          ) : (
-            <>
-              <Send className="h-4 w-4" />
-              <span>Post</span>
-            </>
-          )}
-        </Button>
-      </div>
-      
-      {comment.length > 0 && (
-        <div className="mt-2 text-xs text-muted-foreground">
-          {comment.length}/500
-        </div>
-      )}
-    </form>
-  )
-}
-
-// Component to render comment content with mentions highlighted
-function CommentContentWithMentions({ content, mentions, onMentionClick }: { content: string; mentions?: CommentMention[]; onMentionClick?: (path: string) => void }) {
-  const [userCache, setUserCache] = useState<Map<string, UserMetadata>>(new Map())
-
-  // Fetch user metadata for all mentions
-  useEffect(() => {
-    if (!mentions || mentions.length === 0) return
-
-    const fetchUserMetadata = async () => {
-      // Get unique user IDs that we haven't fetched yet
-      const userIdsToFetch = mentions
-        .map(m => m.userId)
-        .filter((userId, index, self) => self.indexOf(userId) === index)
-        .filter(userId => !userCache.has(userId))
-
-      if (userIdsToFetch.length === 0) {
-        return
-      }
-
-      try {
-        // Fetch all user metadata in parallel
-        const userPromises = userIdsToFetch.map(async (userId) => {
-          try {
-            const metadata = await UserService.getUserMetadata(userId)
-            return { userId, metadata }
-          } catch (error) {
-            console.error('Failed to fetch user metadata for mention:', error)
-            return {
-              userId,
-              metadata: {
-                userId,
-                firstName: 'User',
-                lastName: userId.slice(0, 8),
-                avtUrl: null
-              }
-            }
-          }
-        })
-
-        const results = await Promise.all(userPromises)
-        
-        // Update cache with all results
-        setUserCache(prevCache => {
-          const updatedCache = new Map(prevCache)
-          results.forEach(({ userId, metadata }) => {
-            updatedCache.set(userId, metadata)
-          })
-          return updatedCache
-        })
-      } catch (error) {
-        console.error('Error fetching user metadata:', error)
-      }
-    }
-
-    fetchUserMetadata()
-  }, [mentions]) // Only depend on mentions
-
-  // Render content with highlighted mentions
-  const renderContent = () => {
-    if (!mentions || mentions.length === 0) {
-      return <span className="text-sm text-foreground bg-background rounded-lg p-3 whitespace-pre-wrap break-words block">{content}</span>
-    }
-
-    // Sort mentions by startIndex to process them in order
-    const sortedMentions = [...mentions].sort((a, b) => a.startIndex - b.startIndex)
-    
-    const parts: Array<{
-      type: 'text' | 'mention'
-      content: string
-      startIndex: number
-      endIndex: number
-      userId?: string
-    }> = []
-    let lastIndex = 0
-
-    sortedMentions.forEach((mention) => {
-      // Add text before mention
-      if (mention.startIndex > lastIndex) {
-        parts.push({
-          type: 'text',
-          content: content.slice(lastIndex, mention.startIndex),
-          startIndex: lastIndex,
-          endIndex: mention.startIndex
-        })
-      }
-
-      // Add mention
-      const userMetadata = userCache.get(mention.userId)
-      const displayName = userMetadata 
-        ? `${userMetadata.firstName} ${userMetadata.lastName}`.trim()
-        : `@user${mention.userId.slice(0, 8)}`
-
-      parts.push({
-        type: 'mention',
-        content: `@${displayName}`,
-        userId: mention.userId,
-        startIndex: mention.startIndex,
-        endIndex: mention.endIndex
-      })
-
-      lastIndex = mention.endIndex
-    })
-
-    // Add remaining text after last mention
-    if (lastIndex < content.length) {
-      parts.push({
-        type: 'text',
-        content: content.slice(lastIndex),
-        startIndex: lastIndex,
-        endIndex: content.length
-      })
-    }
-
-    return (
-      <span className="text-sm text-foreground bg-background rounded-lg p-3 whitespace-pre-wrap break-words block">
-        {parts.map((part, index) => {
-          if (part.type === 'mention') {
-            return (
-              <span
-                key={index}
-                className="text-blue-600 dark:text-blue-400 font-medium cursor-pointer hover:underline"
-                onClick={() => {
-                  if (onMentionClick && part.userId) {
-                    onMentionClick(`/profile/${part.userId}`)
-                  }
-                }}
-              >
-                {part.content}
-              </span>
-            )
-          }
-          return <span key={index}>{part.content}</span>
-        })}
-      </span>
-    )
-  }
-
-  return renderContent()
-}
-
-// Component to display comment media
-function CommentMediaGrid({ medias }: { medias: CommentMedia[] }) {
-  return (
-    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-      {medias.map((media, idx) => {
-        const isImage = media.mediaUrl.includes('image') || 
-                       media.mediaUrl.match(/\.(jpg|jpeg|png|gif|webp)$/i)
-        const isVideo = media.mediaUrl.includes('video') || 
-                       media.mediaUrl.match(/\.(mp4|webm|ogg)$/i)
-
-        return (
-          <div
-            key={idx}
-            className="relative group rounded-lg overflow-hidden border border-gray-200 bg-white shadow-sm"
-          >
-            {isImage ? (
-              <img
-                src={media.mediaUrl}
-                alt={`Media ${idx + 1}`}
-                className="w-full h-24 object-contain select-none rounded-lg bg-gray-100"
-              />
-            ) : isVideo ? (
-              <video
-                src={media.mediaUrl}
-                className="w-full h-24 object-contain rounded-lg bg-gray-100"
-                controls
-                preload="metadata"
-                muted
-              />
-            ) : (
-              <div className="w-full h-24 bg-gray-100 flex items-center justify-center rounded-lg select-none">
-                <FileText className="w-6 h-6 text-gray-400" />
-              </div>
-            )}
-          </div>
-        )
-      })}
     </div>
   )
 }

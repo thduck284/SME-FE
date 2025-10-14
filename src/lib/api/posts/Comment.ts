@@ -89,6 +89,72 @@ export const commentApi = {
     }
   },
 
+  updateComment: async (
+    commentId: string, 
+    data: {
+      content: string
+      mentions?: Array<{ userId: string; startIndex: number; endIndex: number }>
+      files?: File[]
+    }
+  ): Promise<Comment> => {
+    const { content, mentions, files } = data
+
+    if (!content?.trim() && (!files || files.length === 0)) {
+      throw new Error("Comment cannot be empty")
+    }
+
+    try {
+      // Send as JSON if no files, FormData if files present
+      if (!files || files.length === 0) {
+        const requestData: any = {
+          content: content.trim(),
+        }
+
+        // Chỉ gửi mentions khi có items
+        if (mentions && mentions.length > 0) {
+          requestData.mentions = mentions.map(mention => ({
+            userId: mention.userId,
+            startIndex: mention.startIndex,
+            endIndex: mention.endIndex
+          }))
+        }
+        
+        const res = await apiClient.put(`/comments/${commentId}`, requestData, {
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        })
+        
+        return res.data
+      } else {
+        // Use FormData for file uploads
+        const formData = new FormData()
+        formData.append('content', content.trim())
+        
+        files.forEach((file) => formData.append('mediaFiles', file))
+        
+        if (mentions && Array.isArray(mentions) && mentions.length > 0) {
+          mentions.forEach((mention, index) => {
+            formData.append(`mentions[${index}][userId]`, mention.userId)
+            formData.append(`mentions[${index}][startIndex]`, mention.startIndex.toString())
+            formData.append(`mentions[${index}][endIndex]`, mention.endIndex.toString())
+          })
+        }
+        
+        const res = await apiClient.put(`/comments/${commentId}`, formData, {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+          },
+        })
+        
+        return res.data
+      }
+    } catch (error: any) {
+      const message = error.response?.data?.message || "Failed to update comment"
+      throw new Error(message)
+    }
+  },
+
   likeComment: async (commentId: string): Promise<{ likes: number; isLiked: boolean }> => {
     const res = await apiClient.post(`/comments/${commentId}/like`)
     return res.data
