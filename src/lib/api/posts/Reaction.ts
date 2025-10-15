@@ -1,4 +1,5 @@
 import { ReactionsMetaResponse, ReactDto, ReactionMeta } from "@/lib/types/posts/Reaction"
+import apiClient from "@/lib/services/ApiClient"
 
 export const reactionService = {
   async getPostsReactions(userId: string, postIds: string[]): Promise<ReactionsMetaResponse> {
@@ -48,16 +49,11 @@ export const reactionService = {
   },
 
   async removeReaction(targetId: string, targetType: string, userId: string): Promise<void> {
-    const res = await fetch(`/reaction/${targetId}/${targetType}/${userId}`, {
-      method: 'DELETE',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    })
-    
-    if (!res.ok) {
-      const errorText = await res.text();
-      throw new Error(`Failed to remove reaction: ${res.statusText} - ${errorText}`)
+    try {
+      await apiClient.delete(`/reaction/${targetId}/${targetType}`)
+    } catch (error: any) {
+      const message = error.response?.data?.message || "Failed to remove reaction"
+      throw new Error(message)
     }
   },
 }
