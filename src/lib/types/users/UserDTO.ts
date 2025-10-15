@@ -37,3 +37,18 @@ export interface SearchUsersParams {
   cursor?: string
   limit?: number
 }
+
+export interface UpdateUserRequest {
+  username?: string
+  firstName?: string
+  lastName?: string
+  email?: string
+  phone?: string
+  avtUrl?: string
+}
+
+export interface UpdateUserResponse {
+  success: boolean
+  data: User
+  message?: string
+}

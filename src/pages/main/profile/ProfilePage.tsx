@@ -1,9 +1,9 @@
 "use client"
 
 import { useState, useRef, useEffect } from "react"
-import { useParams, useSearchParams } from "react-router-dom"
+import { useParams, useSearchParams, useNavigate } from "react-router-dom"
 import { Badge, Button, Card } from "@/components/ui"
-import { User, FileText, ImageIcon, MapPin, LinkIcon, Calendar, Mail, Camera, MoreVertical } from "lucide-react"
+import { User, FileText, ImageIcon, MapPin, LinkIcon, Calendar, Mail, Camera, MoreVertical, Edit3 } from "lucide-react"
 import { LeftBar, RightBar } from "@/components/layouts"
 import { PostsTab } from "@/components/profile/PostsTab"
 import { ImagesTab } from "@/components/profile/ImagesTab"
@@ -70,6 +70,7 @@ const getAvatarUrl = (avtUrl: string | null): string => {
 export function ProfilePage() {
   const { userId: userIdFromParams } = useParams()
   const [searchParams, setSearchParams] = useSearchParams()
+  const navigate = useNavigate()
   
   const [userId, setUserId] = useState<string | null>(null)
   const [isOwnProfile, setIsOwnProfile] = useState(true)
@@ -563,7 +564,13 @@ export function ProfilePage() {
                 </p>
               </div>
               {isOwnProfile ? (
-                <Button className="w-full md:w-auto">Edit Profile</Button>
+                <Button 
+                  className="w-full md:w-auto bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105 px-6 py-3 rounded-xl font-semibold"
+                  onClick={() => navigate('/profile/edit')}
+                >
+                  <Edit3 className="h-4 w-4 mr-2" />
+                  Edit Profile
+                </Button>
               ) : (
                 (() => {
                   const buttonConfig = getRelationshipButton()

@@ -3,6 +3,7 @@ import { HomePage } from "./feed/HomePage";
 import { SuggestedUsersPage } from "./suggested/SuggestedUsersPage";
 import { ProfilePage } from "./profile/ProfilePage";
 import { ProfileOtherPage } from "./profile/ProfileOtherPage";
+import { EditProfilePage } from "./profile/EditProfilePage";
 
 export const feedRoutes: RouteObject[] = [
   {
@@ -20,5 +21,9 @@ export const feedRoutes: RouteObject[] = [
   {
     path: "/profile-other/:userId", 
     element: <ProfileOtherPage />
+  },
+  {
+    path: "/profile/edit", 
+    element: <EditProfilePage />
   }
 ];

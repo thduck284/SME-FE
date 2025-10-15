@@ -1,12 +1,13 @@
 import { useState, useCallback } from 'react'
 import { userApi } from "@/lib/api/users/User"
-import type { User, SearchUsersParams } from "@/lib/types/users/UserDTO"
+import type { User, SearchUsersParams, UpdateUserRequest } from "@/lib/types/users/UserDTO"
 
 export function useUsers() {
   const [users, setUsers] = useState<User[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [isUploading, setIsUploading] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
+  const [isUpdating, setIsUpdating] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [pagination, setPagination] = useState<{
     nextCursor?: string
@@ -104,6 +105,23 @@ export function useUsers() {
     }
   }, [])
 
+  // Update user
+  const updateUser = useCallback(async (userId: string, updateData: UpdateUserRequest): Promise<User> => {
+    setIsUpdating(true)
+    setError(null)
+    
+    try {
+      const response = await userApi.updateUser(userId, updateData)
+      return response.data
+    } catch (error: any) {
+      console.error('Failed to update user:', error)
+      setError(error.message || 'Failed to update user')
+      throw error
+    } finally {
+      setIsUpdating(false)
+    }
+  }, [])
+
   // Clear error
   const clearError = useCallback(() => {
     setError(null)
@@ -121,6 +139,7 @@ export function useUsers() {
     isLoading,
     isUploading,
     isDeleting,
+    isUpdating, // Thêm vào đây
     error,
     pagination,
     
@@ -130,6 +149,7 @@ export function useUsers() {
     uploadAvatar,
     deleteAvatar,
     getUserById,
+    updateUser, // Thêm vào đây
     clearError,
     clearUsers
   }
