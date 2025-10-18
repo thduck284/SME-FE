@@ -5,100 +5,33 @@ import {
   AddRoleDto, 
   AuthResponseDto, 
 } from '@/lib/types/auth/Auth';
+import apiClient from '@/lib/services/ApiClient';
 
 export const authService = {
   async register(body: RegisterDto): Promise<void> {
-    const res = await fetch(`/auth/register`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(body),
-    });
-    
-    if (!res.ok) {
-      const errorText = await res.text();
-      throw new Error(`Registration failed: ${res.statusText} - ${errorText}`);
-    }
+    await apiClient.post(`/auth/register`, body);
   },
 
   async login(body: LoginDto): Promise<AuthResponseDto> {
-    const res = await fetch(`/auth/login`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(body),
-    });
-    
-    if (!res.ok) {
-      const errorText = await res.text();
-      throw new Error(`Login failed: ${res.statusText} - ${errorText}`);
-    }
-    
-    return await res.json();
+    const response = await apiClient.post(`/auth/login`, body);
+    return response.data;
   },
 
   async refreshToken(body: TokenActionRequestDto): Promise<AuthResponseDto> {
-    const res = await fetch(`/auth/refresh-token`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(body),
-    });
-    
-    if (!res.ok) {
-      const errorText = await res.text();
-      throw new Error(`Token refresh failed: ${res.statusText} - ${errorText}`);
-    }
-    
-    return await res.json();
+    const response = await apiClient.post(`/auth/refresh-token`, body);
+    return response.data;
   },
 
   async logout(body: TokenActionRequestDto): Promise<void> {
-    const res = await fetch(`/auth/logout`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(body),
-    });
-    
-    if (!res.ok) {
-      const errorText = await res.text();
-      throw new Error(`Logout failed: ${res.statusText} - ${errorText}`);
-    }
+    await apiClient.post(`/auth/logout`, body);
   },
 
   async assignRole(body: AddRoleDto): Promise<void> {
-    const res = await fetch(`/auth/assign-role`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(body),
-    });
-    
-    if (!res.ok) {
-      const errorText = await res.text();
-      throw new Error(`Role assignment failed: ${res.statusText} - ${errorText}`);
-    }
+    await apiClient.post(`/auth/assign-role`, body);
   },
 
   async getProfile(): Promise<any> {
-    const res = await fetch(`/auth/profile`, {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    });
-    
-    if (!res.ok) {
-      const errorText = await res.text();
-      throw new Error(`Get profile failed: ${res.statusText} - ${errorText}`);
-    }
-    
-    return await res.json();
+    const response = await apiClient.get(`/auth/profile`);
+    return response.data;
   },
 };

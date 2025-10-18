@@ -57,7 +57,7 @@ export async function updatePost(postId: string, payload: UpdatePostPayload) {
       })
     }
 
-    const res = await apiClient.post(`/posts/${postId}`, formData, {
+    const res = await apiClient.patch(`/posts/${postId}`, formData, {
       headers: {
         "Content-Type": "multipart/form-data",
       },

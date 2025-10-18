@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState, useRef, useEffect } from "react"
+import React, { useState, useRef, useEffect, useCallback } from "react"
 import { useNavigate } from "react-router-dom"
 import { Card, Avatar, Button } from "@/components/ui"
 import { PostFullDto } from "@/lib/types/posts/PostFullDto"
@@ -10,11 +10,13 @@ import { formatTimeAgo, getVisibilityIcon } from "@/lib/utils/PostUtils"
 import { CommentsSection } from "./CommentsSection"
 import { ShareModal } from "./ShareModal"
 import { PostOptionsMenu } from "./PostOptionsMenu"
+import { ReactionDetailsModal } from "./ReactionDetailsModal"
 import { MessageCircle, Share, Repeat2, Lock, ThumbsUp, X } from "lucide-react"
 import { UserService } from "@/lib/api/users/UserService"
 import type { PostStats } from "@/lib/api/posts/PostStats"
 import type { UserMetadata } from "@/lib/types/User"
 import { getUserId } from "@/lib/utils/Jwt"
+import { usePostStats } from "@/lib/hooks/usePostStats"
 
 interface PostDetailModalProps {
   post: PostFullDto
@@ -53,10 +55,38 @@ export function PostDetailModal({
   const [isReacting, setIsReacting] = useState(false)
   const [showReactionPicker, setShowReactionPicker] = useState(false)
   const [showShareModal, setShowShareModal] = useState(false)
+  const [showReactionDetails, setShowReactionDetails] = useState(false)
   const [authorMetadata, setAuthorMetadata] = useState<UserMetadata | null>(null)
   const [loadingAuthor, setLoadingAuthor] = useState(true)
+  const [rootAuthorMetadata, setRootAuthorMetadata] = useState<UserMetadata | null>(null)
+  const [loadingRootAuthor, setLoadingRootAuthor] = useState(false)
+  
+  // Post stats hook
+  const { fetchPostStats, getPostStats } = usePostStats()
+  const [localPostStats, setLocalPostStats] = useState<PostStats | null>(postStats || null)
+
+  // Initialize stats on mount
+  useEffect(() => {
+    if (!localPostStats && post.postId) {
+      fetchPostStats(post.postId).then(setLocalPostStats).catch(console.error)
+    }
+  }, [post.postId, localPostStats, fetchPostStats])
   
   const hideTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+
+  // Console.log props khi modal mở
+  useEffect(() => {
+    if (isOpen) {
+      console.log("=== PostDetailModal Props ===")
+      console.log("post:", post)
+      console.log("isOpen:", isOpen)
+      console.log("reaction:", reaction)
+      console.log("loading:", loading)
+      console.log("isOwnPost:", isOwnPost)
+      console.log("postStats:", postStats)
+      console.log("===========================")
+    }
+  }, [isOpen, post, reaction, loading, isOwnPost, postStats])
 
   useEffect(() => {
     return () => {
@@ -80,6 +110,36 @@ export function PostDetailModal({
 
     fetchAuthorMetadata()
   }, [post.authorId])
+
+  // Fetch root author metadata for repost
+  useEffect(() => {
+    const fetchRootAuthorMetadata = async () => {
+      if (post.type === 'SHARE' && post.rootPost?.authorId) {
+        try {
+          setLoadingRootAuthor(true)
+          const metadata = await UserService.getUserMetadata(post.rootPost.authorId)
+          setRootAuthorMetadata(metadata)
+        } catch (error) {
+          console.error('Failed to fetch root author metadata:', error)
+          setRootAuthorMetadata(null)
+        } finally {
+          setLoadingRootAuthor(false)
+        }
+      }
+    }
+
+    fetchRootAuthorMetadata()
+  }, [post.type, post.rootPost?.authorId])
+
+  // Callback to refresh stats after comment
+  const handleCommentSuccess = useCallback(async () => {
+    try {
+      const updatedStats = await fetchPostStats(post.postId)
+      setLocalPostStats(updatedStats)
+    } catch (error) {
+      console.error('Failed to refresh post stats:', error)
+    }
+  }, [fetchPostStats, post.postId])
 
   const handleReactionShow = () => {
     if (hideTimeoutRef.current) clearTimeout(hideTimeoutRef.current)
@@ -306,8 +366,8 @@ export function PostDetailModal({
                   {getUserId() && post.authorId === getUserId() && (
                     <PostOptionsMenu
                       postId={post.postId}
+                      post={post}
                       isOwnPost={isOwnPost}
-                      onEdit={onEdit}
                       onDelete={onDelete}
                       onHide={onHide}
                       onReport={onReport}
@@ -348,23 +408,23 @@ export function PostDetailModal({
                   <div className="flex items-center gap-2.5 px-3 py-2.5 border-b border-gray-200 dark:border-gray-700">
                     <div 
                       className="cursor-pointer hover:opacity-90 transition-opacity ring-2 ring-transparent hover:ring-blue-200 dark:hover:ring-blue-800 rounded-full"
-                      onClick={() => navigate(`/profile/${post.authorId}`)}
+                      onClick={() => navigate(`/profile/${post.rootPost?.authorId}`)}
                     >
                       <Avatar 
-                        src={authorMetadata?.avtUrl || "/assets/images/default.png"} 
-                        alt={authorMetadata ? `${authorMetadata.firstName} ${authorMetadata.lastName}` : "Original author"} 
+                        src={rootAuthorMetadata?.avtUrl || "/assets/images/default.png"} 
+                        alt={rootAuthorMetadata ? `${rootAuthorMetadata.firstName} ${rootAuthorMetadata.lastName}` : "Original author"} 
                         className="h-8 w-8" 
                       />
                     </div>
                     <div className="flex-1 min-w-0">
                       <p 
                         className="font-semibold text-[15px] text-gray-900 dark:text-gray-100 hover:underline cursor-pointer"
-                        onClick={() => navigate(`/profile/${post.authorId}`)}
+                        onClick={() => navigate(`/profile/${post.rootPost?.authorId}`)}
                       >
-                        {loadingAuthor ? (
+                        {loadingRootAuthor ? (
                           <div className="h-4 w-20 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
-                        ) : authorMetadata ? (
-                          `${authorMetadata.firstName} ${authorMetadata.lastName}`.trim()
+                        ) : rootAuthorMetadata ? (
+                          `${rootAuthorMetadata.firstName} ${rootAuthorMetadata.lastName}`.trim()
                         ) : (
                           "Original Author"
                         )}
@@ -425,7 +485,10 @@ export function PostDetailModal({
                 <div className="px-4 py-2 flex items-center justify-between text-[15px] text-gray-500 dark:text-gray-400 border-t border-gray-200 dark:border-gray-700 mt-3">
                   <div className="flex items-center gap-1">
                     {loading ? <span className="text-sm">Loading...</span> : (
-                      <div className="flex items-center gap-1.5 hover:underline cursor-pointer">
+                      <div 
+                        className="flex items-center gap-1.5 hover:underline cursor-pointer"
+                        onClick={() => setShowReactionDetails(true)}
+                      >
                         <div className="flex items-center -space-x-1">
                           {topReactions.map(([type], idx) => (
                             <div key={type} style={{ zIndex: topReactions.length - idx }}
@@ -440,10 +503,10 @@ export function PostDetailModal({
                   </div>
                   <div className="flex items-center gap-3">
                     <span className="hover:underline cursor-pointer">
-                      {postStats ? `${postStats.commentCount || 0} comments` : '... comments'}
+                      {localPostStats ? `${localPostStats.commentCount || 0} comments` : '... comments'}
                     </span>
                     <span className="hover:underline cursor-pointer">
-                      {postStats ? `${postStats.shareCount || 0} shares` : '... shares'}
+                      {localPostStats ? `${localPostStats.shareCount || 0} shares` : '... shares'}
                     </span>
                   </div>
                 </div>
@@ -455,12 +518,12 @@ export function PostDetailModal({
                   <ReactionButton />
                   <ActionBtn 
                     icon={MessageCircle} 
-                    label={`Comment${postStats ? ` (${postStats.commentCount || 0})` : ''}`} 
+                    label={`Comment${localPostStats ? ` (${localPostStats.commentCount || 0})` : ''}`} 
                     onClick={() => {}} 
                   />
                   <ActionBtn 
                     icon={Share} 
-                    label={`Share${postStats ? ` (${postStats.shareCount || 0})` : ''}`} 
+                    label={`Share${localPostStats ? ` (${localPostStats.shareCount || 0})` : ''}`} 
                     onClick={() => setShowShareModal(true)} 
                   />
                 </div>
@@ -474,6 +537,7 @@ export function PostDetailModal({
                 isOpen={true} 
                 onClose={() => {}} 
                 currentUserId={getUserId() || ''}
+                onCommentSuccess={handleCommentSuccess}
               />
             </div>
           </div>
@@ -489,6 +553,13 @@ export function PostDetailModal({
           authorAvatar: authorMetadata?.avtUrl || "/assets/images/default.png" 
         }}
         onSuccess={() => { onShareSuccess?.() }} />
+
+      <ReactionDetailsModal 
+        isOpen={showReactionDetails}
+        onClose={() => setShowReactionDetails(false)}
+        targetId={post.postId}
+        targetType="POST"
+      />
     </>
   )
 }

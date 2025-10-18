@@ -60,17 +60,14 @@ export function CommentItem({
     <div className={`flex gap-3 ${isTemp ? 'opacity-70' : ''}`}>
       {/* Avatar */}
       <div className="flex-shrink-0">
-        {avatarUrl ? (
-          <img
-            src={avatarUrl}
-            alt={displayName}
-            className="w-8 h-8 rounded-full object-cover border-2 border-primary/10"
-          />
-        ) : (
-          <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-xs font-medium text-primary">
-            {displayName?.charAt(0)?.toUpperCase() || 'U'}
-          </div>
-        )}
+        <img
+          src={avatarUrl || "/assets/images/default.png"}
+          alt={displayName}
+          className="w-8 h-8 rounded-full object-cover border-2 border-primary/10"
+          onError={(e) => {
+            e.currentTarget.src = "/assets/images/default.png"
+          }}
+        />
       </div>
       
       {/* Content */}

@@ -3,12 +3,12 @@ import apiClient from '@/lib/services/ApiClient'
 
 export const relationshipService = {
   async getFollowers(userId: string): Promise<UserRelationshipsResponseDto> {
-    const { data } = await apiClient.get(`/relationships/${userId}/followers`)
-    return data
+    const response = await apiClient.get(`/relationships/${userId}/followers`);
+    return response.data;
   },
 
   async getFollowing(userId: string): Promise<UserRelationshipsResponseDto> {
-    const { data } = await apiClient.get(`/relationships/${userId}/following`)
-    return data
-  },
+    const response = await apiClient.get(`/relationships/${userId}/following`);
+    return response.data;
+  }
 }

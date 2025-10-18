@@ -12,8 +12,8 @@ export const reactionService = {
       params.append('targetIds', id)
     })
 
-    const { data } = await apiClient.get(`/reaction/metadata?${params.toString()}`)
-    return data
+    const response = await apiClient.get(`/reaction/metadata?${params.toString()}`);
+    return response.data;
   },
 
   async getPostReactions(userId: string, postId: string): Promise<ReactionMeta> {
@@ -22,7 +22,7 @@ export const reactionService = {
   },
 
   async react(dto: ReactDto): Promise<void> {
-    await apiClient.post(`/reaction`, dto)
+    await apiClient.post(`/reaction`, dto);
   },
 
   async removeReaction(targetId: string, targetType: string, userId: string): Promise<void> {
