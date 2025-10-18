@@ -1,5 +1,6 @@
 import { UserMetadata, UserMetadataResponse } from "@/lib/types/User"
 import { RelationshipSuggestion, RelationshipResponse, RelationshipDto } from "@/lib/types/Relationship"
+import apiClient from "@/lib/services/ApiClient"
 
 export class UserService {
   private static readonly RELATIONSHIPS_BASE_URL = '/relationships'
@@ -10,21 +11,11 @@ export class UserService {
    */
   static async getSuggestedUsers(currentUserId: string): Promise<RelationshipSuggestion[]> {
     try {
-      const response = await fetch(`${this.RELATIONSHIPS_BASE_URL}/${currentUserId}/suggestion`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        mode: 'cors'
-      })
-    
-      if (!response.ok) return []
-      
-      const result: RelationshipResponse = await response.json()
-      
-      if (!result.success) return []
-      console.log("aaaa", result.data)
+      const { data: result } = await apiClient.get<RelationshipResponse>(
+        `${this.RELATIONSHIPS_BASE_URL}/${currentUserId}/suggestion`
+      )
 
+      if (!result.success) return []
       return result.data
     } catch (error) {
       console.error('Error fetching suggested users:', error)
@@ -37,20 +28,11 @@ export class UserService {
    */
   static async getUserMetadata(userId: string): Promise<UserMetadata> {
     try {
-      const response = await fetch(`${this.USERS_BASE_URL}/${userId}/metadata`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        mode: 'cors'
-      })
-      
-      if (!response.ok) throw new Error(`User metadata not found for ${userId}`)
-      
-      const result: UserMetadataResponse = await response.json()
-      
+      const { data: result } = await apiClient.get<UserMetadataResponse>(
+        `${this.USERS_BASE_URL}/${userId}/metadata`
+      )
+
       if (!result.success) throw new Error(`User metadata API error for ${userId}`)
-      
       return result.data
     } catch (error) {
       console.error('Error fetching user metadata:', error)
@@ -78,10 +60,9 @@ export class UserService {
   static async getSuggestedUsersWithDetails(currentUserId: string): Promise<Array<RelationshipSuggestion & { userInfo: UserMetadata }>> {
     try {
       const suggestions = await this.getSuggestedUsers(currentUserId)
-      
       const userIds = suggestions.map(s => s.userId)
       const userInfos = await this.getMultipleUsersMetadata(userIds)
-      
+
       return suggestions.map(suggestion => ({
         ...suggestion,
         userInfo: userInfos.find(info => info.userId === suggestion.userId)!
@@ -97,21 +78,11 @@ export class UserService {
    */
   static async followUser(fromUserId: string, toUserId: string): Promise<RelationshipDto> {
     try {
-      const response = await fetch(`${this.RELATIONSHIPS_BASE_URL}/${fromUserId}/follow`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        mode: 'cors',
-        body: JSON.stringify({ toUserId })
-      })
-
-      if (!response.ok) {
-        throw new Error('Follow API request failed')
-      }
-
-      const result: RelationshipDto = await response.json()
-      return result
+      const { data } = await apiClient.post<RelationshipDto>(
+        `${this.RELATIONSHIPS_BASE_URL}/${fromUserId}/follow`,
+        { toUserId }
+      )
+      return data
     } catch (error) {
       console.error('Error following user:', error)
       throw error
@@ -123,18 +94,7 @@ export class UserService {
    */
   static async unfollowUser(fromUserId: string, toUserId: string): Promise<void> {
     try {
-      const response = await fetch(`${this.RELATIONSHIPS_BASE_URL}/${fromUserId}/unfollow`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        mode: 'cors',
-        body: JSON.stringify({ toUserId })
-      })
-
-      if (!response.ok) {
-        throw new Error('Unfollow API request failed')
-      }
+      await apiClient.post(`${this.RELATIONSHIPS_BASE_URL}/${fromUserId}/unfollow`, { toUserId })
     } catch (error) {
       console.error('Error unfollowing user:', error)
       throw error
@@ -150,19 +110,10 @@ export class UserService {
     mutualRelationships: string[]
   }> {
     try {
-      const response = await fetch(`${this.RELATIONSHIPS_BASE_URL}/${fromUserId}/relationship/${toUserId}`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        mode: 'cors'
-      })
-
-      if (!response.ok) {
-        throw new Error('Get relationship API request failed')
-      }
-
-      return await response.json()
+      const { data } = await apiClient.get(
+        `${this.RELATIONSHIPS_BASE_URL}/${fromUserId}/relationship/${toUserId}`
+      )
+      return data
     } catch (error) {
       console.error('Error getting relationship:', error)
       throw error
@@ -174,20 +125,11 @@ export class UserService {
    */
   static async muteUser(fromUserId: string, toUserId: string): Promise<RelationshipDto> {
     try {
-      const response = await fetch(`${this.RELATIONSHIPS_BASE_URL}/${fromUserId}/mute`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        mode: 'cors',
-        body: JSON.stringify({ toUserId })
-      })
-
-      if (!response.ok) {
-        throw new Error('Mute user API request failed')
-      }
-
-      return await response.json()
+      const { data } = await apiClient.post<RelationshipDto>(
+        `${this.RELATIONSHIPS_BASE_URL}/${fromUserId}/mute`,
+        { toUserId }
+      )
+      return data
     } catch (error) {
       console.error('Error muting user:', error)
       throw error
@@ -199,18 +141,7 @@ export class UserService {
    */
   static async unmuteUser(fromUserId: string, toUserId: string): Promise<void> {
     try {
-      const response = await fetch(`${this.RELATIONSHIPS_BASE_URL}/${fromUserId}/unmute`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        mode: 'cors',
-        body: JSON.stringify({ toUserId })
-      })
-
-      if (!response.ok) {
-        throw new Error('Unmute user API request failed')
-      }
+      await apiClient.post(`${this.RELATIONSHIPS_BASE_URL}/${fromUserId}/unmute`, { toUserId })
     } catch (error) {
       console.error('Error unmuting user:', error)
       throw error
@@ -222,18 +153,7 @@ export class UserService {
    */
   static async blockUser(fromUserId: string, toUserId: string): Promise<void> {
     try {
-      const response = await fetch(`${this.RELATIONSHIPS_BASE_URL}/${fromUserId}/block`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        mode: 'cors',
-        body: JSON.stringify({ toUserId })
-      })
-
-      if (!response.ok) {
-        throw new Error('Block user API request failed')
-      }
+      await apiClient.post(`${this.RELATIONSHIPS_BASE_URL}/${fromUserId}/block`, { toUserId })
     } catch (error) {
       console.error('Error blocking user:', error)
       throw error
@@ -245,18 +165,7 @@ export class UserService {
    */
   static async unblockUser(fromUserId: string, toUserId: string): Promise<void> {
     try {
-      const response = await fetch(`${this.RELATIONSHIPS_BASE_URL}/${fromUserId}/unblock`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        mode: 'cors',
-        body: JSON.stringify({ toUserId })
-      })
-
-      if (!response.ok) {
-        throw new Error('Unblock user API request failed')
-      }
+      await apiClient.post(`${this.RELATIONSHIPS_BASE_URL}/${fromUserId}/unblock`, { toUserId })
     } catch (error) {
       console.error('Error unblocking user:', error)
       throw error
