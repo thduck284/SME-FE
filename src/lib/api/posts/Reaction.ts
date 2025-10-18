@@ -12,20 +12,8 @@ export const reactionService = {
       params.append('targetIds', id);
     });
 
-    const res = await fetch(`/reaction/metadata?${params.toString()}`, {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    })
-    
-    if (!res.ok) {
-      const errorText = await res.text();
-      throw new Error(`Failed to fetch reactions: ${res.statusText} - ${errorText}`)
-    }
-    
-    const data = await res.json();
-    return data;
+    const response = await apiClient.get(`/reaction/metadata?${params.toString()}`);
+    return response.data;
   },
 
   async getPostReactions(userId: string, postId: string): Promise<ReactionMeta> {
@@ -34,18 +22,7 @@ export const reactionService = {
   },
 
   async react(dto: ReactDto): Promise<void> {
-    const res = await fetch(`/reaction`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(dto),
-    })
-    
-    if (!res.ok) {
-      const errorText = await res.text();
-      throw new Error(`Failed to react: ${res.statusText} - ${errorText}`)
-    }
+    await apiClient.post(`/reaction`, dto);
   },
 
   async removeReaction(targetId: string, targetType: string, userId: string): Promise<void> {

@@ -55,8 +55,24 @@ export function PostDetailModal({
   const [showShareModal, setShowShareModal] = useState(false)
   const [authorMetadata, setAuthorMetadata] = useState<UserMetadata | null>(null)
   const [loadingAuthor, setLoadingAuthor] = useState(true)
+  const [rootAuthorMetadata, setRootAuthorMetadata] = useState<UserMetadata | null>(null)
+  const [loadingRootAuthor, setLoadingRootAuthor] = useState(false)
   
   const hideTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+
+  // Console.log props khi modal mở
+  useEffect(() => {
+    if (isOpen) {
+      console.log("=== PostDetailModal Props ===")
+      console.log("post:", post)
+      console.log("isOpen:", isOpen)
+      console.log("reaction:", reaction)
+      console.log("loading:", loading)
+      console.log("isOwnPost:", isOwnPost)
+      console.log("postStats:", postStats)
+      console.log("===========================")
+    }
+  }, [isOpen, post, reaction, loading, isOwnPost, postStats])
 
   useEffect(() => {
     return () => {
@@ -81,6 +97,26 @@ export function PostDetailModal({
 
     fetchAuthorMetadata()
   }, [post.authorId])
+
+  // Fetch root author metadata for repost
+  useEffect(() => {
+    const fetchRootAuthorMetadata = async () => {
+      if (post.type === 'SHARE' && post.rootPost?.authorId) {
+        try {
+          setLoadingRootAuthor(true)
+          const metadata = await UserService.getUserMetadata(post.rootPost.authorId)
+          setRootAuthorMetadata(metadata)
+        } catch (error) {
+          console.error('Failed to fetch root author metadata:', error)
+          setRootAuthorMetadata(null)
+        } finally {
+          setLoadingRootAuthor(false)
+        }
+      }
+    }
+
+    fetchRootAuthorMetadata()
+  }, [post.type, post.rootPost?.authorId])
 
   const handleReactionShow = () => {
     if (hideTimeoutRef.current) clearTimeout(hideTimeoutRef.current)
@@ -307,8 +343,8 @@ export function PostDetailModal({
                   {getUserId() && post.authorId === getUserId() && (
                     <PostOptionsMenu
                       postId={post.postId}
+                      post={post}
                       isOwnPost={isOwnPost}
-                      onEdit={onEdit}
                       onDelete={onDelete}
                       onHide={onHide}
                       onReport={onReport}
@@ -349,23 +385,23 @@ export function PostDetailModal({
                   <div className="flex items-center gap-2.5 px-3 py-2.5 border-b border-gray-200 dark:border-gray-700">
                     <div 
                       className="cursor-pointer hover:opacity-90 transition-opacity ring-2 ring-transparent hover:ring-blue-200 dark:hover:ring-blue-800 rounded-full"
-                      onClick={() => navigate(`/profile/${post.authorId}`)}
+                      onClick={() => navigate(`/profile/${post.rootPost?.authorId}`)}
                     >
                       <Avatar 
-                        src={authorMetadata?.avtUrl || "/assets/images/default.png"} 
-                        alt={authorMetadata ? `${authorMetadata.firstName} ${authorMetadata.lastName}` : "Original author"} 
+                        src={rootAuthorMetadata?.avtUrl || "/assets/images/default.png"} 
+                        alt={rootAuthorMetadata ? `${rootAuthorMetadata.firstName} ${rootAuthorMetadata.lastName}` : "Original author"} 
                         className="h-8 w-8" 
                       />
                     </div>
                     <div className="flex-1 min-w-0">
                       <p 
                         className="font-semibold text-[15px] text-gray-900 dark:text-gray-100 hover:underline cursor-pointer"
-                        onClick={() => navigate(`/profile/${post.authorId}`)}
+                        onClick={() => navigate(`/profile/${post.rootPost?.authorId}`)}
                       >
-                        {loadingAuthor ? (
+                        {loadingRootAuthor ? (
                           <div className="h-4 w-20 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
-                        ) : authorMetadata ? (
-                          `${authorMetadata.firstName} ${authorMetadata.lastName}`.trim()
+                        ) : rootAuthorMetadata ? (
+                          `${rootAuthorMetadata.firstName} ${rootAuthorMetadata.lastName}`.trim()
                         ) : (
                           "Original Author"
                         )}
