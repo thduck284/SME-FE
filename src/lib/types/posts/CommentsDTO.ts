@@ -9,6 +9,7 @@ export interface Comment {
   isLiked: boolean
   postId: string
   parentCommentId?: string
+  hasChilds?: boolean
   mentions?: CommentMention[]
   medias?: CommentMedia[]
 }

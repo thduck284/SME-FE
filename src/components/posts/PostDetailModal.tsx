@@ -534,6 +534,7 @@ export function PostDetailModal({
             {/* Comments Section */}
             <div className="border-t border-gray-200 dark:border-gray-700">
               <CommentsSection 
+                key={post.postId} // Force re-render when post changes
                 postId={post.postId} 
                 isOpen={true} 
                 onClose={() => {}} 

@@ -11,10 +11,17 @@ interface CommentInputProps {
   isAdding: boolean
   isEditing: string | null
   editingComment: CommentType | null
+  replyingTo: CommentType | null
   onChange: (value: string) => void
   onClearError: () => void
   onSubmit: (e: React.FormEvent) => void
   onCancelEdit: () => void
+  onCancelReply: () => void
+  getDisplayInfo: (comment: CommentType) => {
+    displayName: string
+    avatarUrl?: string
+    fullName?: string
+  }
   // Mention props
   mentionUsers: any[]
   isMentionLoading: boolean
@@ -39,10 +46,13 @@ export function CommentInput({
   isAdding, 
   isEditing,
   editingComment,
+  replyingTo,
   onChange, 
   onClearError, 
   onSubmit,
   onCancelEdit,
+  onCancelReply,
+  getDisplayInfo,
   mentionUsers,
   isMentionLoading,
   showMentionDropdown,
@@ -183,6 +193,24 @@ export function CommentInput({
         </div>
       )}
 
+      {/* Reply Mode Header */}
+      {replyingTo && (
+        <div className="mb-3 p-3 bg-green-50 border border-green-200 rounded-lg flex items-center justify-between">
+          <div className="flex items-center gap-2 text-green-700 text-sm">
+            <span>Replying to <strong>{getDisplayInfo(replyingTo).displayName}</strong></span>
+          </div>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="h-6 w-6 p-0 text-green-700 hover:bg-green-100"
+            onClick={onCancelReply}
+          >
+            <X className="h-3 w-3" />
+          </Button>
+        </div>
+      )}
+
       {/* File Preview */}
       {files.length > 0 && (
         <div className="mb-3">
@@ -219,7 +247,13 @@ export function CommentInput({
           value={comment}
           onChange={handleInputChange}
           onKeyDown={handleKeyDown}
-          placeholder={isEditMode ? "Edit your comment..." : "Write a comment... Type @ to see all users"}
+          placeholder={
+            isEditMode 
+              ? "Edit your comment..." 
+              : replyingTo 
+                ? `Reply to ${getDisplayInfo(replyingTo).displayName}...` 
+                : "Write a comment... Type @ to see all users"
+          }
           disabled={isAdding || isEditing !== null}
           className="flex-1 px-3 py-2 text-sm bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:opacity-50 transition-colors"
         />
@@ -256,12 +290,14 @@ export function CommentInput({
           {isAdding || isEditing !== null ? (
             <>
               <Loader2 className="h-4 w-4 animate-spin" />
-              <span>{isEditMode ? 'Updating...' : 'Posting...'}</span>
+              <span>
+                {isEditMode ? 'Updating...' : replyingTo ? 'Replying...' : 'Posting...'}
+              </span>
             </>
           ) : (
             <>
               <Send className="h-4 w-4" />
-              <span>{isEditMode ? 'Update' : 'Post'}</span>
+              <span>{isEditMode ? 'Update' : replyingTo ? 'Reply' : 'Post'}</span>
             </>
           )}
         </Button>

@@ -10,7 +10,7 @@ import type { PostFullDto } from "@/lib/types/posts/PostFullDto"
 import { MessageCircle } from "lucide-react"
 import { ImageModal } from "@/components/profile/ImageModal"
 import { PostList } from "@/components/posts/PostList" 
-import { usePostsReactions } from "@/lib/hooks/usePostReaction" 
+import { usePostsReactions } from "@/lib/hooks/usePostReaction"
 
 export function HomePage() {
   const [posts, setPosts] = useState<PostFullDto[]>([])

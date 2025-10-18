@@ -14,6 +14,7 @@ interface CommentsListProps {
   onLike: (commentId: string) => void
   onDelete: (commentId: string) => void
   onEdit: (comment: CommentType) => void
+  onReply: (comment: CommentType) => void
   onMentionClick?: (path: string) => void
   getDisplayInfo: (comment: CommentType) => {
     displayName: string
@@ -21,6 +22,10 @@ interface CommentsListProps {
     fullName?: string
   }
   isTempComment: (comment: CommentType) => boolean
+  replies: Map<string, CommentType[]>
+  expandedComments: Set<string>
+  loadingReplies: Set<string>
+  onToggleReplies: (commentId: string) => void
 }
 
 export function CommentsList({
@@ -33,9 +38,14 @@ export function CommentsList({
   onLike,
   onDelete,
   onEdit,
+  onReply,
   onMentionClick,
   getDisplayInfo,
-  isTempComment
+  isTempComment,
+  replies,
+  expandedComments,
+  loadingReplies,
+  onToggleReplies
 }: CommentsListProps) {
   if (isLoading && comments.length === 0) {
     return (
@@ -61,24 +71,34 @@ export function CommentsList({
         
         const tempComment = isTempComment(comment)
         const { displayName, avatarUrl, fullName } = getDisplayInfo(comment)
+        const commentReplies = replies.get(comment.id) || []
+        const isExpanded = expandedComments.has(comment.id)
+        const isLoadingReplies = loadingReplies.has(comment.id)
         
         return (
-          <CommentItem
-            key={comment.id || `comment-${index}-${comment.authorId}`}
-            comment={comment}
-            isTemp={tempComment}
-            displayName={displayName}
-            avatarUrl={avatarUrl}
-            fullName={fullName}
-            isLiking={isLiking}
-            isEditing={isEditing}
-            isDeleting={isDeleting}
-            onLike={onLike}
-            onDelete={onDelete}
-            onEdit={onEdit}
-            onMentionClick={onMentionClick}
-            currentUserId={currentUserId}
-          />
+          <div key={comment.id || `comment-${index}-${comment.authorId}`}>
+            <CommentItem
+              comment={comment}
+              isTemp={tempComment}
+              displayName={displayName}
+              avatarUrl={avatarUrl}
+              fullName={fullName}
+              isLiking={isLiking}
+              isEditing={isEditing}
+              isDeleting={isDeleting}
+              onLike={onLike}
+              onDelete={onDelete}
+              onEdit={onEdit}
+              onReply={onReply}
+              onMentionClick={onMentionClick}
+              currentUserId={currentUserId}
+              replies={commentReplies}
+              isExpanded={isExpanded}
+              isLoadingReplies={isLoadingReplies}
+              onToggleReplies={onToggleReplies}
+              getDisplayInfo={getDisplayInfo}
+            />
+          </div>
         )
       })}
     </div>
