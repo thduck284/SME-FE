@@ -127,6 +127,105 @@ export function useUpdatePostModal(post: PostFullDto | null, onClose: () => void
   const handleTextareaKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
       if (!postData) return
+      
+      const textarea = textareaRef.current || (e.currentTarget as HTMLTextAreaElement | null)
+      if (!textarea) {
+        handleMentionKeyDown(e)
+        return
+      }
+
+      const selectionStart = textarea.selectionStart
+      const selectionEnd = textarea.selectionEnd
+      const content = postData.content || ""
+      const mentions = postData.mentions || []
+
+      // Hàm xử lý xóa mention
+      const deleteRange = (start: number, end: number) => {
+        const safeStart = Math.max(0, Math.min(start, content.length))
+        const safeEnd = Math.max(safeStart, Math.min(end, content.length))
+        const newText = content.slice(0, safeStart) + content.slice(safeEnd)
+        const delta = safeEnd - safeStart
+
+        // Update mentions: remove overlapped, shift those after
+        const updatedMentions = mentions
+          .filter(m => !(m.endIndex > safeStart && m.startIndex < safeEnd))
+          .map(m => {
+            if (m.startIndex >= safeEnd) {
+              return {
+                ...m,
+                startIndex: m.startIndex - delta,
+                endIndex: m.endIndex - delta,
+              }
+            }
+            return m
+          })
+
+        e.preventDefault()
+        setPostData((prev) => prev ? { ...prev, content: newText, mentions: updatedMentions } : null)
+
+        // Restore caret to start of deleted range
+        setTimeout(() => {
+          if (textareaRef.current) {
+            textareaRef.current.focus()
+            textareaRef.current.setSelectionRange(safeStart, safeStart)
+          }
+        }, 0)
+      }
+
+      // Handle Backspace để xóa cả mention
+      if (e.key === 'Backspace') {
+        if (selectionStart === selectionEnd) {
+          // Trường hợp 1: Con trỏ ở trong mention - xóa cả mention
+          const mentionAtCursor = mentions.find(m => selectionStart > m.startIndex && selectionStart <= m.endIndex)
+          if (mentionAtCursor) {
+            deleteRange(mentionAtCursor.startIndex, mentionAtCursor.endIndex)
+            return
+          }
+
+          // Trường hợp 2: Con trỏ ngay sau mention - xóa cả mention
+          const pos = selectionStart - 1
+          if (pos >= 0) {
+            const mentionLeft = mentions.find(m => pos >= m.startIndex && pos < m.endIndex)
+            if (mentionLeft) {
+              deleteRange(mentionLeft.startIndex, mentionLeft.endIndex)
+              return
+            }
+          }
+        } else {
+          // Trường hợp 3: Đang chọn vùng text chứa mention - xóa cả mention
+          const overlappedMentions = mentions.filter(m => 
+            !(m.endIndex <= selectionStart || m.startIndex >= selectionEnd)
+          )
+          if (overlappedMentions.length > 0) {
+            const mentionStart = Math.min(...overlappedMentions.map(m => m.startIndex))
+            const mentionEnd = Math.max(...overlappedMentions.map(m => m.endIndex))
+            deleteRange(mentionStart, mentionEnd)
+            return
+          }
+        }
+      }
+      
+      if (e.key === 'Delete') {
+        if (selectionStart === selectionEnd) {
+          // Trường hợp: Con trỏ ở trước mention - xóa cả mention
+          const mentionAtCursor = mentions.find(m => selectionStart >= m.startIndex && selectionStart < m.endIndex)
+          if (mentionAtCursor) {
+            deleteRange(mentionAtCursor.startIndex, mentionAtCursor.endIndex)
+            return
+          }
+        } else {
+          // Trường hợp: Đang chọn vùng text chứa mention - xóa cả mention
+          const overlappedMentions = mentions.filter(m => 
+            !(m.endIndex <= selectionStart || m.startIndex >= selectionEnd)
+          )
+          if (overlappedMentions.length > 0) {
+            const mentionStart = Math.min(...overlappedMentions.map(m => m.startIndex))
+            const mentionEnd = Math.max(...overlappedMentions.map(m => m.endIndex))
+            deleteRange(mentionStart, mentionEnd)
+            return
+          }
+        }
+      }
       handleMentionKeyDown(e)
     },
     [postData, handleMentionKeyDown],
@@ -151,7 +250,7 @@ export function useUpdatePostModal(post: PostFullDto | null, onClose: () => void
         files: files.length > 0 ? files : undefined,
         existingMedias: existingMedias.length > 0 ? existingMedias : undefined,
         removedMediaIds: removedMediaIds.length > 0 ? removedMediaIds : undefined,
-        mentions: validMentions.length > 0 ? validMentions : undefined,
+        mentions: validMentions,
       }
 
       await updatePost(postData.postId, payload)

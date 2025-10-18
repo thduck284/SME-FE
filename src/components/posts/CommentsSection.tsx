@@ -91,7 +91,6 @@ export function CommentsSection({ postId, isOpen, currentUserId }: CommentsSecti
   // Fetch comments when section opens
   useEffect(() => {
     if (isOpen && postId) {
-      console.log('🔄 Fetching comments for postId:', postId)
       setError(null)
       setOptimisticComments([])
       fetchComments(10)

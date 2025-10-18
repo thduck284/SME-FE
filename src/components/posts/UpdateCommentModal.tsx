@@ -107,6 +107,113 @@ export function UpdateCommentModal({
   }
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
+    // Xử lý xóa mention với Backspace/Delete
+    if (e.key === 'Backspace' || e.key === 'Delete') {
+      const textarea = textareaRef.current
+      if (!textarea) return
+
+      const selectionStart = textarea.selectionStart
+      const selectionEnd = textarea.selectionEnd
+      const currentMentions = mentions || []
+
+      // Hàm xóa mention
+      const deleteMention = (start: number, end: number) => {
+        const safeStart = Math.max(0, Math.min(start, content.length))
+        const safeEnd = Math.max(safeStart, Math.min(end, content.length))
+        const newText = content.slice(0, safeStart) + content.slice(safeEnd)
+        const delta = safeEnd - safeStart
+
+        // Cập nhật mentions: xóa mention bị ảnh hưởng, điều chỉnh index của các mention sau
+        const updatedMentions = currentMentions
+          .filter(m => !(m.endIndex > safeStart && m.startIndex < safeEnd))
+          .map(m => {
+            if (m.startIndex >= safeEnd) {
+              return {
+                ...m,
+                startIndex: m.startIndex - delta,
+                endIndex: m.endIndex - delta,
+              }
+            }
+            return m
+          })
+
+        e.preventDefault()
+        setContent(newText)
+        setMentions(updatedMentions)
+
+        // Đặt con trỏ về vị trí bắt đầu của vùng xóa
+        setTimeout(() => {
+          if (textareaRef.current) {
+            textareaRef.current.focus()
+            textareaRef.current.setSelectionRange(safeStart, safeStart)
+          }
+        }, 0)
+      }
+
+      // Xử lý Backspace
+      if (e.key === 'Backspace') {
+        if (selectionStart === selectionEnd) {
+          // Trường hợp 1: Con trỏ ở trong mention - xóa cả mention
+          const mentionAtCursor = currentMentions.find(m => 
+            selectionStart > m.startIndex && selectionStart <= m.endIndex
+          )
+          if (mentionAtCursor) {
+            deleteMention(mentionAtCursor.startIndex, mentionAtCursor.endIndex)
+            return
+          }
+
+          // Trường hợp 2: Con trỏ ngay sau mention - xóa cả mention
+          const pos = selectionStart - 1
+          if (pos >= 0) {
+            const mentionLeft = currentMentions.find(m => 
+              pos >= m.startIndex && pos < m.endIndex
+            )
+            if (mentionLeft) {
+              deleteMention(mentionLeft.startIndex, mentionLeft.endIndex)
+              return
+            }
+          }
+        } else {
+          // Trường hợp 3: Đang chọn vùng text chứa mention - xóa cả mention
+          const overlappedMentions = currentMentions.filter(m => 
+            !(m.endIndex <= selectionStart || m.startIndex >= selectionEnd)
+          )
+          if (overlappedMentions.length > 0) {
+            const mentionStart = Math.min(...overlappedMentions.map(m => m.startIndex))
+            const mentionEnd = Math.max(...overlappedMentions.map(m => m.endIndex))
+            deleteMention(mentionStart, mentionEnd)
+            return
+          }
+        }
+      }
+
+      // Xử lý Delete
+      if (e.key === 'Delete') {
+        if (selectionStart === selectionEnd) {
+          // Trường hợp: Con trỏ ở trước mention - xóa cả mention
+          const mentionAtCursor = currentMentions.find(m => 
+            selectionStart >= m.startIndex && selectionStart < m.endIndex
+          )
+          if (mentionAtCursor) {
+            deleteMention(mentionAtCursor.startIndex, mentionAtCursor.endIndex)
+            return
+          }
+        } else {
+          // Trường hợp: Đang chọn vùng text chứa mention - xóa cả mention
+          const overlappedMentions = currentMentions.filter(m => 
+            !(m.endIndex <= selectionStart || m.startIndex >= selectionEnd)
+          )
+          if (overlappedMentions.length > 0) {
+            const mentionStart = Math.min(...overlappedMentions.map(m => m.startIndex))
+            const mentionEnd = Math.max(...overlappedMentions.map(m => m.endIndex))
+            deleteMention(mentionStart, mentionEnd)
+            return
+          }
+        }
+      }
+    }
+
+    // Các phím tắt khác giữ nguyên
     if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
       e.preventDefault()
       handleSubmit()

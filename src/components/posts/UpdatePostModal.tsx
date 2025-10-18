@@ -18,7 +18,6 @@ interface UpdatePostModalProps {
   onPostUpdated?: () => void
 }
 
-// Helper functions từ ProfilePage
 const getAvatarUrl = (avtUrl: string | null): string => {
   if (avtUrl && avtUrl.trim() !== '') {
     return avtUrl
@@ -41,7 +40,6 @@ export function UpdatePostModal({ isOpen, post, onClose, onPostUpdated }: Update
     setIsMounted(true)
   }, [])
 
-  // Fetch current user info
   useEffect(() => {
     const fetchCurrentUser = async () => {
       try {

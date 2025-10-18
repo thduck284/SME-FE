@@ -64,7 +64,6 @@ export function PostDetailModal({
     }
   }, [])
 
-  // Fetch author metadata
   useEffect(() => {
     const fetchAuthorMetadata = async () => {
       try {

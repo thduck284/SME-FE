@@ -11,6 +11,7 @@ export const getPostsByUser = async (
     if (cursor) params.pageState = cursor
 
     const res = await apiClient.get(`/posts/user/${userId}`, { params })
+    console.log("Get Posts By User Response:", res.data)
     return res.data
   } catch (error: any) {
     const message =

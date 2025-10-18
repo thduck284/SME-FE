@@ -29,7 +29,7 @@ export async function updatePost(postId: string, payload: UpdatePostPayload) {
     if (visibility !== undefined) {
       formData.append("visibility", visibility)
     }
-
+    
     if (existingMedias && existingMedias.length > 0) {
       for (const media of existingMedias) {
         try {
@@ -62,7 +62,7 @@ export async function updatePost(postId: string, payload: UpdatePostPayload) {
         "Content-Type": "multipart/form-data",
       },
     })
-
+    
     return res.data
   } catch (error: any) {
     const message = error.response?.data?.message || "Failed to update post"
