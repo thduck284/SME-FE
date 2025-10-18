@@ -17,9 +17,10 @@ interface CommentsSectionProps {
   isOpen: boolean
   onClose: () => void
   currentUserId?: string
+  onCommentSuccess?: () => void
 }
 
-export function CommentsSection({ postId, isOpen, currentUserId }: CommentsSectionProps) {
+export function CommentsSection({ postId, isOpen, currentUserId, onCommentSuccess }: CommentsSectionProps) {
   const navigate = useNavigate()
   const [comment, setComment] = useState("")
   const [error, setError] = useState<string | null>(null)
@@ -171,14 +172,14 @@ export function CommentsSection({ postId, isOpen, currentUserId }: CommentsSecti
     if (comment.authorId === 'current-user') {
       return {
         displayName: 'You',
-        avatarUrl: comment.authorAvatar,
+        avatarUrl: comment.authorAvatar || "/assets/images/default.png",
         fullName: 'You'
       }
     }
 
     const userMetadata = getUserFromCache(comment.authorId)
     const displayName = userMetadata ? `${userMetadata.firstName} ${userMetadata.lastName}`.trim() : 'Loading...'
-    const avatarUrl = userMetadata?.avtUrl || comment.authorAvatar
+    const avatarUrl = userMetadata?.avtUrl || comment.authorAvatar || "/assets/images/default.png"
     const fullName = userMetadata ? `${userMetadata.firstName} ${userMetadata.lastName}`.trim() : 'Loading...'
 
     return { displayName, avatarUrl, fullName }
@@ -215,6 +216,9 @@ export function CommentsSection({ postId, isOpen, currentUserId }: CommentsSecti
         setFiles([])
         setMentions([])
         
+        // Call callback to refresh stats
+        onCommentSuccess?.()
+        
       } catch (error: any) {
         console.error('Failed to edit comment:', error)
         const errorMessage = error.response?.data?.message || error.message || 'Failed to edit comment'
@@ -249,6 +253,9 @@ export function CommentsSection({ postId, isOpen, currentUserId }: CommentsSecti
       setMentions([])
       setOptimisticComments(prev => prev.filter(c => c.id !== tempComment.id))
       await fetchComments(10)
+      
+      // Call callback to refresh stats
+      onCommentSuccess?.()
       
     } catch (error: any) {
       console.error('Failed to submit comment:', error)

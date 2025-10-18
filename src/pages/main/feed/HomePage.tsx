@@ -247,9 +247,9 @@ export function HomePage() {
         <LeftBar />
       </div>
 
-      {/* Main Feed - With left margin to account for fixed sidebar */}
+      {/* Main Feed - Sát với sidebars */}
       <main className="flex-1 bg-gray-50 p-6 ml-64 mr-64">
-        <div className="max-w-2xl mx-auto">
+        <div className="max-w-4xl mx-auto">
           <PostList 
             posts={posts} 
             onOpenImage={handleOpenImage}
@@ -310,9 +310,9 @@ function FeedLoading() {
         <LeftBar />
       </div>
 
-      {/* Main Feed - With left margin to account for fixed sidebar */}
+      {/* Main Feed - Sát với sidebars */}
       <main className="flex-1 bg-gray-50 p-6 ml-64 mr-64">
-        <div className="max-w-2xl mx-auto">
+        <div className="max-w-4xl mx-auto">
           <div className="space-y-6">
             {[1, 2, 3, 4, 5].map((i) => (
               <Card key={i} className="p-6 animate-pulse">
@@ -349,9 +349,9 @@ function FeedError({ error }: { error: string }) {
         <LeftBar />
       </div>
 
-      {/* Main Feed - With left margin to account for fixed sidebar */}
+      {/* Main Feed - Sát với sidebars */}
       <main className="flex-1 bg-gray-50 p-6 ml-64 mr-64">
-        <div className="max-w-2xl mx-auto">
+        <div className="max-w-4xl mx-auto">
           <Card className="p-8 text-center">
             <div className="text-destructive text-lg font-semibold mb-2">Error loading posts</div>
             <p className="text-muted-foreground">{error}</p>
@@ -378,9 +378,9 @@ function FeedEmpty() {
         <LeftBar />
       </div>
 
-      {/* Main Feed - With left margin to account for fixed sidebar */}
+      {/* Main Feed - Sát với sidebars */}
       <main className="flex-1 bg-gray-50 p-6 ml-64 mr-64">
-        <div className="max-w-2xl mx-auto">
+        <div className="max-w-4xl mx-auto">
           <Card className="p-12 text-center">
             <div className="mx-auto w-24 h-24 bg-muted rounded-full flex items-center justify-center mb-4">
               <MessageCircle className="h-10 w-10 text-muted-foreground" />
