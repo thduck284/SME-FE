@@ -1,16 +1,28 @@
 "use client"
 
-import { useState } from "react"
-import { Home, Search, Compass, Film, MessageCircle, Bell, PlusSquare, User, UserPlus, LogOut } from "lucide-react"
+import { useState, useEffect } from "react"
+import { Home, Search, Bell, PlusSquare, User, UserPlus, LogOut } from "lucide-react"
 import { CreatePostModal } from "@/components/posts/CreatePostModal"
 import { SearchModal } from "@/components/search/SearchModal"
+import { NotificationModal } from "@/components/notifications"
+import { useNotifications } from "../../lib/hooks/useNotifications"
 import { Link } from "react-router-dom"
 import { getUserId } from "@/lib/utils/Jwt"
 
 export function LeftBar() {
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isSearchModalOpen, setIsSearchModalOpen] = useState(false)
+  const [isNotificationModalOpen, setIsNotificationModalOpen] = useState(false)
+  const { unreadCount, loadUnreadCount } = useNotifications()
   const userId = getUserId()
+
+  // Load unread count khi component mount
+  useEffect(() => {
+    console.log('LeftBar: Loading unread count...')
+    loadUnreadCount()
+  }, [loadUnreadCount])
+
+  console.log('LeftBar: unreadCount =', unreadCount)
 
   const handleLogout = () => {
     localStorage.removeItem('accessToken')
@@ -47,6 +59,8 @@ export function LeftBar() {
               <span>Search</span>
             </button>
 
+            {/* Hidden: Explore, Reels, Messages */}
+            {/* 
             <a
               href="#"
               className="flex items-center gap-4 px-4 py-3.5 text-gray-700 hover:text-orange-700 hover:bg-orange-50 rounded-xl transition-all duration-300 font-medium group"
@@ -70,14 +84,22 @@ export function LeftBar() {
               <MessageCircle className="w-6 h-6 group-hover:scale-110 transition-transform" />
               <span>Messages</span>
             </a>
+            */}
 
-            <a
-              href="#"
-              className="flex items-center gap-4 px-4 py-3.5 text-gray-700 hover:text-orange-700 hover:bg-orange-50 rounded-xl transition-all duration-300 font-medium group"
+            <button
+              onClick={() => setIsNotificationModalOpen(true)}
+              className="flex items-center gap-4 px-4 py-3.5 text-gray-700 hover:text-orange-700 hover:bg-orange-50 rounded-xl transition-all duration-300 font-medium group w-full relative"
             >
-              <Bell className="w-6 h-6 group-hover:scale-110 transition-transform" />
+              <div className="relative">
+                <Bell className="w-6 h-6 group-hover:scale-110 transition-transform" />
+                {unreadCount > 0 && (
+                  <span className="absolute -top-1 -right-1 bg-white text-red-500 text-xs rounded-full min-w-[18px] h-[18px] flex items-center justify-center font-bold shadow-lg border-2 border-red-500">
+                    {unreadCount > 99 ? '99+' : unreadCount}
+                  </span>
+                )}
+              </div>
               <span>Notifications</span>
-            </a>
+            </button>
 
             {/* Create Button */}
             <button
@@ -127,6 +149,12 @@ export function LeftBar() {
       <SearchModal
         isOpen={isSearchModalOpen}
         onClose={() => setIsSearchModalOpen(false)}
+      />
+
+      {/* Notification Modal */}
+      <NotificationModal
+        isOpen={isNotificationModalOpen}
+        onClose={() => setIsNotificationModalOpen(false)}
       />
     </>
   )

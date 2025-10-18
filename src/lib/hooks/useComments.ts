@@ -58,16 +58,12 @@ export function useComments(postId: string) {
           isLiked: comment.isLiked || false,
           postId: comment.postId,
           parentCommentId: comment.parentCommentId || undefined,
+          hasChilds: comment.hasChilds || false,
           mentions: comment.mentions || [],
           medias: comment.medias || []
         }))
         
         const newComments = cursor ? [...prev, ...mappedComments] : mappedComments
-        console.log('📡 Setting comments:', {
-          prevCount: prev.length,
-          newCount: newComments.length,
-          total: newComments.length
-        })
         return newComments
       })
       
@@ -88,7 +84,7 @@ export function useComments(postId: string) {
     await fetchComments(10, pagination.nextCursor)
   }, [pagination, fetchComments])
 
-  const addComment = useCallback(async (content: string, mentions?: CommentMention[], files?: File[]) => {
+  const addComment = useCallback(async (content: string, mentions?: CommentMention[], files?: File[], parentCommentId?: string) => {
     if (!content.trim() && (!files || files.length === 0)) {
       throw new Error('Comment cannot be empty')
     }
@@ -102,6 +98,7 @@ export function useComments(postId: string) {
       const createData: CreateCommentRequest = {
         postId: postId,
         content: content.trim(),
+        ...(parentCommentId ? { parentCommentId } : {}),
         ...(mentions && mentions.length > 0 ? { mentions } : {}),
         ...(files && files.length > 0 ? { files } : {})
       }
@@ -119,6 +116,7 @@ export function useComments(postId: string) {
         isLiked: newComment.isLiked || false,
         postId: newComment.postId || postId,
         parentCommentId: newComment.parentCommentId || undefined,
+        hasChilds: newComment.hasChilds || false,
         mentions: newComment.mentions || [],
         medias: newComment.medias || []
       }

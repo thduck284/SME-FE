@@ -5,6 +5,7 @@ import { useNavigate } from "react-router-dom"
 import { useComments } from "@/lib/hooks/useComments"
 import { useMention } from "@/lib/hooks/useMention"
 import { UserService } from "@/lib/api/users/UserService"
+import { getReplies } from "@/lib/api/posts/GetReplies"
 import type { Comment as CommentType, CommentMention } from "@/lib/types/posts/CommentsDTO"
 import type { UserMetadata } from "@/lib/types/User"
 import type { MentionData } from "@/lib/types/users/MentionDto"
@@ -28,6 +29,10 @@ export function CommentsSection({ postId, isOpen, currentUserId, onCommentSucces
   const [userCache, setUserCache] = useState<Map<string, UserMetadata>>(new Map())
   const [files, setFiles] = useState<File[]>([])
   const [editingComment, setEditingComment] = useState<CommentType | null>(null)
+  const [replyingTo, setReplyingTo] = useState<CommentType | null>(null)
+  const [replies, setReplies] = useState<Map<string, CommentType[]>>(new Map()) // parentCommentId -> replies
+  const [expandedComments, setExpandedComments] = useState<Set<string>>(new Set()) // commentIds that are expanded
+  const [loadingReplies, setLoadingReplies] = useState<Set<string>>(new Set()) // commentIds currently loading replies
   const inputRef = useRef<HTMLInputElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -94,6 +99,10 @@ export function CommentsSection({ postId, isOpen, currentUserId, onCommentSucces
     if (isOpen && postId) {
       setError(null)
       setOptimisticComments([])
+      // Reset replies state when postId changes
+      setReplies(new Map())
+      setExpandedComments(new Set())
+      setLoadingReplies(new Set())
       fetchComments(10)
     }
   }, [isOpen, postId])
@@ -237,6 +246,16 @@ export function CommentsSection({ postId, isOpen, currentUserId, onCommentSucces
       likes: 0,
       isLiked: false,
       postId,
+      hasChilds: false,
+      // Add reply info if replying
+      ...(replyingTo && { 
+        parentCommentId: replyingTo.id,
+        replyingTo: {
+          id: replyingTo.id,
+          authorId: replyingTo.authorId,
+          authorName: replyingTo.authorName || ''
+        }
+      })
     }
 
     setOptimisticComments(prev => [tempComment, ...prev])
@@ -244,11 +263,14 @@ export function CommentsSection({ postId, isOpen, currentUserId, onCommentSucces
     const currentFiles = [...files]
     setComment("")
     setFiles([])
+    setReplyingTo(null)
 
     try {
       const commentMentions = convertToCommentMentions(mentions)
       
-      await addComment(currentComment, commentMentions, currentFiles)
+      // Pass parentCommentId if replying
+      const parentCommentId = replyingTo ? replyingTo.id : undefined
+      await addComment(currentComment, commentMentions, currentFiles, parentCommentId)
       setMentions([])
       setOptimisticComments(prev => prev.filter(c => c.id !== tempComment.id))
       await fetchComments(10)
@@ -262,11 +284,12 @@ export function CommentsSection({ postId, isOpen, currentUserId, onCommentSucces
       setOptimisticComments(prev => prev.filter(c => c.id !== tempComment.id))
       setComment(currentComment)
       setFiles(currentFiles)
+      setReplyingTo(null)
       
       const errorMessage = error.response?.data?.message || error.message || 'Failed to post comment'
       setError(errorMessage)
     }
-  }, [comment, files, currentUserId, postId, addComment, fetchComments, mentions, editingComment, editComment, convertToCommentMentions])
+  }, [comment, files, currentUserId, postId, addComment, fetchComments, mentions, editingComment, editComment, convertToCommentMentions, replyingTo])
 
   // Other comment handlers with memoization
   const handleLikeComment = useCallback(async (commentId: string) => {
@@ -292,6 +315,18 @@ export function CommentsSection({ postId, isOpen, currentUserId, onCommentSucces
         setOptimisticComments(prev => prev.filter(c => c.id !== commentId))
       }
       await deleteComment(commentId)
+      
+      // Also remove from replies if it's a reply
+      setReplies(prev => {
+        const newMap = new Map(prev)
+        for (const [parentId, replyList] of newMap.entries()) {
+          const filteredReplies = replyList.filter(reply => reply.id !== commentId)
+          if (filteredReplies.length !== replyList.length) {
+            newMap.set(parentId, filteredReplies)
+          }
+        }
+        return newMap
+      })
     } catch (error) {
       console.error('Failed to delete comment:', error)
       setError('Failed to delete comment')
@@ -321,6 +356,105 @@ export function CommentsSection({ postId, isOpen, currentUserId, onCommentSucces
     setMentions([])
   }, [])
 
+  const handleReply = useCallback((comment: CommentType) => {
+    setReplyingTo(comment)
+    
+    // Get display name using the same logic as getDisplayInfo
+    const { displayName } = getDisplayInfo(comment)
+    
+    // Pre-fill comment with mention
+    const mentionText = `@${displayName} `
+    setComment(mentionText)
+    setFiles([])
+    setMentions([])
+    
+    // Focus input after state update
+    setTimeout(() => {
+      inputRef.current?.focus()
+      // Set cursor position after the mention
+      if (inputRef.current) {
+        inputRef.current.setSelectionRange(mentionText.length, mentionText.length)
+      }
+    }, 100)
+  }, [getDisplayInfo])
+
+  const handleCancelReply = useCallback(() => {
+    setReplyingTo(null)
+    setComment("")
+    setFiles([])
+    setMentions([])
+  }, [])
+
+  const loadReplies = useCallback(async (parentCommentId: string) => {
+    if (loadingReplies.has(parentCommentId) || replies.has(parentCommentId)) {
+      return // Already loading or loaded
+    }
+
+    setLoadingReplies(prev => new Set(prev).add(parentCommentId))
+    
+    try {
+      const response = await getReplies(parentCommentId, 10)
+      const newReplies = response.replies || []
+      
+      setReplies(prev => {
+        const newMap = new Map(prev)
+        newMap.set(parentCommentId, newReplies)
+        return newMap
+      })
+      
+      // Fetch user metadata for replies
+      const repliesToFetch = newReplies
+        .filter(reply => reply && !userCache.has(reply.authorId))
+        .filter(reply => reply.authorId && reply.authorId !== 'current-user')
+        .slice(0, 5)
+
+      if (repliesToFetch.length > 0) {
+        const userPromises = repliesToFetch.map(async (reply) => {
+          try {
+            const userMetadata = await UserService.getUserMetadata(reply.authorId)
+            return { authorId: reply.authorId, userMetadata }
+          } catch (error) {
+            console.error(`Failed to fetch user metadata ${reply.authorId}:`, error)
+            return null
+          }
+        })
+
+        const results = await Promise.all(userPromises)
+        const newCache = new Map(userCache)
+        
+        results.forEach(result => {
+          if (result?.userMetadata) {
+            newCache.set(result.authorId, result.userMetadata)
+          }
+        })
+        
+        setUserCache(newCache)
+      }
+      
+    } catch (error) {
+      console.error('Failed to load replies:', error)
+    } finally {
+      setLoadingReplies(prev => {
+        const newSet = new Set(prev)
+        newSet.delete(parentCommentId)
+        return newSet
+      })
+    }
+  }, [loadingReplies, replies, userCache])
+
+  const toggleReplies = useCallback((commentId: string) => {
+    setExpandedComments(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(commentId)) {
+        newSet.delete(commentId)
+      } else {
+        newSet.add(commentId)
+        loadReplies(commentId)
+      }
+      return newSet
+    })
+  }, [loadReplies])
+
   if (!isOpen) return null
 
   return (
@@ -337,9 +471,14 @@ export function CommentsSection({ postId, isOpen, currentUserId, onCommentSucces
         onLike={handleLikeComment}
         onDelete={handleDeleteComment}
         onEdit={handleEditComment}
+        onReply={handleReply}
         onMentionClick={navigate}
         getDisplayInfo={getDisplayInfo}
         isTempComment={isTempComment}
+        replies={replies}
+        expandedComments={expandedComments}
+        loadingReplies={loadingReplies}
+        onToggleReplies={toggleReplies}
       />
 
       <CommentInput
@@ -347,10 +486,13 @@ export function CommentsSection({ postId, isOpen, currentUserId, onCommentSucces
         isAdding={isAdding}
         isEditing={isEditing}
         editingComment={editingComment}
+        replyingTo={replyingTo}
         onChange={setComment}
         onClearError={() => setError(null)}
         onSubmit={handleSubmitComment}
         onCancelEdit={handleCancelEdit}
+        onCancelReply={handleCancelReply}
+        getDisplayInfo={getDisplayInfo}
         mentionUsers={mentionUsers}
         isMentionLoading={isMentionLoading}
         showMentionDropdown={showMentionDropdown}

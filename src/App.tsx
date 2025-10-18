@@ -3,6 +3,7 @@ import '@/lib/api/auth/AutoFetch';
 import { authRoutes } from "@/pages/auth/route"
 import { feedRoutes } from "@/pages/main/route"
 import { Toaster } from "react-hot-toast"
+import { SocketProvider } from "@/lib/context/SocketContext"
 
 function App() {
   const accessToken = localStorage.getItem('accessToken');
@@ -24,10 +25,10 @@ function App() {
   ])
 
   return (
-    <>
+    <SocketProvider>
       {element}
       <Toaster position="top-right" />
-    </>
+    </SocketProvider>
   )
 }
 
