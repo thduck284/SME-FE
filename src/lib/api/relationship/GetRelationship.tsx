@@ -1,35 +1,14 @@
 import { UserRelationshipsResponseDto } from '@/lib/types/Relationship'
+import apiClient from '@/lib/services/ApiClient'
 
 export const relationshipService = {
   async getFollowers(userId: string): Promise<UserRelationshipsResponseDto> {
-    const res = await fetch(`/relationships/${userId}/followers`, {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    })
-    
-    if (!res.ok) {
-      const errorText = await res.text();
-      throw new Error(`Failed to fetch followers: ${res.statusText} - ${errorText}`)
-    }
-    
-    return await res.json();
+    const { data } = await apiClient.get(`/relationships/${userId}/followers`)
+    return data
   },
 
   async getFollowing(userId: string): Promise<UserRelationshipsResponseDto> {
-    const res = await fetch(`/relationships/${userId}/following`, { 
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    })
-    
-    if (!res.ok) {
-      const errorText = await res.text();
-      throw new Error(`Failed to fetch following: ${res.statusText} - ${errorText}`)
-    }
-    
-    return await res.json();
-  }
+    const { data } = await apiClient.get(`/relationships/${userId}/following`)
+    return data
+  },
 }
