@@ -43,3 +43,9 @@ export interface TokenVerifyResponseDto {
   isValid: boolean;
   userId?: string;
 }
+
+export interface ForgotPasswordResponseDto {
+  success: boolean;
+  message: string;
+  resetUrl: string;
+}

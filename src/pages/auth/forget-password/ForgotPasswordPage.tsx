@@ -1,118 +1,112 @@
 "use client"
 
-import type React from "react"
-import { useState } from "react"
-import { Input, Button } from "@/components/ui"
-import { Mail } from "lucide-react"
+import { useAuth } from '@/lib/hooks/useAuth'
+import { Button } from "@/components/ui"
 import { Link } from "react-router-dom"
 
 export function ForgotPasswordPage() {
-  const [email, setEmail] = useState("")
-  const [loading, setLoading] = useState(false)
+  const { 
+    loading, 
+    error, 
+    success, 
+    forgotPassword, 
+    clearError, 
+    clearSuccess 
+  } = useAuth()
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    setLoading(true)
-
-    setTimeout(() => {
-      console.log("Reset password request for:", email)
-      setLoading(false)
-      alert("If this email exists, a reset link has been sent.")
-    }, 1000)
+  const handleResetPassword = async () => {
+    clearError()
+    clearSuccess()
+    
+    const result = await forgotPassword()
+    
+    if (!result.success) {
+      // Error đã được set tự động trong hook
+      console.error('Forgot password failed:', result)
+    }
+    // Nếu success, hook đã tự động redirect
   }
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden bg-gradient-to-tr from-blue-100 via-purple-100 to-pink-100">
-
-      {/* Background Blur Shapes */}
       <div className="absolute inset-0 -z-10">
         <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-purple-300/30 rounded-full blur-3xl animate-pulse" />
         <div className="absolute bottom-0 left-0 w-[500px] h-[500px] bg-pink-200/20 rounded-full blur-2xl animate-pulse" />
       </div>
 
       <div className="w-full max-w-[480px]">
-        {/* Forgot Password Card with Logo */}
         <div className="bg-card border border-border rounded-2xl p-8 md:p-10 shadow-sm backdrop-blur-sm">
-
-          {/* Logo */}
+          
           <div className="flex justify-center mb-6">
-            <img
-              src="/assets/images/logo.svg"
-              alt="Streamora Logo"
-              className="w-60 h-auto"
-            />
+            <img src="/assets/images/logo.svg" alt="Logo" className="w-60 h-auto" />
           </div>
 
-          {/* Header */}
-          <div className="text-center mb-6">
-            <h1 className="text-2xl md:text-3xl font-semibold text-foreground mb-2">
-              Forgot Password
+          <div className="text-center mb-8">
+            <h1 className="text-2xl md:text-3xl font-semibold text-foreground mb-3">
+              Forgot Password?
             </h1>
-            <p className="text-sm text-muted-foreground">
-              Enter your email to receive a password reset link.
+            <p className="text-muted-foreground">
+              Click below to reset your password securely
             </p>
           </div>
 
-          {/* Form */}
-          <form onSubmit={handleSubmit} className="space-y-6">
-            <div className="space-y-2">
-              <label htmlFor="email" className="block text-sm font-medium text-foreground">
-                Email
-              </label>
-              <div className="relative group">
-                <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground w-[18px] h-[18px]" />
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="your_email@email.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="pl-11 h-11 text-base"
-                  required
-                />
-              </div>
+          {/* Error Message */}
+          {error && (
+            <div className="mb-4 p-3 bg-destructive/10 border border-destructive/20 rounded-lg">
+              <p className="text-destructive text-sm">
+                ❌ {error}
+              </p>
             </div>
+          )}
 
+          {/* Success Message */}
+          {success && (
+            <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+              <p className="text-green-700 text-sm font-medium">
+                ✅ {success}
+              </p>
+            </div>
+          )}
+
+          <div className="space-y-4">
             <Button
-              type="submit"
+              onClick={handleResetPassword}
               disabled={loading}
-              className="w-full h-11 text-base font-medium"
+              className="w-full h-12 text-base font-medium bg-blue-600 hover:bg-blue-700 text-white"
+              size="lg"
             >
-              {loading ? "Sending..." : "Send Reset Link"}
+              {loading ? (
+                <div className="flex items-center gap-2">
+                  <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  Redirecting to Secure Portal...
+                </div>
+              ) : (
+                "Reset My Password"
+              )}
             </Button>
-          </form>
 
-          {/* Back to Login */}
-          <div className="text-center mt-6">
+            <div className="text-center text-xs text-muted-foreground">
+              <p>You'll be redirected to our secure password reset page</p>
+            </div>
+          </div>
+
+          <div className="text-center mt-8 pt-6 border-t border-border">
             <p className="text-sm text-muted-foreground">
               Remember your password?{" "}
               <Link
                 to="/login"
-                className="font-semibold text-foreground hover:text-primary transition-colors underline-offset-4 hover:underline"
+                className="font-semibold text-foreground hover:text-blue-600 transition-colors underline-offset-4 hover:underline"
               >
-                Log In
+                Back to Login
               </Link>
             </p>
           </div>
         </div>
 
-        {/* Footer */}
-        <div className="mt-8 text-center">
-          <p className="text-xs text-muted-foreground">
-            By using this service, you agree to our{" "}
-            <Link
-              to="/terms"
-              className="underline underline-offset-4 hover:text-foreground transition-colors"
-            >
-              Terms of Service
-            </Link>{" "}
-            and{" "}
-            <Link
-              to="/privacy"
-              className="underline underline-offset-4 hover:text-foreground transition-colors"
-            >
-              Privacy Policy
-            </Link>
+        {/* Debug Info */}
+        <div className="mt-4 text-center">
+          <p className="text-xs text-gray-500">
+            Using secure authentication system
           </p>
         </div>
       </div>
