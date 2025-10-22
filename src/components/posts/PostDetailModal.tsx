@@ -285,18 +285,18 @@ export function PostDetailModal({
 
   return (
     <>
-      {/* Backdrop */}
+      {/* Backdrop với z-index cao */}
       <div 
-        className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+        className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[10000] flex items-center justify-center p-4"
         onClick={onClose}
       >
-        {/* Modal Content */}
+        {/* Modal Content - Full height, giữ nguyên width */}
         <div 
-          className="bg-white dark:bg-gray-900 rounded-lg shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col"
+          className="bg-white dark:bg-gray-900 rounded-lg shadow-2xl max-w-4xl w-full h-full max-h-[95vh] overflow-hidden flex flex-col"
           onClick={(e) => e.stopPropagation()}
         >
           {/* Header */}
-          <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
+          <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700 shrink-0">
             <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Post Details</h2>
             <Button
               variant="ghost"
@@ -308,7 +308,7 @@ export function PostDetailModal({
             </Button>
           </div>
 
-          {/* Scrollable Content */}
+          {/* Scrollable Content - Chiếm toàn bộ không gian còn lại */}
           <div className="flex-1 overflow-y-auto">
             <Card className="rounded-none shadow-none border-0 bg-transparent">
               {/* Header với thông tin người share (nếu là bài share) */}

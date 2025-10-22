@@ -1,7 +1,11 @@
 import React, { useEffect, useRef, useState, useMemo } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { X, Heart, MessageCircle, UserPlus, Share, AtSign, Trash2, Loader2 } from 'lucide-react'
 import { Avatar } from '@/components/ui/Avatar'
 import Button from '@/components/ui/Button'
+import { PostDetailModal } from '@/components/posts/PostDetailModal'
+import { getBatchPosts } from '@/lib/api/posts/GetBatchPosts'
+import type { PostFullDto } from '@/lib/types/posts/PostFullDto'
 
 interface Notification {
   notificationId: string
@@ -93,6 +97,7 @@ export function NotificationModal({
   onSocketNotificationRead,
   processedSocketNotifications = new Set()
 }: NotificationModalProps) {
+  const navigate = useNavigate()
   const listRef = useRef<HTMLDivElement>(null)
   const observerRef = useRef<IntersectionObserver | null>(null)
   const loadMoreTriggerRef = useRef<HTMLDivElement>(null)
@@ -102,6 +107,12 @@ export function NotificationModal({
   const [isLoadingMore, setIsLoadingMore] = useState(false)
   const [hasInitialLoad, setHasInitialLoad] = useState(false)
   const [localProcessedSocketNotifications, setLocalProcessedSocketNotifications] = useState<Set<string>>(processedSocketNotifications)
+  
+  // State cho PostDetailModal
+  const [selectedPostId, setSelectedPostId] = useState<string | null>(null)
+  const [isPostDetailOpen, setIsPostDetailOpen] = useState(false)
+  const [selectedPost, setSelectedPost] = useState<PostFullDto | null>(null)
+  const [isLoadingPost, setIsLoadingPost] = useState(false)
 
   useEffect(() => {
     setLocalProcessedSocketNotifications(processedSocketNotifications)
@@ -111,6 +122,9 @@ export function NotificationModal({
     if (!isOpen) {
       setDisplayedNotifications([])
       setHasInitialLoad(false)
+      // Đóng PostDetailModal khi NotificationModal đóng
+      setIsPostDetailOpen(false)
+      setSelectedPost(null)
     }
   }, [isOpen])
 
@@ -236,17 +250,31 @@ export function NotificationModal({
     }
   }
 
-  useEffect(() => {
-    return () => {
-      if (observerRef.current) {
-        observerRef.current.disconnect()
+  // Hàm mở PostDetailModal
+  const handleOpenPostDetail = async (postId: string) => {
+    setSelectedPostId(postId)
+    setIsLoadingPost(true)
+    
+    try {
+      const posts = await getBatchPosts([postId])
+      if (posts && posts.length > 0) {
+        setSelectedPost(posts[0])
+        setIsPostDetailOpen(true)
+      } else {
+        console.error('Post not found')
       }
+    } catch (error) {
+      console.error('Error loading post:', error)
+    } finally {
+      setIsLoadingPost(false)
     }
-  }, [])
+  }
 
-  if (!isOpen) return null
-
-  const unreadCount = allNotifications.filter(n => !n.readFlag).length
+  const handleClosePostDetail = () => {
+    setIsPostDetailOpen(false)
+    setSelectedPost(null)
+    setSelectedPostId(null)
+  }
 
   const handleNotificationClick = (notification: Notification) => {
     if (!notification.readFlag) {
@@ -275,10 +303,37 @@ export function NotificationModal({
       }
     }
     
+    // Xử lý navigation khi click vào notification
     if (notification.entityId) {
-      console.log('Navigate to entity:', notification.entityId)
+      switch (notification.eventType) {
+        case 'post.liked':
+        case 'post.commented':
+        case 'post.shared':
+        case 'post.mentioned':
+        case 'post.created':
+          handleOpenPostDetail(notification.entityId)
+          break
+        case 'user.followed':
+          navigate(`/profile/${notification.fromUserId}`)
+          onClose()
+          break
+        default:
+          console.log('Navigate to entity:', notification.entityId)
+      }
     }
   }
+
+  useEffect(() => {
+    return () => {
+      if (observerRef.current) {
+        observerRef.current.disconnect()
+      }
+    }
+  }, [])
+
+  if (!isOpen) return null
+
+  const unreadCount = allNotifications.filter(n => !n.readFlag).length
 
   const handleDeleteNotification = (e: React.MouseEvent, notification: Notification) => {
     e.stopPropagation()
@@ -328,148 +383,169 @@ export function NotificationModal({
   }
 
   return (
-    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-[9999]" onClick={onClose}>
-      <div 
-        className="bg-white rounded-xl shadow-xl w-full max-w-md max-h-[80vh] flex flex-col"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex items-center justify-between p-4 border-b border-gray-200">
-          <div className="flex items-center gap-2">
-            <h2 className="text-lg font-semibold text-gray-900">Notifications</h2>
-            {unreadCount > 0 && (
-              <span className="bg-red-500 text-white text-xs px-2 py-1 rounded-full">
-                {unreadCount}
-              </span>
-            )}
-          </div>
-          <div className="flex items-center gap-2">
-            {unreadCount > 0 && (
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={handleMarkAllAsReadClick}
-                className="text-xs"
-              >
-                Mark all as read
-              </Button>
-            )}
-            <button
-              onClick={onClose}
-              className="p-1 hover:bg-gray-100 rounded-full transition-colors"
-            >
-              <X className="w-5 h-5 text-gray-500" />
-            </button>
-          </div>
-        </div>
-
+    <>
+      {/* Notification Modal - z-index thấp hơn */}
+      <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-[9999]" onClick={onClose}>
         <div 
-          ref={listRef}
-          className="flex-1 overflow-y-auto"
+          className="bg-white rounded-xl shadow-xl w-full max-w-md max-h-[80vh] flex flex-col"
+          onClick={(e) => e.stopPropagation()}
         >
-          {isLoading && allNotifications.length === 0 ? (
-            <div className="flex items-center justify-center p-8">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500"></div>
+          <div className="flex items-center justify-between p-4 border-b border-gray-200">
+            <div className="flex items-center gap-2">
+              <h2 className="text-lg font-semibold text-gray-900">Notifications</h2>
+              {unreadCount > 0 && (
+                <span className="bg-red-500 text-white text-xs px-2 py-1 rounded-full">
+                  {unreadCount}
+                </span>
+              )}
             </div>
-          ) : allNotifications.length === 0 ? (
-            <div className="flex flex-col items-center justify-center p-8 text-gray-500">
-              <MessageCircle className="w-12 h-12 mb-2 opacity-50" />
-              <p>No notifications yet</p>
+            <div className="flex items-center gap-2">
+              {unreadCount > 0 && (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={handleMarkAllAsReadClick}
+                  className="text-xs"
+                >
+                  Mark all as read
+                </Button>
+              )}
+              <button
+                onClick={onClose}
+                className="p-1 hover:bg-gray-100 rounded-full transition-colors"
+              >
+                <X className="w-5 h-5 text-gray-500" />
+              </button>
             </div>
-          ) : (
-            <div className="divide-y divide-gray-100">
-              {allNotifications.map((notification) => {
-                const isRead = notification.isFromSocket 
-                  ? isSocketNotificationRead(notification)
-                  : notification.readFlag
-                
-                return (
-                  <div
-                    key={getUniqueKey(notification)}
-                    className={`p-4 hover:bg-gray-50 cursor-pointer transition-colors group relative ${
-                      !isRead ? 'bg-blue-50 border-l-4 border-l-blue-500' : ''
-                    } ${notification.isFromSocket && !isRead ? 'bg-green-50 border-l-4 border-l-green-500' : ''}`}
-                    onClick={() => handleNotificationClick(notification)}
-                  >
-                    <div className="flex items-start gap-3">
-                      <div className="flex-shrink-0">
-                        {getNotificationIcon(notification.eventType)}
-                      </div>
-                      
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
-                          <Avatar
-                            src={notification.fromUser?.avatarUrl || "/image.png"}
-                            alt={notification.fromUser?.displayName || "User"}
-                            fallback={notification.fromUser?.displayName?.[0] || notification.fromUser?.username?.[0] || "U"}
-                            className="w-8 h-8"
-                          />
-                          <div className="flex-1">
-                            <p className="text-sm font-medium text-gray-900">
-                              {getNotificationMessage(notification)}
-                            </p>
-                            <div className="flex items-center gap-2">
-                              <p className="text-xs text-gray-500">
-                                {formatTimeAgo(notification.createdAt)}
+          </div>
+
+          <div 
+            ref={listRef}
+            className="flex-1 overflow-y-auto"
+          >
+            {isLoading && allNotifications.length === 0 ? (
+              <div className="flex items-center justify-center p-8">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500"></div>
+              </div>
+            ) : allNotifications.length === 0 ? (
+              <div className="flex flex-col items-center justify-center p-8 text-gray-500">
+                <MessageCircle className="w-12 h-12 mb-2 opacity-50" />
+                <p>No notifications yet</p>
+              </div>
+            ) : (
+              <div className="divide-y divide-gray-100">
+                {allNotifications.map((notification) => {
+                  const isRead = notification.isFromSocket 
+                    ? isSocketNotificationRead(notification)
+                    : notification.readFlag
+                  
+                  return (
+                    <div
+                      key={getUniqueKey(notification)}
+                      className={`p-4 hover:bg-gray-50 cursor-pointer transition-colors group relative ${
+                        !isRead ? 'bg-blue-50 border-l-4 border-l-blue-500' : ''
+                      } ${notification.isFromSocket && !isRead ? 'bg-green-50 border-l-4 border-l-green-500' : ''}`}
+                      onClick={() => handleNotificationClick(notification)}
+                    >
+                      <div className="flex items-start gap-3">
+                        <div className="flex-shrink-0">
+                          {getNotificationIcon(notification.eventType)}
+                        </div>
+                        
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1">
+                            <Avatar
+                              src={notification.fromUser?.avatarUrl || "/image.png"}
+                              alt={notification.fromUser?.displayName || "User"}
+                              fallback={notification.fromUser?.displayName?.[0] || notification.fromUser?.username?.[0] || "U"}
+                              className="w-8 h-8"
+                            />
+                            <div className="flex-1">
+                              <p className="text-sm font-medium text-gray-900">
+                                {getNotificationMessage(notification)}
                               </p>
-                              {notification.isFromSocket && !isRead && (
-                                <span className="text-xs text-green-600 font-medium">New</span>
-                              )}
+                              <div className="flex items-center gap-2">
+                                <p className="text-xs text-gray-500">
+                                  {formatTimeAgo(notification.createdAt)}
+                                </p>
+                                {notification.isFromSocket && !isRead && (
+                                  <span className="text-xs text-green-600 font-medium">New</span>
+                                )}
+                              </div>
                             </div>
                           </div>
                         </div>
-                      </div>
 
-                      <div className="flex items-center gap-1">
-                        {!isRead && !notification.isFromSocket && (
-                          <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                        )}
-                        {!isRead && notification.isFromSocket && (
-                          <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                        )}
-                        {!notification.isFromSocket && (
-                          <button
-                            onClick={(e) => handleDeleteNotification(e, notification)}
-                            className="p-1 hover:bg-gray-200 rounded-full transition-colors opacity-0 group-hover:opacity-100"
-                          >
-                            <Trash2 className="w-4 h-4 text-gray-400" />
-                          </button>
-                        )}
+                        <div className="flex items-center gap-1">
+                          {!isRead && !notification.isFromSocket && (
+                            <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                          )}
+                          {!isRead && notification.isFromSocket && (
+                            <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                          )}
+                          {!notification.isFromSocket && (
+                            <button
+                              onClick={(e) => handleDeleteNotification(e, notification)}
+                              className="p-1 hover:bg-gray-200 rounded-full transition-colors opacity-0 group-hover:opacity-100"
+                            >
+                              <Trash2 className="w-4 h-4 text-gray-400" />
+                            </button>
+                          )}
+                        </div>
                       </div>
                     </div>
+                  )
+                })}
+
+                {hasMore && (
+                  <div 
+                    ref={loadMoreTriggerRef} 
+                    className="flex justify-center py-8"
+                    style={{ minHeight: '50px' }}
+                  >
+                    {isLoadingMore ? (
+                      <div className="flex items-center gap-2 text-gray-500">
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <span className="text-sm">Loading more notifications...</span>
+                      </div>
+                    ) : (
+                      <div className="text-center text-gray-400 text-sm">
+                        Scroll to load more
+                      </div>
+                    )}
                   </div>
-                )
-              })}
+                )}
 
-              {hasMore && (
-                <div 
-                  ref={loadMoreTriggerRef} 
-                  className="flex justify-center py-8"
-                  style={{ minHeight: '50px' }}
-                >
-                  {isLoadingMore ? (
-                    <div className="flex items-center gap-2 text-gray-500">
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      <span className="text-sm">Loading more notifications...</span>
-                    </div>
-                  ) : (
-                    <div className="text-center text-gray-400 text-sm">
-                      Scroll to load more
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {!hasMore && allNotifications.length > 0 && (
-                <div className="flex justify-center py-4">
-                  <span className="text-sm text-gray-500">
-                    All notifications loaded
-                  </span>
-                </div>
-              )}
-            </div>
-          )}
+                {!hasMore && allNotifications.length > 0 && (
+                  <div className="flex justify-center py-4">
+                    <span className="text-sm text-gray-500">
+                      All notifications loaded
+                    </span>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
         </div>
       </div>
-    </div>
+
+      {/* PostDetailModal - Wrap trong div có z-index cao hơn */}
+      {isPostDetailOpen && selectedPost && (
+        <div className="fixed inset-0 z-[10000]">
+          <PostDetailModal
+            post={selectedPost}
+            isOpen={isPostDetailOpen}
+            onClose={handleClosePostDetail}
+            onOpenImage={(imageUrl, post) => {
+              console.log('Open image:', imageUrl)
+            }}
+            onShareSuccess={() => {
+              console.log('Share success')
+            }}
+            isOwnPost={false}
+          />
+        </div>
+      )}
+    </>
   )
 }

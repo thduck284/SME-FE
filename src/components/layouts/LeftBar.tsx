@@ -26,7 +26,6 @@ function LeftBarComponent() {
     deleteNotification,
     loadNotifications,
     loadMoreNotifications,
-    refreshNotifications,
     loadUnreadCount
   } = useNotifications()
   
@@ -86,13 +85,6 @@ function LeftBarComponent() {
     }
   }, [loadMoreNotifications])
 
-  const handleRefreshNotifications = useCallback(async () => {
-    await refreshNotifications()
-    setHasNewSocketNotification(false)
-    setProcessedSocketNotifications(new Set())
-  }, [refreshNotifications])
-
-  // 🚨 SỬA: Memoize totalUnreadCount
   const totalUnreadCount = useMemo(() => {
     const unprocessedSocketNotifications = rawSocketNotifications.filter(socketNotif => {
       const socketKey = `${socketNotif.entityId}-${socketNotif.eventType}-${socketNotif.fromUserId}`
@@ -299,7 +291,6 @@ function LeftBarComponent() {
         onMarkAllAsRead={handleMarkAllAsRead}
         onDeleteNotification={handleDeleteNotification}
         onLoadMore={handleLoadMoreNotifications}
-        onRefresh={handleRefreshNotifications}
         onSocketNotificationRead={handleSocketNotificationRead}
         processedSocketNotifications={processedSocketNotifications}
       />
