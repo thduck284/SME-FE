@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import React, { useState, useEffect, useCallback, useMemo } from "react"
 import { Home, Search, Bell, PlusSquare, User, UserPlus, LogOut } from "lucide-react"
 import { CreatePostModal } from "@/components/posts/CreatePostModal"
 import { SearchModal } from "@/components/search/SearchModal"
@@ -11,159 +11,189 @@ import { UserService } from "@/lib/api/users/UserService"
 import { Link } from "react-router-dom"
 import { getUserId } from "@/lib/utils/Jwt"
 
-export function LeftBar() {
+function LeftBarComponent() {
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isSearchModalOpen, setIsSearchModalOpen] = useState(false)
   const [isNotificationModalOpen, setIsNotificationModalOpen] = useState(false)
   
-  // REST notifications từ useNotifications hook
   const {
     notifications: restNotifications,
     unreadCount: restUnreadCount,
     isLoading: isLoadingRest,
+    pagination,
     markAsRead,
     markAllAsRead,
     deleteNotification,
     loadNotifications,
+    loadMoreNotifications,
+    refreshNotifications,
     loadUnreadCount
   } = useNotifications()
   
-  // Socket notifications (real-time)
   const { notifications: rawSocketNotifications } = useSocket()
   
-  // Merged notifications (REST + Socket)
   const [mergedNotifications, setMergedNotifications] = useState<any[]>([])
-  
-  // Có notification mới từ socket chưa được xem
   const [hasNewSocketNotification, setHasNewSocketNotification] = useState(false)
+  const [processedSocketNotifications, setProcessedSocketNotifications] = useState<Set<string>>(new Set())
   
   const userId = getUserId()
+  
+  const handleSocketNotificationRead = useCallback((notification: any) => {
+    const socketKey = `${notification.entityId}-${notification.eventType}-${notification.fromUserId}`
+    
+    setProcessedSocketNotifications(prev => {
+      const newSet = new Set(prev)
+      newSet.add(socketKey)
+      return newSet
+    })
+  }, [])
 
-  // Load REST notifications và unread count lần đầu
+  const handleMarkAllAsRead = useCallback(async () => {
+    await markAllAsRead()
+    loadUnreadCount()
+    setHasNewSocketNotification(false)
+    
+    const allSocketKeys = rawSocketNotifications.map(notif => 
+      `${notif.entityId}-${notif.eventType}-${notif.fromUserId}`
+    )
+    setProcessedSocketNotifications(new Set(allSocketKeys))
+  }, [markAllAsRead, loadUnreadCount, rawSocketNotifications])
+
+  const handleNotificationRead = useCallback(async (notificationId: string, createdAt: string | Date) => {
+    await markAsRead(notificationId, createdAt)
+    loadUnreadCount()
+  }, [markAsRead, loadUnreadCount])
+
+  const handleDeleteNotification = useCallback(async (notificationId: string) => {
+    await deleteNotification(notificationId)
+    loadUnreadCount()
+  }, [deleteNotification, loadUnreadCount])
+
+  const handleLoadMoreNotifications = useCallback(async (currentNotifications: any[]) => {
+    try {
+      const result = await loadMoreNotifications(currentNotifications, currentNotifications.length == 0 ? 10 : currentNotifications.length + 10)
+      
+      return {
+        notifications: result.notifications || [],
+        hasMore: result.hasMore || false
+      }
+    } catch (error) {
+      console.error('Error loading more notifications:', error)
+      return {
+        notifications: [],
+        hasMore: false
+      }
+    }
+  }, [loadMoreNotifications])
+
+  const handleRefreshNotifications = useCallback(async () => {
+    await refreshNotifications()
+    setHasNewSocketNotification(false)
+    setProcessedSocketNotifications(new Set())
+  }, [refreshNotifications])
+
+  // 🚨 SỬA: Memoize totalUnreadCount
+  const totalUnreadCount = useMemo(() => {
+    const unprocessedSocketNotifications = rawSocketNotifications.filter(socketNotif => {
+      const socketKey = `${socketNotif.entityId}-${socketNotif.eventType}-${socketNotif.fromUserId}`
+      return !processedSocketNotifications.has(socketKey)
+    })
+    
+    const socketUnreadCount = unprocessedSocketNotifications.length
+    return restUnreadCount + socketUnreadCount
+  }, [restUnreadCount, rawSocketNotifications, processedSocketNotifications])
+
+  // 🚨 SỬA: Memoize merged notifications
+  const enrichedNotifications = useMemo(async () => {
+    if (rawSocketNotifications.length === 0 && restNotifications.length === 0) {
+      return []
+    }
+
+    try {
+      const allUserIds = [...new Set([
+        ...restNotifications.map(n => n.fromUserId),
+        ...rawSocketNotifications.map(n => n.fromUserId)
+      ].filter(id => id && id.trim() !== ''))]
+
+      let userMap = new Map()
+      
+      if (allUserIds.length > 0) {
+        const userMetadata = await UserService.getMultipleUsersMetadata(allUserIds)
+        userMap = new Map(userMetadata.map(user => [user.userId, user]))
+      }
+
+      const enrichedRestNotifications = restNotifications.map(notification => ({
+        ...notification,
+        fromUser: userMap.get(notification.fromUserId) ? {
+          userId: userMap.get(notification.fromUserId).userId,
+          username: `${userMap.get(notification.fromUserId).firstName} ${userMap.get(notification.fromUserId).lastName}`.trim(),
+          displayName: `${userMap.get(notification.fromUserId).firstName} ${userMap.get(notification.fromUserId).lastName}`.trim(),
+          avatarUrl: userMap.get(notification.fromUserId).avtUrl
+        } : undefined,
+        isFromSocket: false
+      }))
+
+      const enrichedSocketNotifications = rawSocketNotifications.map(notification => ({
+        ...notification,
+        fromUser: userMap.get(notification.fromUserId) ? {
+          userId: userMap.get(notification.fromUserId).userId,
+          username: `${userMap.get(notification.fromUserId).firstName} ${userMap.get(notification.fromUserId).lastName}`.trim(),
+          displayName: `${userMap.get(notification.fromUserId).firstName} ${userMap.get(notification.fromUserId).lastName}`.trim(),
+          avatarUrl: userMap.get(notification.fromUserId).avtUrl
+        } : undefined,
+        readFlag: false,
+        isFromSocket: true
+      }))
+
+      return [...enrichedSocketNotifications, ...enrichedRestNotifications]
+    } catch (error) {
+      console.error('Error merging notifications:', error)
+      return [
+        ...rawSocketNotifications.map(n => ({ ...n, readFlag: false, isFromSocket: true })),
+        ...restNotifications.map(n => ({ ...n, isFromSocket: false }))
+      ]
+    }
+  }, [restNotifications, rawSocketNotifications])
+
+  // 🚨 SỬA: Effect để set merged notifications
+  useEffect(() => {
+    const setMerged = async () => {
+      const result = await enrichedNotifications
+      setMergedNotifications(result)
+    }
+    setMerged()
+  }, [enrichedNotifications])
+
   useEffect(() => {
     if (!userId) return
     
-    console.log('LeftBar: Loading initial notifications and unread count...')
     loadUnreadCount()
     loadNotifications()
   }, [userId, loadUnreadCount, loadNotifications])
 
-  // Merge socket notifications vào REST notifications và enrich user data
-  useEffect(() => {
-    const mergeAndEnrichNotifications = async () => {
-      if (rawSocketNotifications.length === 0 && restNotifications.length === 0) {
-        setMergedNotifications([])
-        return
-      }
-
-      try {
-        // Lấy danh sách unique userIds từ cả REST và socket notifications
-        const allUserIds = [...new Set([
-          ...restNotifications.map(n => n.fromUserId),
-          ...rawSocketNotifications.map(n => n.fromUserId)
-        ].filter(id => id && id.trim() !== ''))]
-
-        let userMap = new Map()
-        
-        if (allUserIds.length > 0) {
-          // Fetch user metadata
-          console.log('Fetching user metadata for notifications:', allUserIds)
-          const userMetadata = await UserService.getMultipleUsersMetadata(allUserIds)
-          userMap = new Map(userMetadata.map(user => [user.userId, user]))
-        }
-
-        // Enrich REST notifications
-        const enrichedRestNotifications = restNotifications.map(notification => ({
-          ...notification,
-          fromUser: userMap.get(notification.fromUserId) ? {
-            userId: userMap.get(notification.fromUserId).userId,
-            username: `${userMap.get(notification.fromUserId).firstName} ${userMap.get(notification.fromUserId).lastName}`.trim(),
-            displayName: `${userMap.get(notification.fromUserId).firstName} ${userMap.get(notification.fromUserId).lastName}`.trim(),
-            avatarUrl: userMap.get(notification.fromUserId).avtUrl
-          } : undefined,
-          isFromSocket: false
-        }))
-
-        // Enrich socket notifications (luôn là unread)
-        const enrichedSocketNotifications = rawSocketNotifications.map(notification => ({
-          ...notification,
-          fromUser: userMap.get(notification.fromUserId) ? {
-            userId: userMap.get(notification.fromUserId).userId,
-            username: `${userMap.get(notification.fromUserId).firstName} ${userMap.get(notification.fromUserId).lastName}`.trim(),
-            displayName: `${userMap.get(notification.fromUserId).firstName} ${userMap.get(notification.fromUserId).lastName}`.trim(),
-            avatarUrl: userMap.get(notification.fromUserId).avtUrl
-          } : undefined,
-          readFlag: false, // Socket notifications luôn là unread
-          isFromSocket: true
-        }))
-
-        // Merge: Socket notifications (mới nhất) + REST notifications
-        const merged = [...enrichedSocketNotifications, ...enrichedRestNotifications]
-        
-        setMergedNotifications(merged)
-        console.log('Merged notifications:', {
-          socket: enrichedSocketNotifications.length,
-          rest: enrichedRestNotifications.length,
-          total: merged.length
-        })
-
-      } catch (error) {
-        console.error('Error merging notifications:', error)
-        // Fallback: merge without enrichment
-        const fallbackMerged = [
-          ...rawSocketNotifications.map(n => ({ ...n, readFlag: false, isFromSocket: true })),
-          ...restNotifications.map(n => ({ ...n, isFromSocket: false }))
-        ]
-        setMergedNotifications(fallbackMerged)
-      }
-    }
-
-    mergeAndEnrichNotifications()
-  }, [restNotifications, rawSocketNotifications])
-
-  // Theo dõi socket notifications mới
   useEffect(() => {
     if (rawSocketNotifications.length > 0) {
       setHasNewSocketNotification(true)
-      console.log('New socket notifications detected:', rawSocketNotifications.length)
     }
   }, [rawSocketNotifications])
 
-  // 🚨 SỬA: Chỉ dùng REST unread count (socket notifications chưa được lưu trong DB)
-  const totalUnreadCount = restUnreadCount
-
-  const handleNotificationClick = () => {
-    // Reset trạng thái có notification mới
+  const handleNotificationClick = useCallback(() => {
     setHasNewSocketNotification(false)
     setIsNotificationModalOpen(true)
-  }
+  }, [])
 
-  const handleLogout = () => {
+  const handleLogout = useCallback(() => {
     localStorage.removeItem('accessToken')
     localStorage.removeItem('userId')
     window.location.href = '/login'
-  }
+  }, [])
 
-  // Callback khi notification được đánh dấu đã đọc từ modal
-  const handleNotificationRead = async (notificationId: string) => {
-    await markAsRead(notificationId)
-    // Reload unread count sau khi mark as read
-    loadUnreadCount()
-  }
-
-  // Callback khi đánh dấu tất cả đã đọc
-  const handleMarkAllAsRead = async () => {
-    await markAllAsRead()
-    // Reload unread count
-    loadUnreadCount()
-  }
-
-  // Callback khi xóa notification
-  const handleDeleteNotification = async (notificationId: string) => {
-    await deleteNotification(notificationId)
-    // Reload unread count
-    loadUnreadCount()
-  }
+  // 🚨 SỬA: Memoize modal handlers
+  const handleCloseCreateModal = useCallback(() => setIsModalOpen(false), [])
+  const handleCloseSearchModal = useCallback(() => setIsSearchModalOpen(false), [])
+  const handleCloseNotificationModal = useCallback(() => setIsNotificationModalOpen(false), [])
+  const handleOpenCreateModal = useCallback(() => setIsModalOpen(true), [])
+  const handleOpenSearchModal = useCallback(() => setIsSearchModalOpen(true), [])
 
   return (
     <>
@@ -187,7 +217,7 @@ export function LeftBar() {
             </Link>
 
             <button
-              onClick={() => setIsSearchModalOpen(true)}
+              onClick={handleOpenSearchModal}
               className="flex items-center gap-4 px-4 py-3.5 text-gray-700 hover:text-orange-700 hover:bg-orange-50 rounded-xl transition-all duration-300 font-medium group w-full"
             >
               <Search className="w-6 h-6 group-hover:scale-110 transition-transform" />
@@ -205,17 +235,15 @@ export function LeftBar() {
                     {totalUnreadCount > 99 ? '99+' : totalUnreadCount}
                   </span>
                 )}
-                {/* Chấm xanh khi có notification mới từ socket */}
-                {hasNewSocketNotification && (
+                {hasNewSocketNotification && totalUnreadCount > 0 && (
                   <span className="absolute -top-0.5 -right-0.5 w-3 h-3 bg-green-500 rounded-full border-2 border-white animate-pulse"></span>
                 )}
               </div>
               <span>Notifications</span>
             </button>
 
-            {/* Create Button */}
             <button
-              onClick={() => setIsModalOpen(true)}
+              onClick={handleOpenCreateModal}
               className="flex items-center gap-4 px-4 py-3.5 text-gray-700 hover:text-orange-700 hover:bg-orange-50 rounded-xl transition-all duration-300 font-medium group w-full"
             >
               <PlusSquare className="w-6 h-6 group-hover:scale-110 transition-transform" />
@@ -238,7 +266,6 @@ export function LeftBar() {
               <span>Gợi ý kết bạn</span>
             </Link>
 
-            {/* Logout Button */}
             <button
               onClick={handleLogout}
               className="flex items-center gap-4 px-4 py-3.5 text-gray-700 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all duration-300 font-medium group w-full"
@@ -250,30 +277,35 @@ export function LeftBar() {
         </div>
       </aside>
 
-      {/* Create Post Modal */}
       <CreatePostModal
         isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
+        onClose={handleCloseCreateModal}
         onPostCreated={() => console.log("Post created")}
       />
 
-      {/* Search Modal */}
       <SearchModal
         isOpen={isSearchModalOpen}
-        onClose={() => setIsSearchModalOpen(false)}
+        onClose={handleCloseSearchModal}
       />
 
-      {/* Notification Modal */}
       <NotificationModal
         isOpen={isNotificationModalOpen}
-        onClose={() => setIsNotificationModalOpen(false)}
+        onClose={handleCloseNotificationModal}
         restNotifications={mergedNotifications}
-        socketNotifications={[]}
+        socketNotifications={rawSocketNotifications}
         isLoading={isLoadingRest}
+        pagination={pagination}
         onNotificationRead={handleNotificationRead}
         onMarkAllAsRead={handleMarkAllAsRead}
         onDeleteNotification={handleDeleteNotification}
+        onLoadMore={handleLoadMoreNotifications}
+        onRefresh={handleRefreshNotifications}
+        onSocketNotificationRead={handleSocketNotificationRead}
+        processedSocketNotifications={processedSocketNotifications}
       />
     </>
   )
 }
+
+// 🚨 QUAN TRỌNG: Wrap với React.memo
+export const LeftBar = React.memo(LeftBarComponent)

@@ -27,38 +27,51 @@ export interface PaginationDto {
   pageState?: string
 }
 
-export interface MarkAsReadRequest {
-  notificationId: string
-}
-
-export interface MarkAllAsReadRequest {
-  userId: string
-}
-
 export class NotificationService {
   private static baseUrl = '/notifications'
 
-  // Lấy danh sách notification của user
   static async getNotifications(
-    pagination: PaginationDto = { fetchSize: 20 }
+    pagination: PaginationDto 
   ): Promise<GetNotificationsResponseDto> {
     try {
+      const fetchSize = pagination.fetchSize || 10
+      const pageState = pagination.pageState || ''
+      
       const response = await apiClient.get(
-        `${this.baseUrl}/me?fetchSize=${pagination.fetchSize}&pageState=${pagination.pageState || ''}`
+        `${this.baseUrl}/me?fetchSize=${fetchSize}&pageState=${pageState}`
       )
-      // API trả về { success, message, data: { notifications, hasMore } }
-      return response.data.data
+     
+      if (response.data.success && response.data.data) {
+        return {
+          notifications: response.data.data.notifications || [],
+          hasMore: response.data.data.hasMore || false
+        }
+      } else {
+        return {
+          notifications: [],
+          hasMore: false
+        }
+      }
     } catch (error) {
       console.error('Error fetching notifications:', error)
       throw error
     }
   }
 
-  // Đánh dấu notification là đã đọc
-  static async markAsRead(notificationId: string): Promise<void> {
+  static async markAsRead(notificationId: string, createdAt: string | Date): Promise<void> {
     try {
-      await apiClient.patch(`${this.baseUrl}/mark-read`, {
-        notificationId
+      let createdAtString: string
+      
+      if (typeof createdAt === 'string') {
+        createdAtString = createdAt
+      } else if (createdAt instanceof Date) {
+        createdAtString = createdAt.toISOString()
+      } else {
+        createdAtString = new Date(createdAt).toISOString()
+      }
+      
+      await apiClient.put(`${this.baseUrl}/${notificationId}/read`, {
+        createdAt: createdAtString
       })
     } catch (error) {
       console.error('Error marking notification as read:', error)
@@ -66,7 +79,6 @@ export class NotificationService {
     }
   }
 
-  // Đánh dấu tất cả notification là đã đọc
   static async markAllAsRead(): Promise<void> {
     try {
       await apiClient.patch(`${this.baseUrl}/mark-all-read`)
@@ -76,13 +88,10 @@ export class NotificationService {
     }
   }
 
-  // Lấy số lượng notification chưa đọc
   static async getUnreadCount(): Promise<number> {
     try {
       const response = await apiClient.get(`${this.baseUrl}/unread-count`)
-      console.log('getUnreadCount API response:', response.data)
       
-      // Backend trả về { success, message, data: { unreadCount } }
       if (response.data.success && response.data.data) {
         return response.data.data.unreadCount || 0
       } else {
@@ -94,7 +103,6 @@ export class NotificationService {
     }
   }
 
-  // Xóa notification
   static async deleteNotification(notificationId: string): Promise<void> {
     try {
       await apiClient.delete(`${this.baseUrl}/${notificationId}`)
