@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react"
+import { useNavigate } from "react-router-dom"
 import { X, Users, UserPlus } from "lucide-react"
 import Button from "@/components/ui/Button"
 import { Card } from "@/components/ui/Card"
@@ -20,6 +21,7 @@ interface RelationshipModalProps {
 }
 
 export function RelationshipModal({ isOpen, onClose, type, userId }: RelationshipModalProps) {
+  const navigate = useNavigate()
   const [users, setUsers] = useState<UserWithRelationship[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -36,15 +38,15 @@ export function RelationshipModal({ isOpen, onClose, type, userId }: Relationshi
       setLoading(true)
       setError(null)
       
-      // Lấy danh sách relationship
+      // Get relationship list
       const response = type === "followers" 
         ? await relationshipService.getFollowers(userId)
         : await relationshipService.getFollowing(userId)
       
-      // Lấy thông tin chi tiết của từng user
+      // Get detailed information for each user
       const userPromises = response.users.map(async (userRel) => {
         try {
-          // Sử dụng API getUser mới từ User.tsx
+          // Use new getUser API from User.tsx
           const userData = await userApi.getUser(userRel.userId)
           
           return {
@@ -53,7 +55,7 @@ export function RelationshipModal({ isOpen, onClose, type, userId }: Relationshi
           } as UserWithRelationship
         } catch (err) {
           console.error(`Error fetching user ${userRel.userId}:`, err)
-          // Trả về thông tin cơ bản nếu không lấy được chi tiết
+          // Return basic information if cannot get details
           return {
             id: 0,
             userId: userRel.userId,
@@ -70,7 +72,7 @@ export function RelationshipModal({ isOpen, onClose, type, userId }: Relationshi
       const usersData = await Promise.all(userPromises)
       setUsers(usersData)
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Có lỗi xảy ra khi tải dữ liệu")
+      setError(err instanceof Error ? err.message : "An error occurred while loading data")
     } finally {
       setLoading(false)
     }
@@ -83,11 +85,16 @@ export function RelationshipModal({ isOpen, onClose, type, userId }: Relationshi
 
       await UserService.followUser(currentUserId, targetUserId)
       
-      // Cập nhật state để hiển thị đã follow
+      // Update state to show followed
       setFollowingUsers(prev => new Set([...prev, targetUserId]))
     } catch (error) {
       console.error('Error following user:', error)
     }
+  }
+
+  const handleUserClick = (targetUserId: string) => {
+    onClose() // Close modal first
+    navigate(`/profile/${targetUserId}`) // Navigate to user profile
   }
 
   const isFollowing = (targetUserId: string) => {
@@ -95,13 +102,13 @@ export function RelationshipModal({ isOpen, onClose, type, userId }: Relationshi
   }
 
   const shouldShowFollowButton = (user: UserWithRelationship) => {
-    // Chỉ hiển thị button Follow trong tab "followers"
+    // Only show Follow button in "followers" tab
     if (type !== "followers") return false
     
-    // Hiển thị button Follow nếu:
-    // 1. Có quan hệ "FOLLOWER" (user này follow mình)
-    // 2. Không có quan hệ "FRIEND" (chưa là bạn)
-    // 3. Chưa follow user này
+    // Show Follow button if:
+    // 1. Has "FOLLOWER" relationship (this user follows me)
+    // 2. No "FRIEND" relationship (not friends yet)
+    // 3. Not following this user yet
     const hasFollowerRelation = user.relationshipTypes.includes('FOLLOWER')
     const hasFriendRelation = user.relationshipTypes.includes('FRIEND')
     const alreadyFollowing = isFollowing(user.userId)
@@ -123,7 +130,7 @@ export function RelationshipModal({ isOpen, onClose, type, userId }: Relationshi
               <UserPlus className="h-5 w-5 text-primary" />
             )}
             <h2 className="text-xl font-semibold text-gray-900">
-              {type === "followers" ? "Người theo dõi" : "Đang theo dõi"}
+              {type === "followers" ? "Followers" : "Following"}
             </h2>
           </div>
           <button
@@ -144,13 +151,17 @@ export function RelationshipModal({ isOpen, onClose, type, userId }: Relationshi
             <div className="text-center py-8">
               <p className="text-red-600 mb-4">{error}</p>
               <Button onClick={fetchData} variant="secondary">
-                Thử lại
+                Try Again
               </Button>
             </div>
           ) : users.length > 0 ? (
             <div className="space-y-3">
               {users.map((user, index) => (
-                <Card key={`${user.userId}-${index}`} className="p-4 hover:bg-gray-50 transition-colors">
+                <Card 
+                  key={`${user.userId}-${index}`} 
+                  className="p-4 hover:bg-gray-50 transition-colors cursor-pointer"
+                  onClick={() => handleUserClick(user.userId)}
+                >
                   <div className="flex items-center gap-3">
                     <div className="h-12 w-12 rounded-full overflow-hidden bg-primary/10 flex items-center justify-center">
                       {user.avtUrl && user.avtUrl.trim() !== '' ? (
@@ -195,7 +206,10 @@ export function RelationshipModal({ isOpen, onClose, type, userId }: Relationshi
                     <div className="flex items-center">
                       {shouldShowFollowButton(user) && (
                         <Button 
-                          onClick={() => handleFollowUser(user.userId)}
+                          onClick={(e) => {
+                            e.stopPropagation() // Prevent navigation when clicking follow button
+                            handleFollowUser(user.userId)
+                          }}
                           size="sm"
                           className="text-xs px-3 py-1"
                         >
@@ -212,8 +226,8 @@ export function RelationshipModal({ isOpen, onClose, type, userId }: Relationshi
               <Users className="h-12 w-12 text-gray-400 mx-auto mb-4" />
               <p className="text-gray-500">
                 {type === "followers" 
-                  ? "Chưa có người theo dõi nào" 
-                  : "Chưa theo dõi ai"
+                  ? "No followers yet" 
+                  : "Not following anyone yet"
                 }
               </p>
             </div>
@@ -223,9 +237,9 @@ export function RelationshipModal({ isOpen, onClose, type, userId }: Relationshi
         {/* Footer */}
         <div className="p-6 border-t border-gray-200">
           <div className="flex justify-between items-center text-sm text-gray-600">
-            <span>Tổng cộng: {users.length}</span>
+            <span>Total: {users.length}</span>
             <Button onClick={onClose} variant="secondary">
-              Đóng
+              Close
             </Button>
           </div>
         </div>

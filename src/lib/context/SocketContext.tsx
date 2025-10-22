@@ -34,83 +34,69 @@ export function SocketProvider({ children }: SocketProviderProps) {
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [isConnected, setIsConnected] = useState(false)
   const userId = getUserId()
-  const hasJoinedRef = useRef(false) // Track xem đã join room chưa
+  const hasJoinedRef = useRef(false)
 
   useEffect(() => {
     if (!userId) {
-      // Nếu không có userId, cleanup socket hiện tại
       if (socket) {
         socket.removeAllListeners()
-        socket.close()
+        socket.disconnect()
         setSocket(null)
         setIsConnected(false)
       }
       return
     }
 
-    // Cleanup socket cũ trước khi tạo mới
     if (socket) {
-      console.log('Cleaning up old socket connection')
       socket.removeAllListeners()
-      socket.close()
+      socket.disconnect()
     }
 
-    // Reset state khi tạo connection mới
     setNotifications([])
     setIsConnected(false)
 
-    // Tạo kết nối socket mới
     const newSocket = io('http://localhost:3000/notifications', {
       path: '/socket.io',
-      transports: ['websocket'],
-      forceNew: true // Force tạo connection mới
+      transports: ['polling', 'websocket'],
+      forceNew: false,
+      timeout: 15000,
+      reconnection: true,
+      reconnectionAttempts: Infinity,
+      reconnectionDelay: 1000,
+      reconnectionDelayMax: 5000,
     })
 
-    // Lắng nghe sự kiện kết nối
     newSocket.on('connect', () => {
-      console.log('Connected to notification server for user:', userId)
       setIsConnected(true)
       
-      // Chỉ join room nếu chưa join
       if (!hasJoinedRef.current) {
-        console.log('Joining room for user:', userId)
         newSocket.emit('join', { userId })
         hasJoinedRef.current = true
       }
     })
 
-    // Lắng nghe sự kiện ngắt kết nối
     newSocket.on('disconnect', () => {
-      console.log('Disconnected from notification server')
-      setIsConnected(false)
-      hasJoinedRef.current = false // Reset join state khi disconnect
-    })
-
-    // Lắng nghe notification mới
-    newSocket.on('notification', (notification: Notification) => {
-      console.log('New notification received:', notification)
-      setNotifications(prev => [notification, ...prev])
-    })
-
-    // Lắng nghe message từ server
-    newSocket.on('message', (data: any) => {
-      console.log('Message from server:', data)
-    })
-
-    // Lắng nghe lỗi kết nối
-    newSocket.on('connect_error', (error) => {
-      console.error('Socket connection error:', error)
       setIsConnected(false)
       hasJoinedRef.current = false
     })
 
-    // Lắng nghe reconnection
+    newSocket.on('notification', (notification: Notification) => {
+      setNotifications(prev => {
+        const exists = prev.some(n => n.notificationId === notification.notificationId)
+        console.log('Received notification:', notification, 'Exists:', exists)
+        if (exists) return prev
+        return [notification, ...prev]
+      })
+    })
+
+    newSocket.on('connect_error', (error) => {
+      setIsConnected(false)
+      hasJoinedRef.current = false
+    })
+
     newSocket.on('reconnect', () => {
-      console.log('Reconnected to notification server')
       setIsConnected(true)
-      // Rejoin room sau khi reconnect
       if (!hasJoinedRef.current) {
-        console.log('Rejoining room after reconnect for user:', userId)
         newSocket.emit('join', { userId })
         hasJoinedRef.current = true
       }
@@ -118,23 +104,19 @@ export function SocketProvider({ children }: SocketProviderProps) {
 
     setSocket(newSocket)
 
-    // Cleanup khi component unmount hoặc userId thay đổi
     return () => {
-      console.log('Cleaning up socket connection')
-      hasJoinedRef.current = false // Reset join state
-      newSocket.removeAllListeners()
-      newSocket.close()
+      hasJoinedRef.current = false
+      if (newSocket) {
+        newSocket.removeAllListeners()
+        newSocket.disconnect()
+      }
     }
   }, [userId])
 
   const addNotification = (notification: Notification) => {
     setNotifications(prev => {
-      // Check if notification already exists
       const exists = prev.some(n => n.notificationId === notification.notificationId)
-      if (exists) {
-        console.log('Notification already exists, skipping:', notification.notificationId)
-        return prev
-      }
+      if (exists) return prev
       return [notification, ...prev]
     })
   }

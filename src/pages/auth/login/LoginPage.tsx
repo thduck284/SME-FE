@@ -3,7 +3,7 @@
 import type React from "react"
 import { useState } from "react"
 import { Input, Button } from "@/components/ui"
-import { Mail, Lock } from "lucide-react"
+import { Mail, Lock, Eye, EyeOff } from "lucide-react"
 import { Link, useNavigate } from "react-router-dom"
 import { useAuth } from '@/lib/hooks/useAuth'
 
@@ -16,6 +16,7 @@ export function LoginPage() {
     password: ""
   });
 
+  const [showPassword, setShowPassword] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
   const [loginAttempts, setLoginAttempts] = useState(0); 
 
@@ -23,6 +24,10 @@ export function LoginPage() {
     setFormData(prev => ({ ...prev, [field]: e.target.value }));
     if (error) clearError();
     if (successMessage) setSuccessMessage("");
+  };
+
+  const togglePasswordVisibility = () => {
+    setShowPassword(!showPassword);
   };
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -49,6 +54,13 @@ export function LoginPage() {
         }, 100);
       }
     }
+  }
+
+  // HÀM MỚI: Mở forgot password trong tab mới
+  const handleForgotPassword = (e: React.MouseEvent) => {
+    e.preventDefault();
+    // Mở tab mới với forgot password page
+    window.open('/forgot-password', '_blank');
   }
 
   return (
@@ -126,21 +138,37 @@ export function LoginPage() {
                 <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground w-[18px] h-[18px]" />
                 <Input
                   id="password"
-                  type="password"
+                  type={showPassword ? "text" : "password"}
                   placeholder="••••••••"
                   value={formData.password}
                   onChange={handleChange('password')}
-                  className="pl-11 h-11 text-base"
+                  className="pl-11 pr-11 h-11 text-base"
                   required
                 />
+                {/* CON MẮT HIỂN THỊ MẬT KHẨU */}
+                <button
+                  type="button"
+                  onClick={togglePasswordVisibility}
+                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  {showPassword ? (
+                    <EyeOff className="w-[18px] h-[18px]" />
+                  ) : (
+                    <Eye className="w-[18px] h-[18px]" />
+                  )}
+                </button>
               </div>
               <div className="flex justify-between items-center">
-                <Link
-                  to="/forgot-password"
-                  className="text-sm text-primary hover:underline underline-offset-4 transition-colors"
+                {/* SỬA LINK FORGOT PASSWORD - MỞ TAB MỚI */}
+                <a
+                  href="/forgot-password"
+                  onClick={handleForgotPassword}
+                  className="text-sm text-primary hover:underline underline-offset-4 transition-colors cursor-pointer"
+                  target="_blank"
+                  rel="noopener noreferrer"
                 >
                   Forgot Password?
-                </Link>
+                </a>
                 {loginAttempts > 1 && (
                   <span className="text-xs text-destructive">
                     {3 - loginAttempts > 0 
@@ -168,12 +196,15 @@ export function LoginPage() {
                 <p className="text-yellow-700 text-sm">
                   ⚠️ Your account has been temporarily locked due to multiple failed attempts. 
                   Please try again in 15 minutes or{' '}
-                  <Link
-                    to="/forgot-password"
-                    className="font-semibold underline underline-offset-2"
+                  <a
+                    href="/forgot-password"
+                    onClick={handleForgotPassword}
+                    className="font-semibold underline underline-offset-2 cursor-pointer"
+                    target="_blank"
+                    rel="noopener noreferrer"
                   >
                     reset your password
-                  </Link>.
+                  </a>.
                 </p>
               </div>
             )}

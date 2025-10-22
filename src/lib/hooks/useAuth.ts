@@ -108,6 +108,33 @@ export const useAuth = () => {
     }
   };
 
+  // THÊM FORGOT PASSWORD FUNCTION
+  const forgotPassword = async () => {
+    setLoading(true);
+    setError(null);
+    setSuccess(null);
+    try {
+      const response = await authService.forgotPassword();
+      setSuccess('Redirecting to password reset page...');
+      
+      // Redirect đến trang Keycloak sau 1 giây
+      setTimeout(() => {
+        window.location.href = response.resetUrl;
+      }, 1000);
+      
+      return { 
+        success: true, 
+        data: response,
+        redirectUrl: response.resetUrl 
+      };
+    } catch (err: any) {
+      setError(err?.message || 'Failed to initiate password reset');
+      return { success: false };
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const isAuthenticated = (): boolean => {
     const token = localStorage.getItem(ACCESS_TOKEN_KEY);
     const expires = localStorage.getItem(TOKEN_EXPIRES_KEY);
@@ -129,6 +156,7 @@ export const useAuth = () => {
     login,
     logout,
     assignRole,
+    forgotPassword, 
     isAuthenticated,
     getAccessToken,
     autoRefreshToken,

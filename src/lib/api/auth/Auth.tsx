@@ -4,6 +4,7 @@ import {
   TokenActionRequestDto,  
   AddRoleDto, 
   AuthResponseDto, 
+  ForgotPasswordResponseDto
 } from '@/lib/types/auth/Auth';
 import apiClient from '@/lib/services/ApiClient';
 
@@ -32,6 +33,11 @@ export const authService = {
 
   async getProfile(): Promise<any> {
     const response = await apiClient.get(`/auth/profile`);
+    return response.data;
+  },
+
+  async forgotPassword(): Promise<ForgotPasswordResponseDto> {
+    const response = await apiClient.get(`/auth/forgot-password`);
     return response.data;
   },
 };

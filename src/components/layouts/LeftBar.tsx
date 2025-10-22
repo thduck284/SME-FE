@@ -1,34 +1,191 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import React, { useState, useEffect, useCallback, useMemo } from "react"
 import { Home, Search, Bell, PlusSquare, User, UserPlus, LogOut } from "lucide-react"
 import { CreatePostModal } from "@/components/posts/CreatePostModal"
 import { SearchModal } from "@/components/search/SearchModal"
 import { NotificationModal } from "@/components/notifications"
-import { useNotifications } from "../../lib/hooks/useNotifications"
+import { useSocket } from "@/lib/context/SocketContext"
+import { useNotifications } from "@/lib/hooks/useNotifications"
+import { UserService } from "@/lib/api/users/UserService"
 import { Link } from "react-router-dom"
 import { getUserId } from "@/lib/utils/Jwt"
 
-export function LeftBar() {
+function LeftBarComponent() {
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isSearchModalOpen, setIsSearchModalOpen] = useState(false)
   const [isNotificationModalOpen, setIsNotificationModalOpen] = useState(false)
-  const { unreadCount, loadUnreadCount } = useNotifications()
+  
+  const {
+    notifications: restNotifications,
+    unreadCount: restUnreadCount,
+    isLoading: isLoadingRest,
+    pagination,
+    markAsRead,
+    markAllAsRead,
+    deleteNotification,
+    loadNotifications,
+    loadMoreNotifications,
+    loadUnreadCount
+  } = useNotifications()
+  
+  const { notifications: rawSocketNotifications } = useSocket()
+  
+  const [mergedNotifications, setMergedNotifications] = useState<any[]>([])
+  const [hasNewSocketNotification, setHasNewSocketNotification] = useState(false)
+  const [processedSocketNotifications, setProcessedSocketNotifications] = useState<Set<string>>(new Set())
+  
   const userId = getUserId()
+  
+  const handleSocketNotificationRead = useCallback((notification: any) => {
+    const socketKey = `${notification.entityId}-${notification.eventType}-${notification.fromUserId}`
+    
+    setProcessedSocketNotifications(prev => {
+      const newSet = new Set(prev)
+      newSet.add(socketKey)
+      return newSet
+    })
+  }, [])
 
-  // Load unread count khi component mount
-  useEffect(() => {
-    console.log('LeftBar: Loading unread count...')
+  const handleMarkAllAsRead = useCallback(async () => {
+    await markAllAsRead()
     loadUnreadCount()
-  }, [loadUnreadCount])
+    setHasNewSocketNotification(false)
+    
+    const allSocketKeys = rawSocketNotifications.map(notif => 
+      `${notif.entityId}-${notif.eventType}-${notif.fromUserId}`
+    )
+    setProcessedSocketNotifications(new Set(allSocketKeys))
+  }, [markAllAsRead, loadUnreadCount, rawSocketNotifications])
 
-  console.log('LeftBar: unreadCount =', unreadCount)
+  const handleNotificationRead = useCallback(async (notificationId: string, createdAt: string | Date) => {
+    await markAsRead(notificationId, createdAt)
+    loadUnreadCount()
+  }, [markAsRead, loadUnreadCount])
 
-  const handleLogout = () => {
+  const handleDeleteNotification = useCallback(async (notificationId: string) => {
+    await deleteNotification(notificationId)
+    loadUnreadCount()
+  }, [deleteNotification, loadUnreadCount])
+
+  const handleLoadMoreNotifications = useCallback(async (currentNotifications: any[]) => {
+    try {
+      const result = await loadMoreNotifications(currentNotifications, currentNotifications.length == 0 ? 10 : currentNotifications.length + 10)
+      
+      return {
+        notifications: result.notifications || [],
+        hasMore: result.hasMore || false
+      }
+    } catch (error) {
+      console.error('Error loading more notifications:', error)
+      return {
+        notifications: [],
+        hasMore: false
+      }
+    }
+  }, [loadMoreNotifications])
+
+  const totalUnreadCount = useMemo(() => {
+    const unprocessedSocketNotifications = rawSocketNotifications.filter(socketNotif => {
+      const socketKey = `${socketNotif.entityId}-${socketNotif.eventType}-${socketNotif.fromUserId}`
+      return !processedSocketNotifications.has(socketKey)
+    })
+    
+    const socketUnreadCount = unprocessedSocketNotifications.length
+    return restUnreadCount + socketUnreadCount
+  }, [restUnreadCount, rawSocketNotifications, processedSocketNotifications])
+
+  // 🚨 SỬA: Memoize merged notifications
+  const enrichedNotifications = useMemo(async () => {
+    if (rawSocketNotifications.length === 0 && restNotifications.length === 0) {
+      return []
+    }
+
+    try {
+      const allUserIds = [...new Set([
+        ...restNotifications.map(n => n.fromUserId),
+        ...rawSocketNotifications.map(n => n.fromUserId)
+      ].filter(id => id && id.trim() !== ''))]
+
+      let userMap = new Map()
+      
+      if (allUserIds.length > 0) {
+        const userMetadata = await UserService.getMultipleUsersMetadata(allUserIds)
+        userMap = new Map(userMetadata.map(user => [user.userId, user]))
+      }
+
+      const enrichedRestNotifications = restNotifications.map(notification => ({
+        ...notification,
+        fromUser: userMap.get(notification.fromUserId) ? {
+          userId: userMap.get(notification.fromUserId).userId,
+          username: `${userMap.get(notification.fromUserId).firstName} ${userMap.get(notification.fromUserId).lastName}`.trim(),
+          displayName: `${userMap.get(notification.fromUserId).firstName} ${userMap.get(notification.fromUserId).lastName}`.trim(),
+          avatarUrl: userMap.get(notification.fromUserId).avtUrl
+        } : undefined,
+        isFromSocket: false
+      }))
+
+      const enrichedSocketNotifications = rawSocketNotifications.map(notification => ({
+        ...notification,
+        fromUser: userMap.get(notification.fromUserId) ? {
+          userId: userMap.get(notification.fromUserId).userId,
+          username: `${userMap.get(notification.fromUserId).firstName} ${userMap.get(notification.fromUserId).lastName}`.trim(),
+          displayName: `${userMap.get(notification.fromUserId).firstName} ${userMap.get(notification.fromUserId).lastName}`.trim(),
+          avatarUrl: userMap.get(notification.fromUserId).avtUrl
+        } : undefined,
+        readFlag: false,
+        isFromSocket: true
+      }))
+
+      return [...enrichedSocketNotifications, ...enrichedRestNotifications]
+    } catch (error) {
+      console.error('Error merging notifications:', error)
+      return [
+        ...rawSocketNotifications.map(n => ({ ...n, readFlag: false, isFromSocket: true })),
+        ...restNotifications.map(n => ({ ...n, isFromSocket: false }))
+      ]
+    }
+  }, [restNotifications, rawSocketNotifications])
+
+  // 🚨 SỬA: Effect để set merged notifications
+  useEffect(() => {
+    const setMerged = async () => {
+      const result = await enrichedNotifications
+      setMergedNotifications(result)
+    }
+    setMerged()
+  }, [enrichedNotifications])
+
+  useEffect(() => {
+    if (!userId) return
+    
+    loadUnreadCount()
+    loadNotifications()
+  }, [userId, loadUnreadCount, loadNotifications])
+
+  useEffect(() => {
+    if (rawSocketNotifications.length > 0) {
+      setHasNewSocketNotification(true)
+    }
+  }, [rawSocketNotifications])
+
+  const handleNotificationClick = useCallback(() => {
+    setHasNewSocketNotification(false)
+    setIsNotificationModalOpen(true)
+  }, [])
+
+  const handleLogout = useCallback(() => {
     localStorage.removeItem('accessToken')
     localStorage.removeItem('userId')
     window.location.href = '/login'
-  }
+  }, [])
+
+  // 🚨 SỬA: Memoize modal handlers
+  const handleCloseCreateModal = useCallback(() => setIsModalOpen(false), [])
+  const handleCloseSearchModal = useCallback(() => setIsSearchModalOpen(false), [])
+  const handleCloseNotificationModal = useCallback(() => setIsNotificationModalOpen(false), [])
+  const handleOpenCreateModal = useCallback(() => setIsModalOpen(true), [])
+  const handleOpenSearchModal = useCallback(() => setIsSearchModalOpen(true), [])
 
   return (
     <>
@@ -52,58 +209,33 @@ export function LeftBar() {
             </Link>
 
             <button
-              onClick={() => setIsSearchModalOpen(true)}
+              onClick={handleOpenSearchModal}
               className="flex items-center gap-4 px-4 py-3.5 text-gray-700 hover:text-orange-700 hover:bg-orange-50 rounded-xl transition-all duration-300 font-medium group w-full"
             >
               <Search className="w-6 h-6 group-hover:scale-110 transition-transform" />
               <span>Search</span>
             </button>
 
-            {/* Hidden: Explore, Reels, Messages */}
-            {/* 
-            <a
-              href="#"
-              className="flex items-center gap-4 px-4 py-3.5 text-gray-700 hover:text-orange-700 hover:bg-orange-50 rounded-xl transition-all duration-300 font-medium group"
-            >
-              <Compass className="w-6 h-6 group-hover:scale-110 transition-transform" />
-              <span>Explore</span>
-            </a>
-
-            <a
-              href="#"
-              className="flex items-center gap-4 px-4 py-3.5 text-gray-700 hover:text-orange-700 hover:bg-orange-50 rounded-xl transition-all duration-300 font-medium group"
-            >
-              <Film className="w-6 h-6 group-hover:scale-110 transition-transform" />
-              <span>Reels</span>
-            </a>
-
-            <a
-              href="#"
-              className="flex items-center gap-4 px-4 py-3.5 text-gray-700 hover:text-orange-700 hover:bg-orange-50 rounded-xl transition-all duration-300 font-medium group"
-            >
-              <MessageCircle className="w-6 h-6 group-hover:scale-110 transition-transform" />
-              <span>Messages</span>
-            </a>
-            */}
-
             <button
-              onClick={() => setIsNotificationModalOpen(true)}
+              onClick={handleNotificationClick}
               className="flex items-center gap-4 px-4 py-3.5 text-gray-700 hover:text-orange-700 hover:bg-orange-50 rounded-xl transition-all duration-300 font-medium group w-full relative"
             >
               <div className="relative">
                 <Bell className="w-6 h-6 group-hover:scale-110 transition-transform" />
-                {unreadCount > 0 && (
+                {totalUnreadCount > 0 && (
                   <span className="absolute -top-1 -right-1 bg-white text-red-500 text-xs rounded-full min-w-[18px] h-[18px] flex items-center justify-center font-bold shadow-lg border-2 border-red-500">
-                    {unreadCount > 99 ? '99+' : unreadCount}
+                    {totalUnreadCount > 99 ? '99+' : totalUnreadCount}
                   </span>
+                )}
+                {hasNewSocketNotification && totalUnreadCount > 0 && (
+                  <span className="absolute -top-0.5 -right-0.5 w-3 h-3 bg-green-500 rounded-full border-2 border-white animate-pulse"></span>
                 )}
               </div>
               <span>Notifications</span>
             </button>
 
-            {/* Create Button */}
             <button
-              onClick={() => setIsModalOpen(true)}
+              onClick={handleOpenCreateModal}
               className="flex items-center gap-4 px-4 py-3.5 text-gray-700 hover:text-orange-700 hover:bg-orange-50 rounded-xl transition-all duration-300 font-medium group w-full"
             >
               <PlusSquare className="w-6 h-6 group-hover:scale-110 transition-transform" />
@@ -126,7 +258,6 @@ export function LeftBar() {
               <span>Gợi ý kết bạn</span>
             </Link>
 
-            {/* Logout Button */}
             <button
               onClick={handleLogout}
               className="flex items-center gap-4 px-4 py-3.5 text-gray-700 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all duration-300 font-medium group w-full"
@@ -138,24 +269,34 @@ export function LeftBar() {
         </div>
       </aside>
 
-      {/* Create Post Modal */}
       <CreatePostModal
         isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
+        onClose={handleCloseCreateModal}
         onPostCreated={() => console.log("Post created")}
       />
 
-      {/* Search Modal */}
       <SearchModal
         isOpen={isSearchModalOpen}
-        onClose={() => setIsSearchModalOpen(false)}
+        onClose={handleCloseSearchModal}
       />
 
-      {/* Notification Modal */}
       <NotificationModal
         isOpen={isNotificationModalOpen}
-        onClose={() => setIsNotificationModalOpen(false)}
+        onClose={handleCloseNotificationModal}
+        restNotifications={mergedNotifications}
+        socketNotifications={rawSocketNotifications}
+        isLoading={isLoadingRest}
+        pagination={pagination}
+        onNotificationRead={handleNotificationRead}
+        onMarkAllAsRead={handleMarkAllAsRead}
+        onDeleteNotification={handleDeleteNotification}
+        onLoadMore={handleLoadMoreNotifications}
+        onSocketNotificationRead={handleSocketNotificationRead}
+        processedSocketNotifications={processedSocketNotifications}
       />
     </>
   )
 }
+
+// 🚨 QUAN TRỌNG: Wrap với React.memo
+export const LeftBar = React.memo(LeftBarComponent)
