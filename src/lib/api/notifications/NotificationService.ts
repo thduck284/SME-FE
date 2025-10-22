@@ -81,7 +81,7 @@ export class NotificationService {
 
   static async markAllAsRead(): Promise<void> {
     try {
-      await apiClient.patch(`${this.baseUrl}/mark-all-read`)
+      await apiClient.put(`${this.baseUrl}/read-all`)
     } catch (error) {
       console.error('Error marking all notifications as read:', error)
       throw error
