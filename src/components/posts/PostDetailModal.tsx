@@ -194,25 +194,27 @@ export function PostDetailModal({
 
     if (medias.length === 1) {
       return (
-        <div className="w-full bg-black">
+        <div className="w-full bg-gradient-to-br from-gray-100 to-gray-50 dark:from-gray-800 dark:to-gray-900 rounded-xl overflow-hidden">
           <div className="relative group cursor-pointer w-full max-h-[500px] flex items-center justify-center overflow-hidden"
             onClick={() => onOpenImage(medias[0].mediaUrl, post)}>
-            <img src={medias[0].mediaUrl} alt="Post media" className="w-full h-auto object-contain transition-transform duration-300 group-hover:scale-105" />
+            <img src={medias[0].mediaUrl} alt="Post media" className="w-full h-auto object-contain transition-all duration-500 group-hover:scale-105" />
+            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/5 transition-all duration-300"></div>
           </div>
         </div>
       )
     }
 
     return (
-      <div className={`grid gap-0.5 ${medias.length === 2 ? 'grid-cols-2' : 'grid-cols-2'}`}>
+      <div className={`grid gap-1 rounded-xl overflow-hidden ${medias.length === 2 ? 'grid-cols-2' : 'grid-cols-2'}`}>
         {displayMedias.map((media, idx) => (
-          <div key={media.mediaId} className={`relative group cursor-pointer bg-gray-100 dark:bg-gray-800 overflow-hidden ${
+          <div key={media.mediaId} className={`relative group cursor-pointer bg-gradient-to-br from-gray-100 to-gray-50 dark:from-gray-800 dark:to-gray-900 overflow-hidden ${
             medias.length === 3 && idx === 0 ? "row-span-2 col-span-2" : "aspect-square"}`}
             onClick={() => onOpenImage(media.mediaUrl, post)}>
-            <img src={media.mediaUrl} alt={`Media ${idx + 1}`} className="w-full h-full object-contain transition-all duration-300 group-hover:brightness-95 bg-gray-100" />
+            <img src={media.mediaUrl} alt={`Media ${idx + 1}`} className="w-full h-full object-contain transition-all duration-500 group-hover:scale-105 group-hover:brightness-95" />
+            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/5 transition-all duration-300"></div>
             {idx === 3 && remainingCount > 0 && (
-              <div className="absolute inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center">
-                <span className="text-white text-4xl font-bold">+{remainingCount}</span>
+              <div className="absolute inset-0 bg-gradient-to-br from-black/80 to-black/60 backdrop-blur-md flex items-center justify-center">
+                <span className="text-white text-5xl font-bold drop-shadow-lg">+{remainingCount}</span>
               </div>
             )}
           </div>
@@ -228,20 +230,20 @@ export function PostDetailModal({
         size="sm" 
         disabled={loading || isReacting}
         onClick={currentReaction ? handleRemoveReaction : undefined}
-        className={`flex items-center justify-center gap-1.5 rounded-md h-9 w-full transition-all ${
+        className={`flex items-center justify-center gap-2 rounded-xl h-10 w-full transition-all duration-300 font-semibold ${
           currentReaction 
-            ? `${reactionIcons[currentReaction].color} ${reactionIcons[currentReaction].bg} ${reactionIcons[currentReaction].darkBg} hover:opacity-80`
-            : 'bg-white text-gray-700 border border-gray-200 hover:bg-gray-50 dark:bg-gray-900 dark:text-gray-300 dark:border-gray-700 dark:hover:bg-gray-800'}`}>
+            ? `${reactionIcons[currentReaction].color} ${reactionIcons[currentReaction].bg} ${reactionIcons[currentReaction].darkBg} hover:opacity-80 shadow-sm`
+            : 'bg-white text-gray-700 border border-gray-200 hover:bg-gray-50 hover:border-gray-300 dark:bg-gray-900 dark:text-gray-300 dark:border-gray-700 dark:hover:bg-gray-800'}`}>
         {isReacting ? (
-          <div className="animate-spin h-4 w-4 border-2 border-current border-t-transparent rounded-full" />
+          <div className="animate-spin h-5 w-5 border-2 border-current border-t-transparent rounded-full" />
         ) : (
           <>
             {currentReaction ? (
-              <span className={`text-lg ${reactionIcons[currentReaction].color}`}>{reactionIcons[currentReaction].icon}</span>
+              <span className={`text-xl ${reactionIcons[currentReaction].color}`}>{reactionIcons[currentReaction].icon}</span>
             ) : (
-              <ThumbsUp className="h-[18px] w-[18px] text-gray-600 dark:text-gray-400" />
+              <ThumbsUp className="h-5 w-5 text-gray-600 dark:text-gray-400" />
             )}
-            <span className={`text-[15px] font-semibold ${currentReaction ? reactionIcons[currentReaction].color : ''}`}>
+            <span className={`text-sm ${currentReaction ? reactionIcons[currentReaction].color : ''}`}>
               {currentReaction ? `Remove ${reactionIcons[currentReaction].label}` : "Like"}
             </span>
           </>
@@ -249,19 +251,19 @@ export function PostDetailModal({
       </Button>
 
       {showReactionPicker && !isReacting && (
-        <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-full shadow-xl px-2 py-2 flex items-center gap-1 z-50">
+        <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl shadow-2xl px-3 py-3 flex items-center gap-1.5 z-50 animate-in zoom-in-95 duration-200">
           {Object.entries(reactionIcons).map(([type, { label, icon, color }]) => (
             <button 
               key={type} 
               title={currentReaction === type ? `Remove ${label}` : label} 
               onClick={() => handleReaction(type as ReactionType)}
-              className={`relative p-1 hover:scale-150 transition-all duration-200 text-2xl rounded-full ${
+              className={`relative p-2 hover:scale-150 transition-all duration-300 text-3xl rounded-xl ${
                 currentReaction === type 
-                  ? 'scale-125 ring-2 ring-red-300 dark:ring-red-700 bg-red-50 dark:bg-red-900/20' 
+                  ? 'scale-125 ring-2 ring-red-400 dark:ring-red-600 bg-red-50 dark:bg-red-900/30' 
                   : 'hover:bg-gray-100 dark:hover:bg-gray-700'
               }`}
             >
-              <span className={`block transform hover:-translate-y-1 transition-transform ${color}`}>{icon}</span>
+              <span className={`block transform hover:-translate-y-2 transition-transform duration-300 ${color}`}>{icon}</span>
             </button>
           ))}
         </div>
@@ -271,9 +273,9 @@ export function PostDetailModal({
 
   const ActionBtn = ({ icon: Icon, label, onClick }: { icon: any; label: string; onClick?: () => void }) => (
     <Button variant="ghost" size="sm" onClick={onClick}
-      className="flex items-center justify-center gap-1.5 text-gray-600 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 rounded-md h-9 transition-all hover:bg-gray-100 dark:hover:bg-gray-800 flex-1">
-      <Icon className="h-[18px] w-[18px]" />
-      <span className="text-[15px] font-semibold">{label}</span>
+      className="flex items-center justify-center gap-2 text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 rounded-xl h-10 transition-all duration-300 hover:bg-gray-100 dark:hover:bg-gray-800 flex-1 font-semibold border border-transparent hover:border-gray-200 dark:hover:border-gray-700">
+      <Icon className="h-5 w-5" />
+      <span className="text-sm">{label}</span>
     </Button>
   )
 
@@ -287,78 +289,86 @@ export function PostDetailModal({
     <>
       {/* Backdrop với z-index cao */}
       <div 
-        className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[10000] flex items-center justify-center p-4"
+        className="fixed inset-0 bg-black/60 backdrop-blur-md z-[10000] flex items-center justify-center p-4 animate-in fade-in duration-200"
         onClick={onClose}
       >
         {/* Modal Content - Full height, giữ nguyên width */}
         <div 
-          className="bg-white dark:bg-gray-900 rounded-lg shadow-2xl max-w-4xl w-full h-full max-h-[95vh] overflow-hidden flex flex-col"
+          className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl max-w-4xl w-full h-full max-h-[95vh] overflow-hidden flex flex-col animate-in zoom-in-95 duration-200"
           onClick={(e) => e.stopPropagation()}
         >
-          {/* Header */}
-          <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700 shrink-0">
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Post Details</h2>
+          {/* Header - Cải thiện với gradient và icon đẹp hơn */}
+          <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200/80 dark:border-gray-700/80 bg-gradient-to-r from-gray-50/50 to-transparent dark:from-gray-800/50 shrink-0">
+            <div className="flex items-center gap-3">
+              <div className="w-1 h-6 bg-gradient-to-b from-blue-500 to-purple-500 rounded-full"></div>
+              <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100">Post Details</h2>
+            </div>
             <Button
               variant="ghost"
               size="sm"
               onClick={onClose}
-              className="h-8 w-8 p-0 hover:bg-gray-100 dark:hover:bg-gray-800"
+              className="h-9 w-9 p-0 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 hover:rotate-90 transition-all duration-300"
             >
-              <X className="h-4 w-4" />
+              <X className="h-5 w-5" />
             </Button>
           </div>
 
           {/* Scrollable Content - Chiếm toàn bộ không gian còn lại */}
-          <div className="flex-1 overflow-y-auto">
+          <div className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-gray-700 scrollbar-track-transparent">
             <Card className="rounded-none shadow-none border-0 bg-transparent">
-              {/* Header với thông tin người share (nếu là bài share) */}
+              {/* Header với thông tin người share (nếu là bài share) - Cải thiện */}
               {isSharePost && (
-                <div className="px-4 pt-3 pb-0">
-                  <div className="flex items-center gap-2 text-[13px] text-gray-500 dark:text-gray-400">
-                    <Repeat2 className="h-3.5 w-3.5" />
-                    <span className="font-normal">
+                <div className="px-6 pt-4 pb-2">
+                  <div className="flex items-center gap-2.5 text-sm text-gray-600 dark:text-gray-400 bg-blue-50/50 dark:bg-blue-900/10 px-3 py-2 rounded-lg border border-blue-100 dark:border-blue-900/30">
+                    <div className="p-1 bg-blue-100 dark:bg-blue-900/30 rounded-full">
+                      <Repeat2 className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                    </div>
+                    <span className="font-medium">
                       {loadingAuthor ? (
-                        <div className="h-4 w-32 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+                        <div className="h-4 w-36 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
                       ) : authorMetadata ? (
-                        `${authorMetadata.firstName} ${authorMetadata.lastName} shared a post`
+                        <span className="text-gray-800 dark:text-gray-200">{authorMetadata.firstName} {authorMetadata.lastName}</span>
                       ) : (
-                        "Unknown User shared a post"
+                        "Unknown User"
                       )}
+                      <span className="text-gray-500 dark:text-gray-400 ml-1">shared this post</span>
                     </span>
                   </div>
                 </div>
               )}
 
-              {/* Thông tin tác giả */}
-              <div className="flex items-start justify-between px-4 pt-3 pb-2">
+              {/* Thông tin tác giả - Cải thiện */}
+              <div className="flex items-start justify-between px-6 pt-4 pb-3">
                 <div className="flex items-start gap-3 flex-1">
                   <div 
-                    className="cursor-pointer hover:opacity-90 transition-opacity ring-2 ring-transparent hover:ring-blue-200 dark:hover:ring-blue-800 rounded-full"
+                    className="cursor-pointer hover:opacity-90 transition-all duration-300 ring-2 ring-gray-200 dark:ring-gray-700 hover:ring-blue-400 dark:hover:ring-blue-600 rounded-full hover:scale-105"
                     onClick={() => navigate(`/profile/${post.authorId}`)}
                   >
                     <Avatar 
                       src={authorMetadata?.avtUrl || "/assets/images/default.png"} 
                       alt={authorMetadata ? `${authorMetadata.firstName} ${authorMetadata.lastName}` : "User avatar"} 
-                      className="h-10 w-10" 
+                      className="h-12 w-12" 
                     />
                   </div>
                   <div className="flex-1 min-w-0">
                     <h4 
-                      className="font-semibold text-[15px] text-gray-900 dark:text-gray-100 hover:underline cursor-pointer"
+                      className="font-bold text-base text-gray-900 dark:text-gray-100 hover:text-blue-600 dark:hover:text-blue-400 cursor-pointer transition-colors"
                       onClick={() => navigate(`/profile/${post.authorId}`)}
                     >
                       {loadingAuthor ? (
-                        <div className="h-4 w-24 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+                        <div className="h-5 w-28 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
                       ) : authorMetadata ? (
                         `${authorMetadata.firstName} ${authorMetadata.lastName}`.trim()
                       ) : (
                         "Unknown User"
                       )}
                     </h4>
-                    <div className="flex items-center gap-1 text-[13px] text-gray-500 dark:text-gray-400">
-                      <span className="hover:underline cursor-pointer">{formatTimeAgo(post.createdAt)}</span>
-                      <span>·</span>
-                      {React.cloneElement(getVisibilityIcon(post.visibility as CreateSharePostDto["visibility"]), { className: "h-4 w-4 text-muted-foreground" })}
+                    <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400 mt-0.5">
+                      <span className="hover:underline cursor-pointer font-medium">{formatTimeAgo(post.createdAt)}</span>
+                      <span className="text-gray-400 dark:text-gray-600">·</span>
+                      <div className="flex items-center gap-1">
+                        {React.cloneElement(getVisibilityIcon(post.visibility as CreateSharePostDto["visibility"]), { className: "h-4 w-4 text-gray-400 dark:text-gray-500" })}
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -378,63 +388,63 @@ export function PostDetailModal({
 
               {/* Nội dung của người share (nếu có) */}
               {isSharePost && post.content && (
-                <div className="px-4 pt-0.5 pb-0">
+                <div className="px-6 pt-1 pb-3">
                   <PostContentWithMentions content={post.content} mentions={post.mentions} onMentionClick={navigate} />
                 </div>
               )}
 
               {/* Media của người share (nếu có) */}
               {isSharePost && post.medias && post.medias.length > 0 && (
-                <div className={post.content ? 'mt-3' : ''}><MediaGrid medias={post.medias} /></div>
+                <div className={`px-6 ${post.content ? 'pb-3' : 'pb-3'}`}><MediaGrid medias={post.medias} /></div>
               )}
 
               {/* TRƯỜNG HỢP 1: Bài viết ORIGINAL */}
               {!isSharePost && (
                 <>
                   {post.content && (
-                    <div className="px-4 pt-0.5 pb-0">
+                    <div className="px-6 pt-1 pb-3">
                       <PostContentWithMentions content={post.content} mentions={post.mentions} onMentionClick={navigate} />
                     </div>
                   )}
                   {post.medias && post.medias.length > 0 && (
-                    <div className={post.content ? 'mt-3' : ''}><MediaGrid medias={post.medias} /></div>
+                    <div className={`px-6 ${post.content ? 'pb-3' : 'pb-3'}`}><MediaGrid medias={post.medias} /></div>
                   )}
                 </>
               )}
 
               {/* TRƯỜNG HỢP 2: Bài viết SHARE có rootPost */}
               {isSharePost && hasRootPost && post.rootPost && (
-                <div className="mx-4 my-3 border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden bg-gray-50 dark:bg-gray-800/50 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors cursor-pointer">
-                  <div className="flex items-center gap-2.5 px-3 py-2.5 border-b border-gray-200 dark:border-gray-700">
+                <div className="mx-6 my-3 border-2 border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden bg-gradient-to-br from-gray-50 to-white dark:from-gray-800/50 dark:to-gray-800 hover:border-gray-300 dark:hover:border-gray-600 transition-all duration-300 cursor-pointer shadow-sm hover:shadow-md">
+                  <div className="flex items-center gap-3 px-4 py-3 border-b border-gray-200 dark:border-gray-700 bg-white/50 dark:bg-gray-900/30">
                     <div 
-                      className="cursor-pointer hover:opacity-90 transition-opacity ring-2 ring-transparent hover:ring-blue-200 dark:hover:ring-blue-800 rounded-full"
+                      className="cursor-pointer hover:opacity-90 transition-all duration-300 ring-2 ring-gray-200 dark:ring-gray-700 hover:ring-blue-400 dark:hover:ring-blue-600 rounded-full hover:scale-105"
                       onClick={() => navigate(`/profile/${post.rootPost?.authorId}`)}
                     >
                       <Avatar 
                         src={rootAuthorMetadata?.avtUrl || "/assets/images/default.png"} 
                         alt={rootAuthorMetadata ? `${rootAuthorMetadata.firstName} ${rootAuthorMetadata.lastName}` : "Original author"} 
-                        className="h-8 w-8" 
+                        className="h-9 w-9" 
                       />
                     </div>
                     <div className="flex-1 min-w-0">
                       <p 
-                        className="font-semibold text-[15px] text-gray-900 dark:text-gray-100 hover:underline cursor-pointer"
+                        className="font-bold text-sm text-gray-900 dark:text-gray-100 hover:text-blue-600 dark:hover:text-blue-400 cursor-pointer transition-colors"
                         onClick={() => navigate(`/profile/${post.rootPost?.authorId}`)}
                       >
                         {loadingRootAuthor ? (
-                          <div className="h-4 w-20 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+                          <div className="h-4 w-24 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
                         ) : rootAuthorMetadata ? (
                           `${rootAuthorMetadata.firstName} ${rootAuthorMetadata.lastName}`.trim()
                         ) : (
                           "Original Author"
                         )}
                       </p>
-                      <p className="text-[13px] text-gray-500 dark:text-gray-400">{formatTimeAgo(post.rootPost.createdAt)}</p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 font-medium">{formatTimeAgo(post.rootPost.createdAt)}</p>
                     </div>
                   </div>
                   {post.rootPost.content && (
-                    <div className="px-3 py-2.5">
-                      <p className="text-[15px] text-gray-900 dark:text-gray-100 leading-[1.3333] line-clamp-4">{post.rootPost.content}</p>
+                    <div className="px-4 py-3 bg-white/30 dark:bg-gray-900/20">
+                      <p className="text-sm text-gray-900 dark:text-gray-100 leading-relaxed line-clamp-4">{post.rootPost.content}</p>
                     </div>
                   )}
                   {post.rootPost.medias && post.rootPost.medias.length > 0 && (
@@ -443,10 +453,10 @@ export function PostDetailModal({
                         {post.rootPost.medias.slice(0, 4).map((media, idx) => (
                           <div key={media.mediaId} className="relative aspect-square bg-gray-200 dark:bg-gray-700 group cursor-pointer"
                             onClick={(e) => { e.stopPropagation(); onOpenImage(media.mediaUrl, post) }}>
-                            <img src={media.mediaUrl} alt={`Root media ${idx + 1}`} className="w-full h-full object-cover group-hover:brightness-95 transition-all" />
+                            <img src={media.mediaUrl} alt={`Root media ${idx + 1}`} className="w-full h-full object-cover group-hover:scale-105 group-hover:brightness-95 transition-all duration-300" />
                             {idx === 3 && post.rootPost!.medias && post.rootPost!.medias.length > 4 && (
-                              <div className="absolute inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center">
-                                <span className="text-white text-2xl font-bold">+{post.rootPost!.medias.length - 4}</span>
+                              <div className="absolute inset-0 bg-gradient-to-br from-black/80 to-black/60 backdrop-blur-md flex items-center justify-center">
+                                <span className="text-white text-3xl font-bold drop-shadow-lg">+{post.rootPost!.medias.length - 4}</span>
                               </div>
                             )}
                           </div>
@@ -459,19 +469,19 @@ export function PostDetailModal({
 
               {/* TRƯỜNG HỢP 3: Bài viết SHARE KHÔNG có rootPost (bị xóa) */}
               {isSharePost && !hasRootPost && (
-                <div className="mx-4 my-3 border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden bg-gray-50 dark:bg-gray-800/50">
-                  <div className="px-4 py-6">
-                    <div className="flex items-start gap-3">
-                      <div className="flex-shrink-0 mt-0.5">
-                        <div className="w-10 h-10 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center">
-                          <Lock className="w-5 h-5 text-gray-400 dark:text-gray-500" />
+                <div className="mx-6 my-3 border-2 border-dashed border-gray-300 dark:border-gray-700 rounded-xl overflow-hidden bg-gradient-to-br from-gray-50 to-white dark:from-gray-800/30 dark:to-gray-800/50">
+                  <div className="px-5 py-8">
+                    <div className="flex items-start gap-4">
+                      <div className="flex-shrink-0 mt-1">
+                        <div className="w-12 h-12 rounded-full bg-gradient-to-br from-gray-200 to-gray-100 dark:from-gray-700 dark:to-gray-800 flex items-center justify-center shadow-inner">
+                          <Lock className="w-6 h-6 text-gray-400 dark:text-gray-500" />
                         </div>
                       </div>
                       <div className="flex-1">
-                        <p className="font-semibold text-[15px] text-gray-900 dark:text-gray-100 mb-1">
+                        <p className="font-bold text-base text-gray-900 dark:text-gray-100 mb-2">
                           This content is currently unavailable
                         </p>
-                        <p className="text-[13px] text-gray-500 dark:text-gray-400 leading-relaxed">
+                        <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed">
                           This error is usually because the owner only shared the content with a small group, changed who can see it, or deleted the content.
                         </p>
                       </div>
@@ -482,30 +492,30 @@ export function PostDetailModal({
 
               {/* Reactions summary */}
               {totalReactions > 0 && (
-                <div className="px-4 py-2 flex items-center justify-between text-[15px] text-gray-500 dark:text-gray-400 border-t border-gray-200 dark:border-gray-700 mt-3">
-                  <div className="flex items-center gap-1">
+                <div className="px-6 py-3 flex items-center justify-between text-sm text-gray-500 dark:text-gray-400 border-t border-gray-200 dark:border-gray-700 mt-3 bg-gray-50/50 dark:bg-gray-800/30">
+                  <div className="flex items-center gap-2">
                     {loading ? <span className="text-sm">Loading...</span> : (
                       <div 
-                        className="flex items-center gap-1.5 hover:underline cursor-pointer"
+                        className="flex items-center gap-2 hover:underline cursor-pointer group"
                         onClick={() => setShowReactionDetails(true)}
                       >
-                        <div className="flex items-center -space-x-1">
+                        <div className="flex items-center -space-x-1.5">
                           {topReactions.map(([type], idx) => (
                             <div key={type} style={{ zIndex: topReactions.length - idx }}
-                              className="w-[18px] h-[18px] rounded-full bg-white dark:bg-gray-900 border border-white dark:border-gray-900 flex items-center justify-center">
-                              {(() => { const cfg = reactionIcons[(type.toUpperCase() as ReactionType)]; return cfg ? <span className="text-sm">{cfg.icon}</span> : null })()}
+                              className="w-6 h-6 rounded-full bg-white dark:bg-gray-900 border-2 border-white dark:border-gray-900 flex items-center justify-center group-hover:scale-110 transition-transform duration-200">
+                              {(() => { const cfg = reactionIcons[(type.toUpperCase() as ReactionType)]; return cfg ? <span className="text-base">{cfg.icon}</span> : null })()}
                             </div>
                           ))}
                         </div>
-                        <span className="text-[15px]">{totalReactions}</span>
+                        <span className="text-base font-semibold text-gray-700 dark:text-gray-300">{totalReactions}</span>
                       </div>
                     )}
                   </div>
-                  <div className="flex items-center gap-3">
-                    <span className="hover:underline cursor-pointer">
+                  <div className="flex items-center gap-4">
+                    <span className="hover:underline cursor-pointer font-medium text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 transition-colors">
                       {localPostStats ? `${localPostStats.commentCount || 0} comments` : '... comments'}
                     </span>
-                    <span className="hover:underline cursor-pointer">
+                    <span className="hover:underline cursor-pointer font-medium text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 transition-colors">
                       {localPostStats ? `${localPostStats.shareCount || 0} shares` : '... shares'}
                     </span>
                   </div>
@@ -513,8 +523,8 @@ export function PostDetailModal({
               )}
 
               {/* Action buttons */}
-              <div className="px-2 py-1 border-t border-gray-200 dark:border-gray-700">
-                <div className="flex items-center gap-1">
+              <div className="px-4 py-3 border-t border-gray-200 dark:border-gray-700 bg-gradient-to-b from-transparent to-gray-50/50 dark:to-gray-800/30">
+                <div className="flex items-center gap-2">
                   <ReactionButton />
                   <ActionBtn 
                     icon={MessageCircle} 
@@ -531,7 +541,7 @@ export function PostDetailModal({
             </Card>
 
             {/* Comments Section */}
-            <div className="border-t border-gray-200 dark:border-gray-700">
+            <div className="border-t-4 border-gray-100 dark:border-gray-800">
               <CommentsSection 
                 key={post.postId} // Force re-render when post changes
                 postId={post.postId} 
@@ -625,7 +635,7 @@ function PostContentWithMentions({ content, mentions, onMentionClick }: { conten
   // Render content with highlighted mentions
   const renderContent = () => {
     if (!mentions || mentions.length === 0) {
-      return <span className="text-[15px] text-gray-900 dark:text-gray-100 leading-[1.3333] whitespace-pre-wrap break-words">{content}</span>
+      return <span className="text-base text-gray-900 dark:text-gray-100 leading-relaxed whitespace-pre-wrap break-words">{content}</span>
     }
 
     // Sort mentions by startIndex to process them in order
@@ -679,13 +689,13 @@ function PostContentWithMentions({ content, mentions, onMentionClick }: { conten
     }
 
     return (
-      <span className="text-[15px] text-gray-900 dark:text-gray-100 leading-[1.3333] whitespace-pre-wrap break-words">
+      <span className="text-base text-gray-900 dark:text-gray-100 leading-relaxed whitespace-pre-wrap break-words">
         {parts.map((part, index) => {
           if (part.type === 'mention') {
             return (
               <span
                 key={index}
-                className="text-blue-600 dark:text-blue-400 font-medium hover:underline cursor-pointer"
+                className="text-blue-600 dark:text-blue-400 font-semibold hover:underline cursor-pointer bg-blue-50 dark:bg-blue-900/20 px-1 py-0.5 rounded transition-all duration-200 hover:bg-blue-100 dark:hover:bg-blue-900/30"
                 title={`@${part.userId}`}
                 onClick={() => {
                   if (onMentionClick && part.userId) {
