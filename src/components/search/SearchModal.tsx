@@ -106,7 +106,7 @@ export function SearchModal({ isOpen, onClose }: SearchModalProps) {
                 >
                   {/* Avatar và User Info */}
                   <Link
-                    to={`/profile-other/${user.userId}`}
+                    to={`/profile/${user.userId}`}
                     onClick={onClose}
                     className="flex items-center gap-4 flex-1 min-w-0"
                   >

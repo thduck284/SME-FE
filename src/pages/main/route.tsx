@@ -19,8 +19,8 @@ export const feedRoutes: RouteObject[] = [
     element: <ProfilePage />
   },
   {
-    path: "/profile-other/:userId", 
-    element: <ProfileOtherPage />
+    path: "/profile/:userId", 
+    element: <ProfilePage />
   },
   {
     path: "/profile/edit", 
