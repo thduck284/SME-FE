@@ -92,7 +92,7 @@ export const userApi = {
 
   updateUser: async (userId: string, updateUserDto: UpdateUserRequest): Promise<UpdateUserResponse> => {
     try {
-      const response = await apiClient.post(`/users/edit`, updateUserDto)
+      const response = await apiClient.patch(`/users/edit`, updateUserDto)
       
       if (response.data.data) {
         response.data.data = transformUserData(response.data.data)
