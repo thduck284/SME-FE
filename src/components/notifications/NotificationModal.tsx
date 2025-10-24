@@ -5,6 +5,9 @@ import { Avatar } from '@/components/ui/Avatar'
 import Button from '@/components/ui/Button'
 import { PostDetailModal } from '@/components/posts/PostDetailModal'
 import { getBatchPosts } from '@/lib/api/posts/GetBatchPosts'
+import { usePostReactions } from '@/lib/hooks/usePostReaction'
+import { usePostStats } from '@/lib/hooks/usePostStats'
+import { getUserId } from '@/lib/utils/Jwt'
 import type { PostFullDto } from '@/lib/types/posts/PostFullDto'
 
 interface Notification {
@@ -113,6 +116,12 @@ export function NotificationModal({
   const [isPostDetailOpen, setIsPostDetailOpen] = useState(false)
   const [selectedPost, setSelectedPost] = useState<PostFullDto | null>(null)
   const [isLoadingPost, setIsLoadingPost] = useState(false)
+  
+  // Hooks cho post reactions và stats
+  const { reaction, loading: reactionLoading, react, removeReaction } = usePostReactions(selectedPostId || '')
+  const { fetchPostStats } = usePostStats()
+  const [postStats, setPostStats] = useState<any>(null)
+  const [isOwnPost, setIsOwnPost] = useState(false)
 
   useEffect(() => {
     setLocalProcessedSocketNotifications(processedSocketNotifications)
@@ -258,8 +267,21 @@ export function NotificationModal({
     try {
       const posts = await getBatchPosts([postId])
       if (posts && posts.length > 0) {
-        setSelectedPost(posts[0])
+        const post = posts[0]
+        setSelectedPost(post)
         setIsPostDetailOpen(true)
+        
+        // Check if current user owns the post
+        const currentUserId = getUserId()
+        setIsOwnPost(currentUserId === post.authorId)
+        
+        // Fetch post stats
+        try {
+          const stats = await fetchPostStats(postId)
+          setPostStats(stats)
+        } catch (error) {
+          console.error('Failed to fetch post stats:', error)
+        }
       } else {
         console.error('Post not found')
       }
@@ -274,6 +296,55 @@ export function NotificationModal({
     setIsPostDetailOpen(false)
     setSelectedPost(null)
     setSelectedPostId(null)
+    setPostStats(null)
+  }
+
+  // Handler cho reaction
+  const handleReact = async (reactionType: string) => {
+    if (!selectedPostId) return
+    try {
+      const currentReaction = reaction?.userReaction
+      if (currentReaction === reactionType) {
+        await removeReaction()
+      } else {
+        await react(reactionType)
+      }
+    } catch (error) {
+      console.error('Failed to react:', error)
+    }
+  }
+
+  // Handler cho edit post
+  const handleEditPost = (postId: string) => {
+    console.log('Edit post:', postId)
+    // Implement edit functionality if needed
+  }
+
+  // Handler cho delete post
+  const handleDeletePost = (postId: string) => {
+    console.log('Delete post:', postId)
+    // Implement delete functionality if needed
+  }
+
+  // Handler cho hide post
+  const handleHidePost = (postId: string) => {
+    console.log('Hide post:', postId)
+    // Implement hide functionality if needed
+  }
+
+  // Handler cho report post
+  const handleReportPost = (postId: string) => {
+    console.log('Report post:', postId)
+    // Implement report functionality if needed
+  }
+
+  // Handler cho share success
+  const handleShareSuccess = () => {
+    console.log('Share success')
+    // Refresh post stats after share
+    if (selectedPostId) {
+      fetchPostStats(selectedPostId).then(setPostStats).catch(console.error)
+    }
   }
 
   const handleNotificationClick = (notification: Notification) => {
@@ -532,18 +603,30 @@ export function NotificationModal({
       {/* PostDetailModal - Wrap trong div có z-index cao hơn */}
       {isPostDetailOpen && selectedPost && (
         <div className="fixed inset-0 z-[10000]">
-          <PostDetailModal
-            post={selectedPost}
-            isOpen={isPostDetailOpen}
-            onClose={handleClosePostDetail}
-            onOpenImage={(imageUrl, post) => {
-              console.log('Open image:', imageUrl)
-            }}
-            onShareSuccess={() => {
-              console.log('Share success')
-            }}
-            isOwnPost={false}
-          />
+          {isLoadingPost ? (
+            <div className="flex items-center justify-center h-full">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500"></div>
+            </div>
+          ) : (
+            <PostDetailModal
+              post={selectedPost}
+              isOpen={isPostDetailOpen}
+              onClose={handleClosePostDetail}
+              onOpenImage={(imageUrl) => {
+                console.log('Open image:', imageUrl)
+              }}
+              reaction={reaction}
+              loading={reactionLoading}
+              onReact={handleReact}
+              onShareSuccess={handleShareSuccess}
+              isOwnPost={isOwnPost}
+              onEdit={handleEditPost}
+              onDelete={handleDeletePost}
+              onHide={handleHidePost}
+              onReport={handleReportPost}
+              postStats={postStats}
+            />
+          )}
         </div>
       )}
     </>
