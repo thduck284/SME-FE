@@ -71,10 +71,56 @@ export function CommentContentWithMentions({
     fetchUserMetadata()
   }, [mentions])
 
-  // Render content with highlighted mentions
+  // Function to render content with hashtag highlighting
+  const renderContentWithHashtags = (text: string) => {
+    if (!text) return text
+    
+    // Regex to match hashtags (#word)
+    const hashtagRegex = /#(\w+)/g
+    const parts: (string | JSX.Element)[] = []
+    let lastIndex = 0
+    let match: RegExpExecArray | null
+    
+    while ((match = hashtagRegex.exec(text)) !== null) {
+      // Add text before hashtag
+      if (match.index > lastIndex) {
+        parts.push(text.slice(lastIndex, match.index))
+      }
+      
+      // Store hashtag value to avoid null reference
+      const hashtagValue = match[1]
+      const fullHashtag = match[0]
+      
+      // Add hashtag with highlighting
+      parts.push(
+        <span
+          key={match.index}
+          className="text-purple-600 dark:text-purple-400 font-semibold hover:underline cursor-pointer bg-purple-50 dark:bg-purple-900/20 px-1 py-0.5 rounded transition-all duration-200 hover:bg-purple-100 dark:hover:bg-purple-900/30"
+          title={`#${hashtagValue}`}
+          onClick={() => {
+            // Navigate to hashtag page
+            window.location.href = `/hashtag/${hashtagValue}`
+          }}
+        >
+          {fullHashtag}
+        </span>
+      )
+      
+      lastIndex = match.index + match[0].length
+    }
+    
+    // Add remaining text after last hashtag
+    if (lastIndex < text.length) {
+      parts.push(text.slice(lastIndex))
+    }
+    
+    return parts.length > 0 ? parts : text
+  }
+
+  // Render content with highlighted mentions and hashtags
   const renderContent = () => {
     if (!mentions || mentions.length === 0) {
-      return <span className="text-sm text-foreground bg-background rounded-lg p-3 whitespace-pre-wrap break-words block">{content}</span>
+      return <span className="text-sm text-foreground bg-background rounded-lg p-3 whitespace-pre-wrap break-words block">{renderContentWithHashtags(content)}</span>
     }
 
     // Sort mentions by startIndex to process them in order
@@ -145,7 +191,7 @@ export function CommentContentWithMentions({
               </span>
             )
           }
-          return <span key={index}>{part.content}</span>
+          return <span key={index}>{renderContentWithHashtags(part.content)}</span>
         })}
       </span>
     )
