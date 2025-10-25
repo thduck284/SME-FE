@@ -4,6 +4,7 @@ import { authRoutes } from "@/pages/auth/route"
 import { feedRoutes } from "@/pages/main/route"
 import { Toaster } from "react-hot-toast"
 import { SocketProvider } from "@/lib/context/SocketContext"
+import { LivenessProvider } from "@/lib/context/LivenessSocketContext"
 
 function App() {
   const accessToken = localStorage.getItem('accessToken');
@@ -26,8 +27,10 @@ function App() {
 
   return (
     <SocketProvider>
-      {element}
-      <Toaster position="top-right" />
+      <LivenessProvider> 
+        {element}
+        <Toaster position="top-right" />
+      </LivenessProvider>
     </SocketProvider>
   )
 }
