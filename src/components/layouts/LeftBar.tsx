@@ -7,6 +7,7 @@ import { SearchModal } from "@/components/search/SearchModal"
 import { NotificationModal } from "@/components/notifications"
 import { useSocket } from "@/lib/context/SocketContext"
 import { useNotifications } from "@/lib/hooks/useNotifications"
+import { useEnrichedSocketNotifications } from "@/lib/hooks/useEnrichedSocketNotifications"
 import { UserService } from "@/lib/api/users/UserService"
 import { Link } from "react-router-dom"
 import { getUserId } from "@/lib/utils/Jwt"
@@ -30,6 +31,7 @@ function LeftBarComponent() {
   } = useNotifications()
   
   const { notifications: rawSocketNotifications } = useSocket()
+  const enrichedSocketNotifications = useEnrichedSocketNotifications()
   
   const [mergedNotifications, setMergedNotifications] = useState<any[]>([])
   const [hasNewSocketNotification, setHasNewSocketNotification] = useState(false)
@@ -284,7 +286,7 @@ function LeftBarComponent() {
         isOpen={isNotificationModalOpen}
         onClose={handleCloseNotificationModal}
         restNotifications={mergedNotifications}
-        socketNotifications={rawSocketNotifications}
+        socketNotifications={enrichedSocketNotifications}
         isLoading={isLoadingRest}
         pagination={pagination}
         onNotificationRead={handleNotificationRead}

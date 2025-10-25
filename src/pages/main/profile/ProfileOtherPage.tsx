@@ -257,7 +257,7 @@ export function ProfileOtherPage() {
   }
 
   const displayUsername = profile
-    ? `@${generateUsernameFromName(profile.firstName, profile.lastName)}`
+    ? `@${profile.username || generateUsernameFromName(profile.firstName, profile.lastName)}`
     : ''
 
   const displayName = profile ? `${profile.firstName} ${profile.lastName}`.trim() : '—'
