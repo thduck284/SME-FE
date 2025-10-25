@@ -192,14 +192,32 @@ export function PostDetailModal({
     const displayMedias = medias.slice(0, 4)
     const remainingCount = medias.length - 4
 
+    const isVideo = (url: string) => {
+      return url.match(/\.(mp4|webm|ogg|mov|avi)$/i) || url.includes('video')
+    }
+
     if (medias.length === 1) {
+      const media = medias[0]
       return (
         <div className="w-full bg-gradient-to-br from-gray-100 to-gray-50 dark:from-gray-800 dark:to-gray-900 rounded-xl overflow-hidden">
-          <div className="relative group cursor-pointer w-full max-h-[500px] flex items-center justify-center overflow-hidden"
-            onClick={() => onOpenImage(medias[0].mediaUrl, post)}>
-            <img src={medias[0].mediaUrl} alt="Post media" className="w-full h-auto object-contain transition-all duration-500 group-hover:scale-105" />
-            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/5 transition-all duration-300"></div>
-          </div>
+          {isVideo(media.mediaUrl) ? (
+            <div className="relative w-full max-h-[500px] flex items-center justify-center overflow-hidden">
+              <video 
+                src={media.mediaUrl} 
+                className="w-full h-full object-cover" 
+                controls
+                preload="metadata"
+                muted
+                style={{ maxHeight: '500px' }}
+              />
+            </div>
+          ) : (
+            <div className="relative group cursor-pointer w-full max-h-[500px] flex items-center justify-center overflow-hidden"
+              onClick={() => onOpenImage(media.mediaUrl, post)}>
+              <img src={media.mediaUrl} alt="Post media" className="w-full h-auto object-contain transition-all duration-500 group-hover:scale-105" />
+              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/5 transition-all duration-300"></div>
+            </div>
+          )}
         </div>
       )
     }
@@ -207,11 +225,23 @@ export function PostDetailModal({
     return (
       <div className={`grid gap-1 rounded-xl overflow-hidden ${medias.length === 2 ? 'grid-cols-2' : 'grid-cols-2'}`}>
         {displayMedias.map((media, idx) => (
-          <div key={media.mediaId} className={`relative group cursor-pointer bg-gradient-to-br from-gray-100 to-gray-50 dark:from-gray-800 dark:to-gray-900 overflow-hidden ${
-            medias.length === 3 && idx === 0 ? "row-span-2 col-span-2" : "aspect-square"}`}
-            onClick={() => onOpenImage(media.mediaUrl, post)}>
-            <img src={media.mediaUrl} alt={`Media ${idx + 1}`} className="w-full h-full object-contain transition-all duration-500 group-hover:scale-105 group-hover:brightness-95" />
-            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/5 transition-all duration-300"></div>
+          <div key={media.mediaId} className={`relative bg-gradient-to-br from-gray-100 to-gray-50 dark:from-gray-800 dark:to-gray-900 overflow-hidden ${
+            medias.length === 3 && idx === 0 ? "row-span-2 col-span-2" : "aspect-square"}`}>
+            {isVideo(media.mediaUrl) ? (
+              <video 
+                src={media.mediaUrl} 
+                className="w-full h-full object-cover" 
+                controls
+                preload="metadata"
+                muted
+              />
+            ) : (
+              <div className="relative group cursor-pointer w-full h-full"
+                onClick={() => onOpenImage(media.mediaUrl, post)}>
+                <img src={media.mediaUrl} alt={`Media ${idx + 1}`} className="w-full h-full object-contain transition-all duration-500 group-hover:scale-105 group-hover:brightness-95" />
+                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/5 transition-all duration-300"></div>
+              </div>
+            )}
             {idx === 3 && remainingCount > 0 && (
               <div className="absolute inset-0 bg-gradient-to-br from-black/80 to-black/60 backdrop-blur-md flex items-center justify-center">
                 <span className="text-white text-5xl font-bold drop-shadow-lg">+{remainingCount}</span>
