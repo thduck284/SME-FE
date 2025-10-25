@@ -39,3 +39,9 @@ export interface CreateCommentRequest {
   mentions?: CommentMention[]
   files?: File[]
 }
+
+export interface CommentWithReactions extends Comment {
+  userReaction?: string | null
+  reactionCounters?: Record<string, number>
+  totalReactions?: number
+}

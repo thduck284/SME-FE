@@ -18,3 +18,8 @@ export const getReactionDetails = async (targetId: string, targetType: string = 
   const response = await apiClient.get(`/reaction/details/${targetId}/${targetType}`)
   return response.data
 }
+
+export const getReactionCommentDetails = async (targetId: string, targetType: string = 'COMMENT'): Promise<ReactionDetailsResponse> => {
+  const response = await apiClient.get(`/reaction/details/${targetId}/${targetType}`)
+  return response.data
+}

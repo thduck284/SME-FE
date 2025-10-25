@@ -4,9 +4,10 @@ import { useState, useEffect, useCallback, useRef, useMemo } from "react"
 import { useNavigate } from "react-router-dom"
 import { useComments } from "@/lib/hooks/useComments"
 import { useMention } from "@/lib/hooks/useMention"
+import { useCommentsReactions } from "@/lib/hooks/useCommentReaction"
 import { UserService } from "@/lib/api/users/UserService"
 import { getReplies } from "@/lib/api/posts/GetReplies"
-import type { Comment as CommentType, CommentMention } from "@/lib/types/posts/CommentsDTO"
+import type { CommentWithReactions, CommentMention } from "@/lib/types/posts/CommentsDTO"
 import type { UserMetadata } from "@/lib/types/User"
 import type { MentionData } from "@/lib/types/users/MentionDto"
 import { CommentsList } from "./CommentsList"
@@ -25,14 +26,14 @@ export function CommentsSection({ postId, isOpen, currentUserId, onCommentSucces
   const navigate = useNavigate()
   const [comment, setComment] = useState("")
   const [error, setError] = useState<string | null>(null)
-  const [optimisticComments, setOptimisticComments] = useState<CommentType[]>([])
+  const [optimisticComments, setOptimisticComments] = useState<CommentWithReactions[]>([])
   const [userCache, setUserCache] = useState<Map<string, UserMetadata>>(new Map())
   const [files, setFiles] = useState<File[]>([])
-  const [editingComment, setEditingComment] = useState<CommentType | null>(null)
-  const [replyingTo, setReplyingTo] = useState<CommentType | null>(null)
-  const [replies, setReplies] = useState<Map<string, CommentType[]>>(new Map()) // parentCommentId -> replies
-  const [expandedComments, setExpandedComments] = useState<Set<string>>(new Set()) // commentIds that are expanded
-  const [loadingReplies, setLoadingReplies] = useState<Set<string>>(new Set()) // commentIds currently loading replies
+  const [editingComment, setEditingComment] = useState<CommentWithReactions | null>(null)
+  const [replyingTo, setReplyingTo] = useState<CommentWithReactions | null>(null)
+  const [replies, setReplies] = useState<Map<string, CommentWithReactions[]>>(new Map())
+  const [expandedComments, setExpandedComments] = useState<Set<string>>(new Set())
+  const [loadingReplies, setLoadingReplies] = useState<Set<string>>(new Set())
   const inputRef = useRef<HTMLInputElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -75,7 +76,22 @@ export function CommentsSection({ postId, isOpen, currentUserId, onCommentSucces
     deleteComment
   } = useComments(postId)
 
-  // Combine comments from API and optimistic updates
+  // Comment reactions hook
+  const commentIds = useMemo(() => 
+    [...comments, ...optimisticComments]
+      .filter(comment => comment && comment.id && !comment.id.startsWith('temp-'))
+      .map(comment => comment.id),
+    [comments, optimisticComments]
+  )
+
+  const {
+    reactions: commentReactions,
+    react: reactToComment,
+    removeReaction: removeCommentReaction,
+    loading: reactionsLoading
+  } = useCommentsReactions(commentIds)
+
+  // Combine comments from API and optimistic updates với reaction data
   const displayComments = useMemo(() => {
     const allComments = [...comments]
     
@@ -87,19 +103,33 @@ export function CommentsSection({ postId, isOpen, currentUserId, onCommentSucces
     })
     
     const validComments = allComments.filter(Boolean)
-    const sortedComments = validComments.sort((a, b) => 
+    
+    // Merge reaction data vào comments
+    const commentsWithReactions = validComments.map(comment => {
+      const reactionData = commentReactions[comment.id]
+      return {
+        ...comment,
+        userReaction: reactionData?.userReaction || null,
+        reactionCounters: reactionData?.counters || {},
+        totalReactions: Object.values(reactionData?.counters || {}).reduce((sum, count) => sum + count, 0),
+        // Giữ lại like cũ để tương thích
+        likes: comment.likes || 0,
+        isLiked: comment.isLiked || false
+      }
+    })
+    
+    const sortedComments = commentsWithReactions.sort((a, b) => 
       new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
     )
     
     return sortedComments
-  }, [optimisticComments, comments])
+  }, [optimisticComments, comments, commentReactions])
 
   // Fetch comments when section opens
   useEffect(() => {
     if (isOpen && postId) {
       setError(null)
       setOptimisticComments([])
-      // Reset replies state when postId changes
       setReplies(new Map())
       setExpandedComments(new Set())
       setLoadingReplies(new Set())
@@ -107,7 +137,7 @@ export function CommentsSection({ postId, isOpen, currentUserId, onCommentSucces
     }
   }, [isOpen, postId])
 
-  // Fetch user metadata for comments with debouncing
+  // Fetch user metadata for comments với debouncing
   useEffect(() => {
     const fetchUserMetadata = async () => {
       const commentsToFetch = displayComments
@@ -157,11 +187,11 @@ export function CommentsSection({ postId, isOpen, currentUserId, onCommentSucces
     return () => clearTimeout(timeoutId)
   }, [displayComments.length])
 
-  // Helper functions with memoization
+  // Helper functions với memoization
   const getUserFromCache = useCallback((authorId: string): UserMetadata | undefined => 
     userCache.get(authorId), [userCache])
 
-  const isTempComment = useCallback((comment: CommentType): boolean => 
+  const isTempComment = useCallback((comment: CommentWithReactions): boolean => 
     comment?.id?.startsWith?.('temp-') || false, [])
 
   // File upload handlers
@@ -176,7 +206,7 @@ export function CommentsSection({ postId, isOpen, currentUserId, onCommentSucces
     setFiles((prev) => prev.filter((_, i) => i !== index))
   }, [])
 
-  const getDisplayInfo = useCallback((comment: CommentType) => {
+  const getDisplayInfo = useCallback((comment: CommentWithReactions) => {
     if (comment.authorId === 'current-user') {
       return {
         displayName: 'You',
@@ -202,6 +232,25 @@ export function CommentsSection({ postId, isOpen, currentUserId, onCommentSucces
     }))
   }, [])
 
+  // Comment reaction handlers
+  const handleReactToComment = useCallback(async (commentId: string, reactionType: string) => {
+    try {
+      await reactToComment(commentId, reactionType)
+    } catch (error) {
+      console.error('Failed to react to comment:', error)
+      setError('Failed to react to comment')
+    }
+  }, [reactToComment])
+
+  const handleRemoveCommentReaction = useCallback(async (commentId: string) => {
+    try {
+      await removeCommentReaction(commentId)
+    } catch (error) {
+      console.error('Failed to remove comment reaction:', error)
+      setError('Failed to remove reaction')
+    }
+  }, [removeCommentReaction])
+
   // Memoized comment submission handler
   const handleSubmitComment = useCallback(async (e: React.FormEvent) => {
     e.preventDefault()
@@ -224,7 +273,6 @@ export function CommentsSection({ postId, isOpen, currentUserId, onCommentSucces
         setFiles([])
         setMentions([])
         
-        // Call callback to refresh stats
         onCommentSuccess?.()
         
       } catch (error: any) {
@@ -236,7 +284,7 @@ export function CommentsSection({ postId, isOpen, currentUserId, onCommentSucces
     }
 
     // If adding new comment
-    const tempComment: CommentType = {
+    const tempComment: CommentWithReactions = {
       id: `temp-${Date.now()}`,
       content: comment,
       authorId: currentUserId || 'current-user',
@@ -247,7 +295,9 @@ export function CommentsSection({ postId, isOpen, currentUserId, onCommentSucces
       isLiked: false,
       postId,
       hasChilds: false,
-      // Add reply info if replying
+      userReaction: null,
+      reactionCounters: {},
+      totalReactions: 0,
       ...(replyingTo && { 
         parentCommentId: replyingTo.id,
         replyingTo: {
@@ -268,14 +318,12 @@ export function CommentsSection({ postId, isOpen, currentUserId, onCommentSucces
     try {
       const commentMentions = convertToCommentMentions(mentions)
       
-      // Pass parentCommentId if replying
       const parentCommentId = replyingTo ? replyingTo.id : undefined
       await addComment(currentComment, commentMentions, currentFiles, parentCommentId)
       setMentions([])
       setOptimisticComments(prev => prev.filter(c => c.id !== tempComment.id))
       await fetchComments(10)
       
-      // Call callback to refresh stats
       onCommentSuccess?.()
       
     } catch (error: any) {
@@ -291,7 +339,7 @@ export function CommentsSection({ postId, isOpen, currentUserId, onCommentSucces
     }
   }, [comment, files, currentUserId, postId, addComment, fetchComments, mentions, editingComment, editComment, convertToCommentMentions, replyingTo])
 
-  // Other comment handlers with memoization
+  // Other comment handlers với memoization
   const handleLikeComment = useCallback(async (commentId: string) => {
     try {
       await toggleLikeComment(commentId)
@@ -316,7 +364,6 @@ export function CommentsSection({ postId, isOpen, currentUserId, onCommentSucces
       }
       await deleteComment(commentId)
       
-      // Also remove from replies if it's a reply
       setReplies(prev => {
         const newMap = new Map(prev)
         for (const [parentId, replyList] of newMap.entries()) {
@@ -333,17 +380,15 @@ export function CommentsSection({ postId, isOpen, currentUserId, onCommentSucces
     }
   }, [deleteComment])
 
-  const handleEditComment = useCallback((comment: CommentType) => {
+  const handleEditComment = useCallback((comment: CommentWithReactions) => {
     setEditingComment(comment)
     setComment(comment.content)
-    // Set mentions if needed
     if (comment.mentions) {
-      // Convert CommentMention to MentionData
       const mentionData: MentionData[] = comment.mentions.map(mention => ({
         userId: mention.userId,
         startIndex: mention.startIndex,
         endIndex: mention.endIndex,
-        displayName: '' // Add default displayName
+        displayName: ''
       }))
       setMentions(mentionData)
     }
@@ -356,22 +401,16 @@ export function CommentsSection({ postId, isOpen, currentUserId, onCommentSucces
     setMentions([])
   }, [])
 
-  const handleReply = useCallback((comment: CommentType) => {
+  const handleReply = useCallback((comment: CommentWithReactions) => {
     setReplyingTo(comment)
-    
-    // Get display name using the same logic as getDisplayInfo
     const { displayName } = getDisplayInfo(comment)
-    
-    // Pre-fill comment with mention
     const mentionText = `@${displayName} `
     setComment(mentionText)
     setFiles([])
     setMentions([])
     
-    // Focus input after state update
     setTimeout(() => {
       inputRef.current?.focus()
-      // Set cursor position after the mention
       if (inputRef.current) {
         inputRef.current.setSelectionRange(mentionText.length, mentionText.length)
       }
@@ -387,7 +426,7 @@ export function CommentsSection({ postId, isOpen, currentUserId, onCommentSucces
 
   const loadReplies = useCallback(async (parentCommentId: string) => {
     if (loadingReplies.has(parentCommentId) || replies.has(parentCommentId)) {
-      return // Already loading or loaded
+      return
     }
 
     setLoadingReplies(prev => new Set(prev).add(parentCommentId))
@@ -402,7 +441,6 @@ export function CommentsSection({ postId, isOpen, currentUserId, onCommentSucces
         return newMap
       })
       
-      // Fetch user metadata for replies
       const repliesToFetch = newReplies
         .filter(reply => reply && !userCache.has(reply.authorId))
         .filter(reply => reply.authorId && reply.authorId !== 'current-user')
@@ -463,7 +501,7 @@ export function CommentsSection({ postId, isOpen, currentUserId, onCommentSucces
       
       <CommentsList
         comments={displayComments}
-        isLoading={isLoading}
+        isLoading={isLoading || reactionsLoading}
         isLiking={isLiking}
         isEditing={isEditing}
         isDeleting={isDeleting}
@@ -472,6 +510,8 @@ export function CommentsSection({ postId, isOpen, currentUserId, onCommentSucces
         onDelete={handleDeleteComment}
         onEdit={handleEditComment}
         onReply={handleReply}
+        onReact={handleReactToComment}
+        onRemoveReaction={handleRemoveCommentReaction}
         onMentionClick={navigate}
         getDisplayInfo={getDisplayInfo}
         isTempComment={isTempComment}

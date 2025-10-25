@@ -3,13 +3,14 @@
 import { useState, useRef, useEffect } from "react"
 import { Heart, Trash2, Loader2, MoreVertical, Edit, Reply } from "lucide-react"
 import { Button } from "@/components/ui"
-import type { Comment as CommentType } from "@/lib/types/posts/CommentsDTO"
+import type { CommentWithReactions } from "@/lib/types/posts/CommentsDTO"
 import { formatTimeAgo } from "@/lib/utils/PostUtils"
 import { CommentContentWithMentions } from "./CommentContentWithMentions"
 import { CommentMediaGrid } from "./CommentMediaGrid"
+import { CommentReactionButton } from "./CommentReactionButton"
 
 interface CommentItemProps {
-  comment: CommentType
+  comment: CommentWithReactions
   isTemp: boolean
   displayName: string
   avatarUrl?: string
@@ -19,15 +20,17 @@ interface CommentItemProps {
   isDeleting: string | null
   onLike: (commentId: string) => void
   onDelete: (commentId: string) => void
-  onEdit: (comment: CommentType) => void
-  onReply: (comment: CommentType) => void
+  onEdit: (comment: CommentWithReactions) => void
+  onReply: (comment: CommentWithReactions) => void
+  onReact?: (commentId: string, reactionType: string) => void
+  onRemoveReaction?: (commentId: string) => void
   onMentionClick?: (path: string) => void
   currentUserId?: string
-  replies?: CommentType[]
+  replies?: CommentWithReactions[]
   isExpanded?: boolean
   isLoadingReplies?: boolean
   onToggleReplies?: (commentId: string) => void
-  getDisplayInfo?: (comment: CommentType) => {
+  getDisplayInfo?: (comment: CommentWithReactions) => {
     displayName: string
     avatarUrl?: string
     fullName?: string
@@ -47,6 +50,8 @@ export function CommentItem({
   onDelete, 
   onEdit, 
   onReply,
+  onReact,
+  onRemoveReaction,
   onMentionClick, 
   currentUserId,
   replies = [],
@@ -67,7 +72,6 @@ export function CommentItem({
         setShowOptions(false)
       }
       
-      // Close reply options
       Object.values(replyOptionsRef.current).forEach(ref => {
         if (ref && !ref.contains(event.target as Node)) {
           setShowReplyOptions(prev => {
@@ -207,27 +211,27 @@ export function CommentItem({
         
         {/* Actions */}
         {!isTemp && (
-          <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
-            <button 
-              className={`flex items-center gap-1 transition-colors ${
-                comment.isLiked ? 'text-red-500 hover:text-red-600' : 'hover:text-foreground'
-              }`}
-              onClick={() => onLike(comment.id)}
-              disabled={isLiking === comment.id}
-            >
-              {isLiking === comment.id ? (
-                <Loader2 className="h-3 w-3 animate-spin" />
-              ) : (
-                <Heart className={`h-3 w-3 ${comment.isLiked ? 'fill-current' : ''}`} />
-              )}
-              <span>{comment.likes || 0}</span>
-            </button>
+          <div className="flex items-center gap-3 mt-2 text-xs text-muted-foreground">
+            {/* Reaction Button */}
+            {onReact && onRemoveReaction && (
+              <CommentReactionButton
+                commentId={comment.id}
+                currentReaction={comment.userReaction || null}
+                reactionCounters={comment.reactionCounters || {}}
+                onReact={onReact}
+                onRemoveReaction={onRemoveReaction}
+                isReacting={false}
+              />
+            )}
+            
             <button 
               className="hover:text-foreground transition-colors"
               onClick={() => onReply(comment)}
             >
               Reply
             </button>
+            
+            {/* View Replies */}
             {comment.hasChilds && onToggleReplies && (
               <button 
                 className="hover:text-foreground transition-colors"
@@ -357,6 +361,38 @@ export function CommentItem({
                         <CommentMediaGrid medias={reply.medias} />
                       </div>
                     )}
+
+                    {/* Reply Actions */}
+                    <div className="flex items-center gap-3 mt-2 text-xs text-muted-foreground">
+                      {/* Reaction Button cho reply */}
+                      {onReact && onRemoveReaction && (
+                        <CommentReactionButton
+                          commentId={reply.id}
+                          currentReaction={reply.userReaction || null}
+                          reactionCounters={reply.reactionCounters || {}}
+                          onReact={onReact}
+                          onRemoveReaction={onRemoveReaction}
+                          isReacting={false}
+                          size="sm"
+                        />
+                      )}
+                      
+                      {/* Like Button cho reply */}
+                      <button 
+                        className={`flex items-center gap-1 transition-colors ${
+                          reply.isLiked ? 'text-red-500 hover:text-red-600' : 'hover:text-foreground'
+                        }`}
+                        onClick={() => onLike(reply.id)}
+                        disabled={isLiking === reply.id}
+                      >
+                        {isLiking === reply.id ? (
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                        ) : (
+                          <Heart className={`h-3 w-3 ${reply.isLiked ? 'fill-current' : ''}`} />
+                        )}
+                        <span>{reply.likes || 0}</span>
+                      </button>
+                    </div>
                   </div>
                 </div>
               )
