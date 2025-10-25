@@ -2,8 +2,9 @@ import { RouteObject } from "react-router-dom";
 import { HomePage } from "./feed/HomePage";
 import { SuggestedUsersPage } from "./suggested/SuggestedUsersPage";
 import { ProfilePage } from "./profile/ProfilePage";
-import { ProfileOtherPage } from "./profile/ProfileOtherPage";
 import { EditProfilePage } from "./profile/EditProfilePage";
+import { HashtagPage } from "./hashtag/HashtagPage";
+import { SearchPage } from "./search/SearchPage";
 
 export const feedRoutes: RouteObject[] = [
   {
@@ -13,6 +14,14 @@ export const feedRoutes: RouteObject[] = [
   {
     path: "/suggested",
     element: <SuggestedUsersPage />
+  },
+  {
+    path: "/hashtag/:hashtag",
+    element: <HashtagPage />
+  },
+  {
+    path: "/search",
+    element: <SearchPage />
   },
   {
     path: "/profile/:userId", 

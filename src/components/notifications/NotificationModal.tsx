@@ -59,6 +59,10 @@ const getNotificationIcon = (eventType: string) => {
       return <AtSign className="w-5 h-5 text-orange-500" />
     case 'post.created':
       return <MessageCircle className="w-5 h-5 text-blue-500" />
+    case 'post.reacted':
+      return <Heart className="w-5 h-5 text-yellow-500" />
+    case 'post.reaction.changed':
+      return <Heart className="w-5 h-5 text-pink-500" />
     default:
       return <MessageCircle className="w-5 h-5 text-gray-500" />
   }
@@ -81,6 +85,10 @@ const getNotificationMessage = (notification: Notification) => {
       return `${userName} mentioned you in a post`
     case 'post.created':
       return `${userName} created a new post`
+    case 'post.reacted':
+      return `${userName} reacted to your post`
+    case 'post.reaction.changed':
+      return `${userName} changed reaction to your post`
     default:
       return notification.message || `${userName} sent you a notification`
   }
@@ -382,6 +390,8 @@ export function NotificationModal({
         case 'post.shared':
         case 'post.mentioned':
         case 'post.created':
+        case 'post.reacted':
+        case 'post.reaction.changed':
           handleOpenPostDetail(notification.entityId)
           break
         case 'user.followed':
@@ -526,7 +536,7 @@ export function NotificationModal({
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 mb-1">
                             <Avatar
-                              src={notification.fromUser?.avatarUrl || "/image.png"}
+                              src={notification.fromUser?.avatarUrl || "/assets/images/default.png"}
                               alt={notification.fromUser?.displayName || "User"}
                               fallback={notification.fromUser?.displayName?.[0] || notification.fromUser?.username?.[0] || "U"}
                               className="w-8 h-8"

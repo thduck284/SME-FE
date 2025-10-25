@@ -347,9 +347,10 @@ export function ProfilePage() {
     // Nếu đã là bạn
     if (isFriend) {
       return {
-        text: 'Bạn bè',
+        text: 'Hủy kết bạn',
         variant: 'secondary' as const,
-        disabled: true
+        disabled: false,
+        action: 'unfollow'
       }
     }
     
