@@ -32,7 +32,7 @@ export function CommentsSection({ postId, isOpen, currentUserId, onCommentSucces
   const [editingComment, setEditingComment] = useState<CommentWithReactions | null>(null)
   const [replyingTo, setReplyingTo] = useState<CommentWithReactions | null>(null)
   const [replies, setReplies] = useState<Map<string, CommentWithReactions[]>>(new Map())
-  const [expandedComments, setExpandedComments] = useState<Set<string>>(new Set())
+  const [expandedComments, setExpandedComments] = useState<Map<string, boolean>>(new Map())
   const [loadingReplies, setLoadingReplies] = useState<Set<string>>(new Set())
   const inputRef = useRef<HTMLInputElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -77,12 +77,20 @@ export function CommentsSection({ postId, isOpen, currentUserId, onCommentSucces
   } = useComments(postId)
 
   // Comment reactions hook
-  const commentIds = useMemo(() => 
-    [...comments, ...optimisticComments]
+  const commentIds = useMemo(() => {
+    const rootCommentIds = [...comments, ...optimisticComments]
       .filter(comment => comment && comment.id && !comment.id.startsWith('temp-'))
-      .map(comment => comment.id),
-    [comments, optimisticComments]
-  )
+      .map(comment => comment.id)
+
+    const allReplies = Array.from(replies.values()).flat()
+    const replyIds = allReplies
+      .filter(reply => reply && reply.id && !reply.id.startsWith('temp-'))
+      .map(reply => reply.id)
+
+    const allCommentIds = [...rootCommentIds, ...replyIds]
+    
+    return [...new Set(allCommentIds)]
+  }, [comments, optimisticComments, replies])
 
   const {
     reactions: commentReactions,
@@ -112,7 +120,6 @@ export function CommentsSection({ postId, isOpen, currentUserId, onCommentSucces
         userReaction: reactionData?.userReaction || null,
         reactionCounters: reactionData?.counters || {},
         totalReactions: Object.values(reactionData?.counters || {}).reduce((sum, count) => sum + count, 0),
-        // Giữ lại like cũ để tương thích
         likes: comment.likes || 0,
         isLiked: comment.isLiked || false
       }
@@ -131,25 +138,27 @@ export function CommentsSection({ postId, isOpen, currentUserId, onCommentSucces
       setError(null)
       setOptimisticComments([])
       setReplies(new Map())
-      setExpandedComments(new Set())
+      setExpandedComments(new Map())
       setLoadingReplies(new Set())
       fetchComments(10)
     }
   }, [isOpen, postId])
 
-  // Fetch user metadata for comments với debouncing
+  // Fetch user metadata for comments và replies
   useEffect(() => {
     const fetchUserMetadata = async () => {
-      const commentsToFetch = displayComments
+      const allCommentsToFetch = [
+        ...displayComments,
+        ...Array.from(replies.values()).flat()
+      ]
         .filter(comment => comment && !userCache.has(comment.authorId))
         .filter(comment => comment.authorId && comment.authorId !== 'current-user')
-        .slice(0, 5)
 
-      if (commentsToFetch.length === 0) return
+      if (allCommentsToFetch.length === 0) return
 
       const batchSize = 3
-      for (let i = 0; i < commentsToFetch.length; i += batchSize) {
-        const batch = commentsToFetch.slice(i, i + batchSize)
+      for (let i = 0; i < allCommentsToFetch.length; i += batchSize) {
+        const batch = allCommentsToFetch.slice(i, i + batchSize)
         
         const userPromises = batch.map(async (comment) => {
           try {
@@ -172,22 +181,22 @@ export function CommentsSection({ postId, isOpen, currentUserId, onCommentSucces
         
         setUserCache(newCache)
         
-        if (i + batchSize < commentsToFetch.length) {
+        if (i + batchSize < allCommentsToFetch.length) {
           await new Promise(resolve => setTimeout(resolve, 100))
         }
       }
     }
 
     const timeoutId = setTimeout(() => {
-      if (displayComments.length > 0) {
+      if (displayComments.length > 0 || replies.size > 0) {
         fetchUserMetadata()
       }
     }, 300)
 
     return () => clearTimeout(timeoutId)
-  }, [displayComments.length])
+  }, [displayComments.length, replies.size, userCache])
 
-  // Helper functions với memoization
+  // Helper functions
   const getUserFromCache = useCallback((authorId: string): UserMetadata | undefined => 
     userCache.get(authorId), [userCache])
 
@@ -236,22 +245,24 @@ export function CommentsSection({ postId, isOpen, currentUserId, onCommentSucces
   const handleReactToComment = useCallback(async (commentId: string, reactionType: string) => {
     try {
       await reactToComment(commentId, reactionType)
+      await fetchComments(10)
     } catch (error) {
       console.error('Failed to react to comment:', error)
       setError('Failed to react to comment')
     }
-  }, [reactToComment])
+  }, [reactToComment, fetchComments])
 
   const handleRemoveCommentReaction = useCallback(async (commentId: string) => {
     try {
       await removeCommentReaction(commentId)
+      await fetchComments(10)
     } catch (error) {
       console.error('Failed to remove comment reaction:', error)
       setError('Failed to remove reaction')
     }
-  }, [removeCommentReaction])
+  }, [removeCommentReaction, fetchComments])
 
-  // Memoized comment submission handler
+  // Comment submission handler
   const handleSubmitComment = useCallback(async (e: React.FormEvent) => {
     e.preventDefault()
     
@@ -262,19 +273,15 @@ export function CommentsSection({ postId, isOpen, currentUserId, onCommentSucces
     
     setError(null)
 
-    // If editing existing comment
     if (editingComment) {
       try {
         const commentMentions = convertToCommentMentions(mentions)
-        
         await editComment(editingComment.id, comment, commentMentions, files)
         setEditingComment(null)
         setComment("")
         setFiles([])
         setMentions([])
-        
         onCommentSuccess?.()
-        
       } catch (error: any) {
         console.error('Failed to edit comment:', error)
         const errorMessage = error.response?.data?.message || error.message || 'Failed to edit comment'
@@ -283,7 +290,6 @@ export function CommentsSection({ postId, isOpen, currentUserId, onCommentSucces
       return
     }
 
-    // If adding new comment
     const tempComment: CommentWithReactions = {
       id: `temp-${Date.now()}`,
       content: comment,
@@ -317,29 +323,24 @@ export function CommentsSection({ postId, isOpen, currentUserId, onCommentSucces
 
     try {
       const commentMentions = convertToCommentMentions(mentions)
-      
       const parentCommentId = replyingTo ? replyingTo.id : undefined
       await addComment(currentComment, commentMentions, currentFiles, parentCommentId)
       setMentions([])
       setOptimisticComments(prev => prev.filter(c => c.id !== tempComment.id))
       await fetchComments(10)
-      
       onCommentSuccess?.()
-      
     } catch (error: any) {
       console.error('Failed to submit comment:', error)
-      
       setOptimisticComments(prev => prev.filter(c => c.id !== tempComment.id))
       setComment(currentComment)
       setFiles(currentFiles)
       setReplyingTo(null)
-      
       const errorMessage = error.response?.data?.message || error.message || 'Failed to post comment'
       setError(errorMessage)
     }
-  }, [comment, files, currentUserId, postId, addComment, fetchComments, mentions, editingComment, editComment, convertToCommentMentions, replyingTo])
+  }, [comment, files, currentUserId, postId, addComment, fetchComments, mentions, editingComment, editComment, convertToCommentMentions, replyingTo, onCommentSuccess])
 
-  // Other comment handlers với memoization
+  // Other comment handlers
   const handleLikeComment = useCallback(async (commentId: string) => {
     try {
       await toggleLikeComment(commentId)
@@ -368,9 +369,7 @@ export function CommentsSection({ postId, isOpen, currentUserId, onCommentSucces
         const newMap = new Map(prev)
         for (const [parentId, replyList] of newMap.entries()) {
           const filteredReplies = replyList.filter(reply => reply.id !== commentId)
-          if (filteredReplies.length !== replyList.length) {
-            newMap.set(parentId, filteredReplies)
-          }
+          newMap.set(parentId, filteredReplies)
         }
         return newMap
       })
@@ -424,27 +423,38 @@ export function CommentsSection({ postId, isOpen, currentUserId, onCommentSucces
     setMentions([])
   }, [])
 
+  // FIXED: Load replies cho tất cả các cấp comment
   const loadReplies = useCallback(async (parentCommentId: string) => {
-    if (loadingReplies.has(parentCommentId) || replies.has(parentCommentId)) {
+    if (loadingReplies.has(parentCommentId)) {
       return
     }
 
+    console.log('Loading replies for comment:', parentCommentId)
     setLoadingReplies(prev => new Set(prev).add(parentCommentId))
     
     try {
-      const response = await getReplies(parentCommentId, 10)
+      const response = await getReplies(parentCommentId, 50)
       const newReplies = response.replies || []
+      
+      console.log('Loaded replies for:', parentCommentId, 'count:', newReplies.length)
       
       setReplies(prev => {
         const newMap = new Map(prev)
         newMap.set(parentCommentId, newReplies)
         return newMap
       })
+
+      // Tự động set expanded thành true sau khi load replies
+      setExpandedComments(prev => {
+        const newMap = new Map(prev)
+        newMap.set(parentCommentId, true)
+        return newMap
+      })
       
+      // Fetch user metadata cho replies mới
       const repliesToFetch = newReplies
         .filter(reply => reply && !userCache.has(reply.authorId))
         .filter(reply => reply.authorId && reply.authorId !== 'current-user')
-        .slice(0, 5)
 
       if (repliesToFetch.length > 0) {
         const userPromises = repliesToFetch.map(async (reply) => {
@@ -471,6 +481,7 @@ export function CommentsSection({ postId, isOpen, currentUserId, onCommentSucces
       
     } catch (error) {
       console.error('Failed to load replies:', error)
+      setError('Failed to load replies')
     } finally {
       setLoadingReplies(prev => {
         const newSet = new Set(prev)
@@ -478,20 +489,51 @@ export function CommentsSection({ postId, isOpen, currentUserId, onCommentSucces
         return newSet
       })
     }
-  }, [loadingReplies, replies, userCache])
+  }, [loadingReplies, userCache])
 
+  // FIXED: Sửa hàm toggleReplies để hỗ trợ tất cả các cấp
   const toggleReplies = useCallback((commentId: string) => {
+    console.log('Toggle replies for comment:', commentId)
+    
     setExpandedComments(prev => {
-      const newSet = new Set(prev)
-      if (newSet.has(commentId)) {
-        newSet.delete(commentId)
+      const newMap = new Map(prev)
+      const isCurrentlyExpanded = newMap.get(commentId) || false
+      
+      if (isCurrentlyExpanded) {
+        newMap.set(commentId, false)
+        console.log('Hiding replies for:', commentId)
       } else {
-        newSet.add(commentId)
+        newMap.set(commentId, true)
+        console.log('Showing replies for:', commentId)
+        // QUAN TRỌNG: Gọi loadReplies cho tất cả các cấp
         loadReplies(commentId)
       }
-      return newSet
+      return newMap
     })
   }, [loadReplies])
+
+  // FIXED: Tạo displayReplies với reaction data và hỗ trợ nested replies
+  const displayReplies = useMemo(() => {
+    const newRepliesMap = new Map<string, CommentWithReactions[]>()
+    
+    // Tạo map với tất cả replies
+    for (const [parentId, replyList] of replies.entries()) {
+      const repliesWithReactions = replyList.map(reply => {
+        const reactionData = commentReactions[reply.id]
+        return {
+          ...reply,
+          userReaction: reactionData?.userReaction || null,
+          reactionCounters: reactionData?.counters || {},
+          totalReactions: Object.values(reactionData?.counters || {}).reduce((sum, count) => sum + count, 0),
+          likes: reply.likes || 0,
+          isLiked: reply.isLiked || false
+        }
+      })
+      newRepliesMap.set(parentId, repliesWithReactions)
+    }
+    
+    return newRepliesMap
+  }, [replies, commentReactions])
 
   if (!isOpen) return null
 
@@ -515,7 +557,7 @@ export function CommentsSection({ postId, isOpen, currentUserId, onCommentSucces
         onMentionClick={navigate}
         getDisplayInfo={getDisplayInfo}
         isTempComment={isTempComment}
-        replies={replies}
+        replies={displayReplies}
         expandedComments={expandedComments}
         loadingReplies={loadingReplies}
         onToggleReplies={toggleReplies}

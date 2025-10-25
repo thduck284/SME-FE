@@ -1,4 +1,3 @@
-// components/comments/CommentReactionButton.tsx
 "use client"
 
 import React, { useState, useRef } from "react"
@@ -13,7 +12,7 @@ interface CommentReactionButtonProps {
   onReact: (commentId: string, reactionType: string) => void
   onRemoveReaction: (commentId: string) => void
   isReacting: boolean
-  size?: "sm" | "md"
+  size?: "sm" | "md" | "default" // Thêm "default" vào đây
 }
 
 export function CommentReactionButton({
@@ -60,9 +59,12 @@ export function CommentReactionButton({
     }
   }
 
-  const buttonSize = size === "sm" ? "h-7 px-2" : "h-8 px-3"
-  const iconSize = size === "sm" ? "h-3 w-3" : "h-[14px] w-[14px]"
-  const textSize = size === "sm" ? "text-xs" : "text-sm"
+  // Map "default" thành "md"
+  const effectiveSize = size === "default" ? "md" : size
+  
+  const buttonSize = effectiveSize === "sm" ? "h-7 px-2" : "h-8 px-3"
+  const iconSize = effectiveSize === "sm" ? "h-3 w-3" : "h-[14px] w-[14px]"
+  const textSize = effectiveSize === "sm" ? "text-xs" : "text-sm"
 
   return (
     <div 
@@ -72,7 +74,7 @@ export function CommentReactionButton({
     >
       <Button 
         variant="ghost" 
-        size={size}
+        size={effectiveSize}
         disabled={isReacting}
         onClick={currentReaction ? handleRemoveReaction : undefined}
         className={`flex items-center gap-1.5 rounded-full ${buttonSize} transition-all ${

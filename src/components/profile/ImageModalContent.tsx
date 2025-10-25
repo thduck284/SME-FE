@@ -109,7 +109,7 @@ export function ImageModalContent({ post, reactions, onReact, onShareSuccess, po
         )}
       </div>
 
-      {/* Reactions Summary - TEST VỚI EMOJI CỨNG */}
+      {/* Reactions Summary */}
       <div className="px-4 py-2 flex items-center justify-between text-[15px] text-gray-500 dark:text-gray-400 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
         {totalReactions > 0 ? (
           <div className="flex items-center gap-1.5 hover:underline cursor-pointer">
@@ -117,14 +117,23 @@ export function ImageModalContent({ post, reactions, onReact, onShareSuccess, po
               {topReactions.length > 0 ? (
                 topReactions.map(([type], idx) => {
                   const cfg = reactionIcons[type as ReactionType]
-                  const IconComp = cfg?.icon as any
+                  const icon = cfg?.icon
                   return (
                     <div 
                       key={type} 
                       style={{ zIndex: topReactions.length - idx }}
                       className="w-[18px] h-[18px] rounded-full bg-white dark:bg-gray-800 border border-white dark:border-gray-800 flex items-center justify-center"
                     >
-                      {IconComp ? <IconComp className="h-[14px] w-[14px]" /> : null}
+                      {icon ? (
+                        typeof icon === 'string' ? (
+                          <span className="text-[14px] leading-none">{icon}</span>
+                        ) : (
+                          (() => {
+                            const IconComp = icon as any;
+                            return <IconComp className="h-[14px] w-[14px]" />;
+                          })()
+                        )
+                      ) : null}
                     </div>
                   )
                 })
@@ -162,7 +171,16 @@ export function ImageModalContent({ post, reactions, onReact, onShareSuccess, po
                 <div className="animate-spin h-4 w-4 border-2 border-current border-t-transparent rounded-full" />
               ) : (
                 <>
-                  {(() => { const IconComp = reactionIcons[currentReaction as ReactionType]?.icon as any; return IconComp ? <IconComp className="h-[18px] w-[18px]" /> : null })()}
+                  {currentReaction && reactionIcons[currentReaction] && (
+                    typeof reactionIcons[currentReaction].icon === 'string' ? (
+                      <span className="text-[18px] leading-none">{reactionIcons[currentReaction].icon}</span>
+                    ) : (
+                      (() => {
+                        const IconComp = reactionIcons[currentReaction].icon as any;
+                        return <IconComp className="h-[18px] w-[18px]" />;
+                      })()
+                    )
+                  )}
                   <span className="text-sm font-semibold">
                     {currentReaction ? reactionIcons[currentReaction]?.label : "Like"}
                   </span>
@@ -182,9 +200,16 @@ export function ImageModalContent({ post, reactions, onReact, onShareSuccess, po
                       currentReaction === type ? 'scale-125' : ''
                     }`}
                   >
-                    <span className="block transform hover:-translate-y-1 transition-transform" style={{ fontSize: '20px' }}>
-                      {icon}
-                    </span>
+                    {typeof icon === 'string' ? (
+                      <span className="block transform hover:-translate-y-1 transition-transform" style={{ fontSize: '20px' }}>
+                        {icon}
+                      </span>
+                    ) : (
+                      (() => {
+                        const IconComp = icon as any;
+                        return <IconComp className="h-5 w-5 transform hover:-translate-y-1 transition-transform" />;
+                      })()
+                    )}
                   </button>
                 ))}
               </div>

@@ -25,7 +25,7 @@ interface CommentsListProps {
   }
   isTempComment: (comment: CommentWithReactions) => boolean
   replies: Map<string, CommentWithReactions[]>
-  expandedComments: Set<string>
+  expandedComments: Map<string, boolean>
   loadingReplies: Set<string>
   onToggleReplies: (commentId: string) => void
 }
@@ -76,7 +76,7 @@ export function CommentsList({
         const tempComment = isTempComment(comment)
         const { displayName, avatarUrl, fullName } = getDisplayInfo(comment)
         const commentReplies = replies.get(comment.id) || []
-        const isExpanded = expandedComments.has(comment.id)
+        const isExpanded = expandedComments.get(comment.id) || false
         const isLoadingReplies = loadingReplies.has(comment.id)
         
         return (
@@ -101,8 +101,9 @@ export function CommentsList({
               replies={commentReplies}
               isExpanded={isExpanded}
               isLoadingReplies={isLoadingReplies}
-              onToggleReplies={onToggleReplies}
+              onToggleReplies={onToggleReplies} // QUAN TRỌNG: Truyền hook xuống
               getDisplayInfo={getDisplayInfo}
+              level={0}
             />
           </div>
         )
