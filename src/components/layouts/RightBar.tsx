@@ -55,6 +55,38 @@ export function RightBar() {
     }
   }
 
+  // Hàm tạo full name từ firstName và lastName
+  const getFullName = (userInfo: any): string => {
+    if (!userInfo) return `User`
+    
+    // Truy cập vào thuộc tính data nếu tồn tại
+    const userData = userInfo.data || userInfo
+    
+    const firstName = userData.firstName || ''
+    const lastName = userData.lastName || ''
+    const fullName = `${firstName} ${lastName}`.trim()
+    
+    return fullName || userData.username || `User`
+  }
+
+  // Hàm lấy avatar URL
+  const getAvatarUrl = (userInfo: any): string => {
+    if (!userInfo) return "/image.png"
+    
+    // Truy cập vào thuộc tính data nếu tồn tại
+    const userData = userInfo.data || userInfo
+    return userData.avtUrl || "/image.png"
+  }
+
+  // Hàm lấy username
+  const getUsername = (userInfo: any): string => {
+    if (!userInfo) return ""
+    
+    // Truy cập vào thuộc tính data nếu tồn tại
+    const userData = userInfo.data || userInfo
+    return userData.username || ""
+  }
+
   useEffect(() => {
     if (!userId) return
 
@@ -67,15 +99,21 @@ export function RightBar() {
           friendIds.map(async (friendId) => {
             try {
               const userInfo = await userApi.getUser(friendId)
+              console.log("User data:", userInfo)
               const status = getFriendStatus(friendId)
+              
+              // Sử dụng các hàm helper để lấy thông tin
+              const fullName = getFullName(userInfo)
+              const avatarUrl = getAvatarUrl(userInfo)
+              const username = getUsername(userInfo)
               
               return {
                 id: friendId,
-                name: userInfo.displayName || userInfo.username || `User ${friendId}`,
-                avatar: userInfo.avtUrl || "/image.png",
+                name: fullName,
+                avatar: avatarUrl,
                 status: status ? convertServerStatus(status.status) : 'offline',
                 displayName: userInfo.displayName,
-                username: userInfo.username,
+                username: username,
                 lastActiveAt: status?.lastActiveAt
               }
             } catch (error) {
@@ -165,6 +203,11 @@ export function RightBar() {
         <h2 className="font-semibold text-black text-xl">Friends</h2>
         <div className="text-sm text-gray-600 mt-1">
           {friends.length} friends
+          {friends.filter(f => f.status === 'online').length > 0 && (
+            <span className="ml-2 text-green-600">
+              • {friends.filter(f => f.status === 'online').length} online
+            </span>
+          )}
         </div>
       </div>
       
@@ -173,14 +216,14 @@ export function RightBar() {
           {friends.map((friend) => (
             <li
               key={friend.id}
-              className="flex items-center gap-3 p-3 hover:bg-gray-300 rounded-lg cursor-pointer transition-colors"
+              className="flex items-center gap-3 p-3 hover:bg-gray-300 rounded-lg cursor-pointer transition-colors group"
             >
               <div className="relative">
                 <Avatar 
                   src={friend.avatar} 
                   alt={friend.name}
                   fallback={getAvatarFallback(friend.name)}
-                  className="w-12 h-12"
+                  className="w-12 h-12 group-hover:scale-105 transition-transform duration-200"
                 />
                 <span 
                   className={`absolute bottom-0 right-0 w-3 h-3 border-2 border-white rounded-full ${getStatusColor(friend.status)}`}
@@ -188,9 +231,11 @@ export function RightBar() {
                 />
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-base font-medium text-black truncate">{friend.name}</p>
+                <p className="text-base font-semibold text-black truncate" title={friend.name}>
+                  {friend.name}
+                </p>
                 <p className="text-sm text-gray-700">{getStatusText(friend)}</p>
-                {friend.username && (
+                {friend.username && friend.username !== friend.name && (
                   <p className="text-xs text-gray-500 truncate">@{friend.username}</p>
                 )}
               </div>
