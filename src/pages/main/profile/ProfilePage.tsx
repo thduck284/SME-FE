@@ -325,21 +325,38 @@ export function ProfilePage() {
     if (isOwnProfile || !relationshipData) return null
 
     const { fromUser, toUser, mutualRelationships } = relationshipData
+    const currentUserId = getUserId()
     
-    const isBlocked = fromUser.relationshipTypes.includes('BLOCKED') || toUser.relationshipTypes.includes('BLOCKED')
-    const isFriend = mutualRelationships.includes('FRIEND')
-    const isFollowing = fromUser.relationshipTypes.includes('FOLLOWER')
-    const isFollowedBy = toUser.relationshipTypes.includes('FOLLOWING')
+    // Check blocking status with proper direction
+    const fromUserBlocked = fromUser.relationshipTypes.includes('BLOCKED')
+    const toUserBlocked = toUser.relationshipTypes.includes('BLOCKED')
     
-    // Nếu bị block thì hiển thị button "Bỏ chặn"
-    if (isBlocked) {
-      return {
-        text: 'Bỏ chặn',
-        variant: 'primary' as const,
-        disabled: false,
-        action: 'unblock'
+    // Determine who is blocking whom
+    if (fromUserBlocked || toUserBlocked) {
+      // If fromUser is current user and has BLOCKED, then current user is blocking the profile user
+      // If toUser has BLOCKED, then profile user is blocking current user
+      if (fromUser.userId === currentUserId && fromUserBlocked) {
+        // Current user is blocking profile user (đang chặn người ta)
+        return {
+          text: 'Bỏ chặn',
+          variant: 'primary' as const,
+          disabled: false,
+          action: 'unblock'
+        }
+      } else {
+        // Profile user is blocking current user (bị chặn)
+        return {
+          text: 'Bị chặn',
+          variant: 'secondary' as const,
+          disabled: true,
+          action: 'none'
+        }
       }
     }
+    
+    const isFriend = mutualRelationships.includes('FRIEND')
+    const isFollowing = fromUser.relationshipTypes.includes('FOLLOWING')
+    const isFollowedBy = toUser.relationshipTypes.includes('FOLLOWING')
     
     // Nếu đã là bạn
     if (isFriend) {
@@ -384,10 +401,13 @@ export function ProfilePage() {
     if (isOwnProfile || !relationshipData) return []
 
     const { fromUser, toUser, mutualRelationships } = relationshipData
-    const isBlocked = fromUser.relationshipTypes.includes('BLOCKED') || toUser.relationshipTypes.includes('BLOCKED')
+    const currentUserId = getUserId()
+    
+    const fromUserBlocked = fromUser.relationshipTypes.includes('BLOCKED')
+    const toUserBlocked = toUser.relationshipTypes.includes('BLOCKED')
     const isMuted = fromUser.relationshipTypes.includes('MUTED')
     const isFriend = mutualRelationships.includes('FRIEND')
-    const isFollowing = fromUser.relationshipTypes.includes('FOLLOWER')
+    const isFollowing = fromUser.relationshipTypes.includes('FOLLOWING')
     
     const actions: Array<{
       text: string
@@ -395,8 +415,16 @@ export function ProfilePage() {
       danger: boolean
     }> = []
     
-    // Nếu bị block thì không có dropdown actions (chỉ có button "Bỏ chặn")
-    if (isBlocked) return actions
+    
+    // If current user is being blocked (bị chặn), don't show any dropdown actions
+    if (toUser.userId === currentUserId && toUserBlocked) {
+      return actions
+    }
+    
+    // If current user is blocking (đang chặn), only show unblock option in main button, no dropdown
+    if (fromUser.userId === currentUserId && fromUserBlocked) {
+      return actions
+    }
     
     // Mute/Unmute action
     if (isFriend || isFollowing) {
@@ -407,7 +435,7 @@ export function ProfilePage() {
       })
     }
     
-    // Block action (luôn có)
+    // Block action (luôn có nếu chưa bị block)
     actions.push({
       text: 'Chặn',
       action: 'block',
