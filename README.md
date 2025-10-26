@@ -9,7 +9,7 @@ SME-FE là ứng dụng frontend của nền tảng mạng xã hội được x�
 - **Đặng Huỳnh Sơn** - MSSV: 22110406
 
 ### Giảng viên hướng dẫn
-- **TS. Nguyễn Hữu Trung**
+- **ThS. Nguyễn Hữu Trung**
 
 ## 🎯 Mục đích
 
@@ -247,7 +247,7 @@ Dự án này được phát triển cho mục đích học tập tại Trườn
 ## 🙏 Lời cảm ơn
 
 Xin gửi lời cảm ơn chân thành đến:
-- **TS. Nguyễn Hữu Trung** - Giảng viên hướng dẫn
+- **ThS. Nguyễn Hữu Trung** - Giảng viên hướng dẫn
 - **Khoa Công nghệ Thông tin** - Trường ĐH Sư phạm Kỹ thuật TP.HCM
 - Tất cả các thành viên đã đóng góp cho dự án
 
