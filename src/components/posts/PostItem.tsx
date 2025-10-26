@@ -185,13 +185,31 @@ export function PostItem({
     const displayMedias = medias.slice(0, 4)
     const remainingCount = medias.length - 4
 
+    const isVideo = (url: string) => {
+      return url.match(/\.(mp4|webm|ogg|mov|avi)$/i) || url.includes('video')
+    }
+
     if (medias.length === 1) {
+      const media = medias[0]
       return (
         <div className="w-full bg-black">
-          <div className="relative group cursor-pointer w-full max-h-[500px] flex items-center justify-center overflow-hidden"
-            onClick={() => onOpenImage(medias[0].mediaUrl, post)}>
-            <img src={medias[0].mediaUrl} alt="Post media" className="w-full h-auto object-contain transition-transform duration-300 group-hover:scale-105" />
-          </div>
+          {isVideo(media.mediaUrl) ? (
+            <div className="relative w-full max-h-[500px] flex items-center justify-center overflow-hidden">
+              <video 
+                src={media.mediaUrl} 
+                className="w-full h-full object-cover" 
+                controls
+                preload="metadata"
+                muted
+                style={{ maxHeight: '500px' }}
+              />
+            </div>
+          ) : (
+            <div className="relative group cursor-pointer w-full max-h-[500px] flex items-center justify-center overflow-hidden"
+              onClick={() => onOpenImage(media.mediaUrl, post)}>
+              <img src={media.mediaUrl} alt="Post media" className="w-full h-auto object-contain transition-transform duration-300 group-hover:scale-105" />
+            </div>
+          )}
         </div>
       )
     }
@@ -199,10 +217,22 @@ export function PostItem({
     return (
       <div className={`grid gap-0.5 ${medias.length === 2 ? 'grid-cols-2' : 'grid-cols-2'}`}>
         {displayMedias.map((media, idx) => (
-          <div key={media.mediaId} className={`relative group cursor-pointer bg-gray-100 dark:bg-gray-800 overflow-hidden ${
-            medias.length === 3 && idx === 0 ? "row-span-2 col-span-2" : "aspect-square"}`}
-            onClick={() => onOpenImage(media.mediaUrl, post)}>
-            <img src={media.mediaUrl} alt={`Media ${idx + 1}`} className="w-full h-full object-contain transition-all duration-300 group-hover:brightness-95 bg-gray-100" />
+          <div key={media.mediaId} className={`relative bg-gray-100 dark:bg-gray-800 overflow-hidden ${
+            medias.length === 3 && idx === 0 ? "row-span-2 col-span-2" : "aspect-square"}`}>
+            {isVideo(media.mediaUrl) ? (
+              <video 
+                src={media.mediaUrl} 
+                className="w-full h-full object-cover bg-gray-100" 
+                controls
+                preload="metadata"
+                muted
+              />
+            ) : (
+              <div className="relative group cursor-pointer w-full h-full"
+                onClick={() => onOpenImage(media.mediaUrl, post)}>
+                <img src={media.mediaUrl} alt={`Media ${idx + 1}`} className="w-full h-full object-contain transition-all duration-300 group-hover:brightness-95 bg-gray-100" />
+              </div>
+            )}
             {idx === 3 && remainingCount > 0 && (
               <div className="absolute inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center">
                 <span className="text-white text-4xl font-bold">+{remainingCount}</span>
@@ -600,13 +630,59 @@ function PostContentWithMentions({ content, mentions, onMentionClick }: { conten
     fetchUserMetadata()
   }, [mentions]) // Only depend on mentions
 
-  // Render content with highlighted mentions
+  // Function to render content with hashtag highlighting
+  const renderContentWithHashtags = (text: string) => {
+    if (!text) return text
+    
+    // Regex to match hashtags (#word)
+    const hashtagRegex = /#(\w+)/g
+    const parts: (string | JSX.Element)[] = []
+    let lastIndex = 0
+    let match: RegExpExecArray | null
+    
+    while ((match = hashtagRegex.exec(text)) !== null) {
+      // Add text before hashtag
+      if (match.index > lastIndex) {
+        parts.push(text.slice(lastIndex, match.index))
+      }
+      
+      // Store hashtag value to avoid null reference
+      const hashtagValue = match[1]
+      const fullHashtag = match[0]
+      
+      // Add hashtag with highlighting
+      parts.push(
+        <span
+          key={match.index}
+          className="text-purple-600 dark:text-purple-400 font-semibold hover:underline cursor-pointer bg-purple-50 dark:bg-purple-900/20 px-1 py-0.5 rounded transition-all duration-200 hover:bg-purple-100 dark:hover:bg-purple-900/30"
+          title={`#${hashtagValue}`}
+          onClick={() => {
+            // Navigate to hashtag page
+            window.location.href = `/hashtag/${hashtagValue}`
+          }}
+        >
+          {fullHashtag}
+        </span>
+      )
+      
+      lastIndex = match.index + match[0].length
+    }
+    
+    // Add remaining text after last hashtag
+    if (lastIndex < text.length) {
+      parts.push(text.slice(lastIndex))
+    }
+    
+    return parts.length > 0 ? parts : text
+  }
+
+  // Render content with highlighted mentions and hashtags
   const renderContent = () => {
     // Ensure content is a valid string
     const safeContent = content || ''
     
     if (!mentions || mentions.length === 0) {
-      return <span className="text-[15px] text-gray-900 dark:text-gray-100 leading-[1.3333] whitespace-pre-wrap break-words">{safeContent}</span>
+      return <span className="text-[15px] text-gray-900 dark:text-gray-100 leading-[1.3333] whitespace-pre-wrap break-words">{renderContentWithHashtags(safeContent)}</span>
     }
 
     // Sort mentions by startIndex to process them in order
@@ -678,7 +754,7 @@ function PostContentWithMentions({ content, mentions, onMentionClick }: { conten
               </span>
             )
           }
-          return <span key={index}>{part.content}</span>
+          return <span key={index}>{renderContentWithHashtags(part.content)}</span>
         })}
       </span>
     )

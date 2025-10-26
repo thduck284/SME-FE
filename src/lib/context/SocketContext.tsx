@@ -57,7 +57,7 @@ export function SocketProvider({ children }: SocketProviderProps) {
 
     const newSocket = io('http://localhost:3000/notifications', {
       path: '/socket.io',
-      transports: ['polling', 'websocket'],
+      transports: ['websocket'],
       forceNew: false,
       timeout: 15000,
       reconnection: true,
@@ -83,13 +83,12 @@ export function SocketProvider({ children }: SocketProviderProps) {
     newSocket.on('notification', (notification: Notification) => {
       setNotifications(prev => {
         const exists = prev.some(n => n.notificationId === notification.notificationId)
-        console.log('Received notification:', notification, 'Exists:', exists)
         if (exists) return prev
         return [notification, ...prev]
       })
     })
 
-    newSocket.on('connect_error', (error) => {
+    newSocket.on('connect_error', () => {
       setIsConnected(false)
       hasJoinedRef.current = false
     })

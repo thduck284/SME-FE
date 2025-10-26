@@ -245,7 +245,7 @@ export function ProfilePage() {
 
   const displayName = profile ? `${profile.firstName} ${profile.lastName}`.trim() : '—'
   const displayUsername = profile 
-    ? `@${generateUsernameFromName(profile.firstName, profile.lastName)}`
+    ? `@${profile.username || generateUsernameFromName(profile.firstName, profile.lastName)}`
     : ''
   const displayEmail = profile?.email || '—'
   const displayPhone = profile?.phone || '—'
@@ -347,9 +347,10 @@ export function ProfilePage() {
     // Nếu đã là bạn
     if (isFriend) {
       return {
-        text: 'Bạn bè',
+        text: 'Hủy kết bạn',
         variant: 'secondary' as const,
-        disabled: true
+        disabled: false,
+        action: 'unfollow'
       }
     }
     
