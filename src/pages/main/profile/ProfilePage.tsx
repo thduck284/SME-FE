@@ -121,13 +121,20 @@ export function ProfilePage() {
   useEffect(() => {
     const currentUserId = getUserId()
     
+    console.log('=== PROFILE INIT DEBUG ===')
+    console.log('userIdFromParams:', userIdFromParams)
+    console.log('currentUserId:', currentUserId)
+    
     if (userIdFromParams) {
       // Nếu có userId trong URL params, sử dụng userId đó
       setUserId(userIdFromParams)
-      setIsOwnProfile(userIdFromParams === currentUserId)
+      const isOwn = userIdFromParams === currentUserId
+      console.log('Setting isOwnProfile to:', isOwn)
+      setIsOwnProfile(isOwn)
     } else {
       // Nếu không có userId trong URL, sử dụng userId của user hiện tại
       setUserId(currentUserId)
+      console.log('Setting isOwnProfile to: true (no params)')
       setIsOwnProfile(true)
     }
   }, [userIdFromParams])
@@ -135,14 +142,23 @@ export function ProfilePage() {
   // Fetch relationship data khi không phải profile của mình
   useEffect(() => {
     const fetchRelationshipData = async () => {
-      if (isOwnProfile || !userId) return
+      console.log('=== FETCH RELATIONSHIP DEBUG ===')
+      console.log('isOwnProfile:', isOwnProfile)
+      console.log('userId:', userId)
+      
+      if (isOwnProfile || !userId) {
+        console.log('Skipping fetch - isOwnProfile or no userId')
+        return
+      }
       
       try {
         setLoadingRelationship(true)
         const currentUserId = getUserId()
         if (!currentUserId) return
         
+        console.log('Fetching relationship data...')
         const data = await UserService.getRelationship(currentUserId, userId)
+        console.log('Relationship data fetched:', data)
         setRelationshipData(data)
       } catch (error) {
         console.error('Error fetching relationship data:', error)
@@ -322,14 +338,35 @@ export function ProfilePage() {
   }
 
   const getRelationshipButton = () => {
-    if (isOwnProfile || !relationshipData) return null
+    if (isOwnProfile) return null
+    
+    // If no relationship data yet, show default follow button
+    if (!relationshipData) {
+      console.log('No relationship data, showing default follow button')
+      return {
+        text: 'Theo dõi',
+        variant: 'primary' as const,
+        disabled: false,
+        action: 'follow'
+      }
+    }
 
     const { fromUser, toUser, mutualRelationships } = relationshipData
     const currentUserId = getUserId()
     
+    console.log('=== DEBUG RELATIONSHIP BUTTON ===')
+    console.log('currentUserId:', currentUserId)
+    console.log('profile userId:', userId)
+    console.log('fromUser:', fromUser)
+    console.log('toUser:', toUser)
+    console.log('mutualRelationships:', mutualRelationships)
+    
     // Check blocking status with proper direction
     const fromUserBlocked = fromUser.relationshipTypes.includes('BLOCKED')
     const toUserBlocked = toUser.relationshipTypes.includes('BLOCKED')
+    
+    console.log('fromUserBlocked:', fromUserBlocked)
+    console.log('toUserBlocked:', toUserBlocked)
     
     // Determine who is blocking whom
     if (fromUserBlocked || toUserBlocked) {
@@ -337,6 +374,7 @@ export function ProfilePage() {
       // If toUser has BLOCKED, then profile user is blocking current user
       if (fromUser.userId === currentUserId && fromUserBlocked) {
         // Current user is blocking profile user (đang chặn người ta)
+        console.log('Current user is blocking profile user')
         return {
           text: 'Bỏ chặn',
           variant: 'primary' as const,
@@ -345,6 +383,7 @@ export function ProfilePage() {
         }
       } else {
         // Profile user is blocking current user (bị chặn)
+        console.log('Profile user is blocking current user')
         return {
           text: 'Bị chặn',
           variant: 'secondary' as const,
@@ -355,11 +394,20 @@ export function ProfilePage() {
     }
     
     const isFriend = mutualRelationships.includes('FRIEND')
-    const isFollowing = fromUser.relationshipTypes.includes('FOLLOWING')
-    const isFollowedBy = toUser.relationshipTypes.includes('FOLLOWING')
+    
+    // Check if current user is following profile user
+    const isFollowing = fromUser.userId === currentUserId && fromUser.relationshipTypes.includes('FOLLOWER')
+    
+    // Check if profile user is following current user  
+    const isFollowedBy = toUser.userId === currentUserId && toUser.relationshipTypes.includes('FOLLOWER')
+    
+    console.log('isFriend:', isFriend)
+    console.log('isFollowing:', isFollowing)
+    console.log('isFollowedBy:', isFollowedBy)
     
     // Nếu đã là bạn
     if (isFriend) {
+      console.log('Returning: Hủy kết bạn')
       return {
         text: 'Hủy kết bạn',
         variant: 'secondary' as const,
@@ -370,6 +418,7 @@ export function ProfilePage() {
     
     // Nếu mình đã follow họ
     if (isFollowing) {
+      console.log('Returning: Đang theo dõi')
       return {
         text: 'Đang theo dõi',
         variant: 'secondary' as const,
@@ -380,6 +429,7 @@ export function ProfilePage() {
     
     // Nếu họ follow mình nhưng mình chưa follow họ
     if (isFollowedBy) {
+      console.log('Returning: Theo dõi lại')
       return {
         text: 'Theo dõi lại',
         variant: 'primary' as const,
@@ -389,6 +439,7 @@ export function ProfilePage() {
     }
     
     // Chưa có quan hệ gì
+    console.log('Returning: Theo dõi (default)')
     return {
       text: 'Theo dõi',
       variant: 'primary' as const,
@@ -407,7 +458,8 @@ export function ProfilePage() {
     const toUserBlocked = toUser.relationshipTypes.includes('BLOCKED')
     const isMuted = fromUser.relationshipTypes.includes('MUTED')
     const isFriend = mutualRelationships.includes('FRIEND')
-    const isFollowing = fromUser.relationshipTypes.includes('FOLLOWING')
+    // Check if current user is following profile user
+    const isFollowing = fromUser.userId === currentUserId && fromUser.relationshipTypes.includes('FOLLOWER')
     
     const actions: Array<{
       text: string
@@ -602,7 +654,16 @@ export function ProfilePage() {
                   const buttonConfig = getRelationshipButton()
                   const dropdownActions = getDropdownActions()
                   
-                  if (!buttonConfig) return null
+                  console.log('=== RENDER BUTTON DEBUG ===')
+                  console.log('buttonConfig:', buttonConfig)
+                  console.log('dropdownActions:', dropdownActions)
+                  console.log('isOwnProfile:', isOwnProfile)
+                  console.log('relationshipData:', relationshipData)
+                  
+                  if (!buttonConfig) {
+                    console.log('No button config, returning null')
+                    return null
+                  }
                   
                   return (
                     <div className="flex gap-2 w-full md:w-auto">
