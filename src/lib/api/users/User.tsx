@@ -82,7 +82,7 @@ export const userApi = {
   getUser: async (userId: string): Promise<User> => {
     try {
       const response = await apiClient.get(`/users/${userId}`)
-      const userData = response.data.data
+      const userData = response.data
       return transformUserData(userData)
     } catch (error: any) {
       const message = error.response?.data?.message || "Failed to get user"

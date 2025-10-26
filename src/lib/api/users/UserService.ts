@@ -163,4 +163,17 @@ export class UserService {
       throw error
     }
   }
+
+  static async getFriends(userId: string): Promise<string[]> {
+    try {
+      const response = await apiClient.get(`${this.RELATIONSHIPS_BASE_URL}/user/${userId}`)
+      
+      const result = response.data
+      
+      return result.users.map((user: any) => user.userId)
+    } catch (error) {
+      console.error('Error fetching friends:', error)
+      return []
+    }
+  }
 }
