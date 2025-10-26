@@ -100,7 +100,10 @@ if (typeof window !== 'undefined' && !window._originalFetch) {
           if (newToken) {
             notifyTokenRefresh(newToken);
           } else {
-            window.location.href = '/login';
+            // Chỉ redirect nếu không phải đang ở trang login
+            if (window.location.pathname !== '/login') {
+              window.location.href = '/login';
+            }
             return new Response('Unauthorized', { status: 401 });
           }
         } catch (error) {

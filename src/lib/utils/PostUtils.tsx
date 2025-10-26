@@ -27,7 +27,16 @@ export const VISIBILITY_OPTIONS: { value: CreatePostDto["visibility"]; label: st
 import { ImageIcon, VideoIcon, MapPin } from "lucide-react"
 
 export const formatTimeAgo = (dateString: string): string => {
+  if (!dateString) return "Just now"
+  
   const date = new Date(dateString)
+  
+  // Kiểm tra nếu date không hợp lệ
+  if (isNaN(date.getTime())) {
+    console.warn('Invalid date string:', dateString)
+    return "Just now"
+  }
+  
   const now = new Date()
   const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000)
   const diffInMinutes = Math.floor(diffInSeconds / 60)
@@ -49,7 +58,6 @@ export const formatTimeAgo = (dateString: string): string => {
       minute: '2-digit'
     })
   } else {
-
     return date.toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'short',

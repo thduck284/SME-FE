@@ -55,7 +55,7 @@ export function SocketProvider({ children }: SocketProviderProps) {
     setNotifications([])
     setIsConnected(false)
 
-    const newSocket = io('http://localhost:3000/notifications', {
+    const newSocket = io('http://localhost:3005/notifications', {
       path: '/socket.io',
       transports: ['websocket'],
       forceNew: false,

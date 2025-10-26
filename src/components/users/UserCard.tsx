@@ -1,5 +1,6 @@
 "use client"
 import { useState } from "react"
+import { Link } from "react-router-dom"
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui"
 import { Button } from "@/components/ui"
 // no icons needed for minimal Instagram-like look
@@ -79,24 +80,29 @@ export function UserCard({
   return (
     <div className="rounded-xl border border-gray-100 bg-white p-3 hover:shadow-sm transition">
       <div className="flex items-center gap-3">
-        {/* Avatar */}
-        <Avatar className="w-12 h-12">
-          <AvatarImage 
-            src={userInfo.avtUrl || undefined} 
-            alt={`${userInfo.firstName} ${userInfo.lastName}`} 
-          />
-          <AvatarFallback>
-            {userInfo.firstName[0]}{userInfo.lastName[0]}
-          </AvatarFallback>
-        </Avatar>
+        {/* Avatar và User Info - có thể click để redirect */}
+        <Link 
+          to={`/profile/${userInfo.userId}`}
+          className="flex items-center gap-3 flex-1 min-w-0 hover:bg-gray-50 rounded-lg p-1 -m-1 transition-colors"
+        >
+          <Avatar className="w-12 h-12">
+            <AvatarImage 
+              src={userInfo.avtUrl || undefined} 
+              alt={`${userInfo.firstName} ${userInfo.lastName}`} 
+            />
+            <AvatarFallback>
+              {userInfo.firstName[0]}{userInfo.lastName[0]}
+            </AvatarFallback>
+          </Avatar>
 
-        {/* Content */}
-        <div className="flex-1 min-w-0">
-          <h3 className="text-sm font-semibold text-gray-900 truncate">
-            {userInfo.firstName} {userInfo.lastName}
-          </h3>
-          <p className="text-xs text-gray-500 truncate">{mutualCount} người quen</p>
-        </div>
+          {/* Content */}
+          <div className="flex-1 min-w-0">
+            <h3 className="text-sm font-semibold text-gray-900 truncate">
+              {userInfo.firstName} {userInfo.lastName}
+            </h3>
+            <p className="text-xs text-gray-500 truncate">{mutualCount} người quen</p>
+          </div>
+        </Link>
 
         {/* Actions */}
         <div className="shrink-0">

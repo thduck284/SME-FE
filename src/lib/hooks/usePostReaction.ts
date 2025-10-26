@@ -153,15 +153,15 @@ export const usePostsReactions = (postIds: string[]): UsePostsReactionsReturn =>
   }
 }
 
-export const usePostReactions = (postId: string) => {
-  const { reactions, loading, error, react, removeReaction, refetch } = usePostsReactions([postId])
+export const usePostReactions = (postId: string, isLoggedIn: boolean = true) => {
+  const { reactions, loading, error, react, removeReaction, refetch } = usePostsReactions(isLoggedIn ? [postId] : [])
   
   return {
     reaction: reactions[postId] || null,
-    loading,
-    error,
-    react: (reactionType: string) => react(postId, reactionType),
-    removeReaction: () => removeReaction(postId),
-    refetch,
+    loading: isLoggedIn ? loading : false,
+    error: isLoggedIn ? error : null,
+    react: (reactionType: string) => isLoggedIn ? react(postId, reactionType) : Promise.resolve(),
+    removeReaction: () => isLoggedIn ? removeReaction(postId) : Promise.resolve(),
+    refetch: isLoggedIn ? refetch : () => Promise.resolve(),
   }
 }

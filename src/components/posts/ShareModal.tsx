@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { Button, Avatar } from "@/components/ui"
-import { Globe, Users, UserPlus, Lock, ImageIcon, Send, X, Video } from "lucide-react"
+import { Globe, Users, UserPlus, Lock, ImageIcon, Send, X, Video, Link, Check } from "lucide-react"
 import { useShare } from "@/lib/hooks/useShare"
 import type { CreatePostDto, Visibility } from "@/lib/types/posts/CreatePostDto"
 
@@ -31,6 +31,7 @@ export function ShareModal({ isOpen, onClose, post, onSuccess }: ShareModalProps
   const [visibility, setVisibility] = useState<Visibility>("PUBLIC")
   const [mediaFiles, setMediaFiles] = useState<File[]>([])
   const [showVisibilityDropdown, setShowVisibilityDropdown] = useState(false)
+  const [copied, setCopied] = useState(false)
 
   const { isSharing, error, sharePost, clearError } = useShare()
 
@@ -77,6 +78,26 @@ export function ShareModal({ isOpen, onClose, post, onSuccess }: ShareModalProps
     setShowVisibilityDropdown(false)
     clearError()
     onClose()
+  }
+
+  const handleCopyLink = async () => {
+    try {
+      const postUrl = `${window.location.origin}/post/${post.postId}`
+      await navigator.clipboard.writeText(postUrl)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch (error) {
+      console.error('Failed to copy link:', error)
+      // Fallback for older browsers
+      const textArea = document.createElement('textarea')
+      textArea.value = `${window.location.origin}/post/${post.postId}`
+      document.body.appendChild(textArea)
+      textArea.select()
+      document.execCommand('copy')
+      document.body.removeChild(textArea)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    }
   }
 
   const selectedVisibility = VISIBILITY_OPTIONS.find(opt => opt.value === visibility)
@@ -289,6 +310,24 @@ export function ShareModal({ isOpen, onClose, post, onSuccess }: ShareModalProps
 
             {/* Action Buttons */}
             <div className="flex items-center gap-3">
+              <Button
+                variant="secondary"
+                onClick={handleCopyLink}
+                disabled={isSharing}
+                className="px-4 flex items-center gap-2"
+              >
+                {copied ? (
+                  <>
+                    <Check className="h-4 w-4" />
+                    Copied!
+                  </>
+                ) : (
+                  <>
+                    <Link className="h-4 w-4" />
+                    Copy Link
+                  </>
+                )}
+              </Button>
               <Button
                 variant="secondary"
                 onClick={handleClose}

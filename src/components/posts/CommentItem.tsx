@@ -178,6 +178,12 @@ export function CommentItem({
                 </span>
               )}
               
+              {isEditing === localComment.id && (
+                <span className="ml-2 text-xs text-muted-foreground">
+                  (Updating...)
+                </span>
+              )}
+              
               <span className={`${textSize} text-muted-foreground`}>
                 {isTemp ? 'Just now' : formatTimeAgo(localComment.createdAt)}
               </span>
