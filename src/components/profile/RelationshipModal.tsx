@@ -1,3 +1,5 @@
+"use client"
+
 import { useState, useEffect } from "react"
 import { useNavigate } from "react-router-dom"
 import { X, Users, UserPlus } from "lucide-react"
@@ -9,7 +11,12 @@ import { UserService } from "@/lib/api/users/UserService"
 import { User } from "@/lib/types/users/UserDTO"
 import { getUserId } from "@/lib/utils/Jwt"
 
-interface UserWithRelationship extends User {
+interface UserWithRelationship {
+  userId: string
+  firstName: string
+  lastName: string
+  username: string
+  avtUrl: string | null
   relationshipTypes: string[]
 }
 
@@ -46,30 +53,37 @@ export function RelationshipModal({ isOpen, onClose, type, userId }: Relationshi
       // Get detailed information for each user
       const userPromises = response.users.map(async (userRel) => {
         try {
-          // Use new getUser API from User.tsx
           const userData = await userApi.getUser(userRel.userId)
+          console.log('Fetched user data:', userData)
+          
+          // SỬA: Kiểm tra nếu userData có property data (API response format)
+          // hoặc sử dụng trực tiếp userData (User type)
+          const userDetails = (userData as any).data || userData
           
           return {
-            ...userData,
+            userId: userDetails.userId || userRel.userId,
+            firstName: userDetails.firstName || "Unknown",
+            lastName: userDetails.lastName || "User",
+            username: userDetails.username || "unknown",
+            avtUrl: userDetails.avtUrl || null,
             relationshipTypes: userRel.relationshipTypes
           } as UserWithRelationship
         } catch (err) {
           console.error(`Error fetching user ${userRel.userId}:`, err)
           // Return basic information if cannot get details
           return {
-            id: 0,
             userId: userRel.userId,
             firstName: "Unknown",
             lastName: "User",
             username: "unknown",
-            email: "unknown@example.com",
-            avtUrl: undefined,
+            avtUrl: null,
             relationshipTypes: userRel.relationshipTypes
           } as UserWithRelationship
         }
       })
       
       const usersData = await Promise.all(userPromises)
+      console.log('Final users data:', usersData)
       setUsers(usersData)
     } catch (err) {
       setError(err instanceof Error ? err.message : "An error occurred while loading data")
@@ -146,6 +160,7 @@ export function RelationshipModal({ isOpen, onClose, type, userId }: Relationshi
           {loading ? (
             <div className="flex items-center justify-center py-8">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+              <span className="ml-2 text-gray-600">Loading {type}...</span>
             </div>
           ) : error ? (
             <div className="text-center py-8">
@@ -159,49 +174,30 @@ export function RelationshipModal({ isOpen, onClose, type, userId }: Relationshi
               {users.map((user, index) => (
                 <Card 
                   key={`${user.userId}-${index}`} 
-                  className="p-4 hover:bg-gray-50 transition-colors cursor-pointer"
+                  className="p-4 hover:bg-gray-50 transition-colors cursor-pointer border border-gray-200"
                   onClick={() => handleUserClick(user.userId)}
                 >
-                  <div className="flex items-center gap-3">
-                    <div className="h-12 w-12 rounded-full overflow-hidden bg-primary/10 flex items-center justify-center">
-                      {user.avtUrl && user.avtUrl.trim() !== '' ? (
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="h-12 w-12 rounded-full overflow-hidden bg-gray-200 flex items-center justify-center">
                         <img 
-                          src={user.avtUrl} 
+                          src={user.avtUrl || "/default.png"} 
                           alt={`${user.firstName} ${user.lastName}`}
                           className="h-full w-full object-cover"
                           onError={(e) => {
                             const target = e.target as HTMLImageElement
-                            target.style.display = 'none'
-                            const fallback = target.nextElementSibling as HTMLElement
-                            if (fallback) {
-                              fallback.classList.remove('hidden')
-                            }
+                            target.src = "/default.png"
                           }}
                         />
-                      ) : (
-                        <img 
-                          src="/default.png" 
-                          alt={`${user.firstName} ${user.lastName}`}
-                          className="h-full w-full object-cover"
-                          onError={(e) => {
-                            const target = e.target as HTMLImageElement
-                            target.style.display = 'none'
-                            const fallback = target.nextElementSibling as HTMLElement
-                            if (fallback) {
-                              fallback.classList.remove('hidden')
-                            }
-                          }}
-                        />
-                      )}
-                      <Users className="h-6 w-6 text-primary hidden" />
-                    </div>
-                    <div className="flex-1">
-                      <p className="font-medium text-gray-900">
-                        {user.firstName} {user.lastName}
-                      </p>
-                      <p className="text-sm text-gray-600">
-                        @{user.username || user.displayName || `${user.firstName || 'user'}.${user.lastName || 'name'}` || user.userId}
-                      </p>
+                      </div>
+                      <div className="flex-1">
+                        <p className="font-medium text-gray-900">
+                          {user.firstName} {user.lastName}
+                        </p>
+                        <p className="text-sm text-gray-600">
+                          @{user.username}
+                        </p>
+                      </div>
                     </div>
                     <div className="flex items-center">
                       {shouldShowFollowButton(user) && (
@@ -211,7 +207,7 @@ export function RelationshipModal({ isOpen, onClose, type, userId }: Relationshi
                             handleFollowUser(user.userId)
                           }}
                           size="sm"
-                          className="text-xs px-3 py-1"
+                          className="text-xs px-3 py-1 bg-blue-500 hover:bg-blue-600 text-white"
                         >
                           Follow
                         </Button>
