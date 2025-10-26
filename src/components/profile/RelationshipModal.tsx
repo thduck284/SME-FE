@@ -47,7 +47,10 @@ export function RelationshipModal({ isOpen, onClose, type, userId }: Relationshi
       const userPromises = response.users.map(async (userRel) => {
         try {
           // Use new getUser API from User.tsx
-          const userData = await userApi.getUser(userRel.userId)
+          const response = await userApi.getUser(userRel.userId)
+          
+          // Extract data from response - handle both direct User and wrapped response
+          const userData = (response as any).data || response
           
           return {
             ...userData,
@@ -163,44 +166,23 @@ export function RelationshipModal({ isOpen, onClose, type, userId }: Relationshi
                   onClick={() => handleUserClick(user.userId)}
                 >
                   <div className="flex items-center gap-3">
-                    <div className="h-12 w-12 rounded-full overflow-hidden bg-primary/10 flex items-center justify-center">
-                      {user.avtUrl && user.avtUrl.trim() !== '' ? (
-                        <img 
-                          src={user.avtUrl} 
-                          alt={`${user.firstName} ${user.lastName}`}
-                          className="h-full w-full object-cover"
-                          onError={(e) => {
-                            const target = e.target as HTMLImageElement
-                            target.style.display = 'none'
-                            const fallback = target.nextElementSibling as HTMLElement
-                            if (fallback) {
-                              fallback.classList.remove('hidden')
-                            }
-                          }}
-                        />
-                      ) : (
-                        <img 
-                          src="/default.png" 
-                          alt={`${user.firstName} ${user.lastName}`}
-                          className="h-full w-full object-cover"
-                          onError={(e) => {
-                            const target = e.target as HTMLImageElement
-                            target.style.display = 'none'
-                            const fallback = target.nextElementSibling as HTMLElement
-                            if (fallback) {
-                              fallback.classList.remove('hidden')
-                            }
-                          }}
-                        />
-                      )}
-                      <Users className="h-6 w-6 text-primary hidden" />
+                    <div className="h-12 w-12 rounded-full overflow-hidden bg-gray-200 flex items-center justify-center">
+                      <img 
+                        src={user.avtUrl || "/assets/images/default.png"} 
+                        alt={`${user.firstName} ${user.lastName}`}
+                        className="h-full w-full object-cover"
+                        onError={(e) => {
+                          const target = e.target as HTMLImageElement
+                          target.src = "/assets/images/default.png"
+                        }}
+                      />
                     </div>
                     <div className="flex-1">
                       <p className="font-medium text-gray-900">
                         {user.firstName} {user.lastName}
                       </p>
                       <p className="text-sm text-gray-600">
-                        @{user.username || user.displayName || `${user.firstName || 'user'}.${user.lastName || 'name'}` || user.userId}
+                        @{user.username || user.userId}
                       </p>
                     </div>
                     <div className="flex items-center">

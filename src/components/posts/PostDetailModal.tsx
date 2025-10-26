@@ -254,16 +254,19 @@ export function PostDetailModal({
   }
 
   const ReactionButton = () => (
-    <div className="relative flex-1" onMouseEnter={handleReactionShow} onMouseLeave={handleReactionHide}>
+    <div className="relative flex-1" onMouseEnter={onReact ? handleReactionShow : undefined} onMouseLeave={onReact ? handleReactionHide : undefined}>
       <Button 
         variant="ghost" 
         size="sm" 
-        disabled={loading || isReacting}
-        onClick={currentReaction ? handleRemoveReaction : undefined}
+        disabled={loading || isReacting || !onReact}
+        onClick={onReact && currentReaction ? handleRemoveReaction : undefined}
         className={`flex items-center justify-center gap-2 rounded-xl h-10 w-full transition-all duration-300 font-semibold ${
-          currentReaction 
-            ? `${reactionIcons[currentReaction].color} ${reactionIcons[currentReaction].bg} ${reactionIcons[currentReaction].darkBg} hover:opacity-80 shadow-sm`
-            : 'bg-white text-gray-700 border border-gray-200 hover:bg-gray-50 hover:border-gray-300 dark:bg-gray-900 dark:text-gray-300 dark:border-gray-700 dark:hover:bg-gray-800'}`}>
+          !onReact 
+            ? 'bg-gray-100 text-gray-400 border border-gray-200 cursor-not-allowed dark:bg-gray-800 dark:text-gray-600 dark:border-gray-700'
+            : currentReaction 
+              ? `${reactionIcons[currentReaction].color} ${reactionIcons[currentReaction].bg} ${reactionIcons[currentReaction].darkBg} hover:opacity-80 shadow-sm`
+              : 'bg-white text-gray-700 border border-gray-200 hover:bg-gray-50 hover:border-gray-300 dark:bg-gray-900 dark:text-gray-300 dark:border-gray-700 dark:hover:bg-gray-800'
+        }`}>
         {isReacting ? (
           <div className="animate-spin h-5 w-5 border-2 border-current border-t-transparent rounded-full" />
         ) : (
@@ -274,13 +277,13 @@ export function PostDetailModal({
               <ThumbsUp className="h-5 w-5 text-gray-600 dark:text-gray-400" />
             )}
             <span className={`text-sm ${currentReaction ? reactionIcons[currentReaction].color : ''}`}>
-              {currentReaction ? `Remove ${reactionIcons[currentReaction].label}` : "Like"}
+              {!onReact ? "Đăng nhập để Like" : currentReaction ? `Remove ${reactionIcons[currentReaction].label}` : "Like"}
             </span>
           </>
         )}
       </Button>
 
-      {showReactionPicker && !isReacting && (
+      {showReactionPicker && !isReacting && onReact && (
         <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl shadow-2xl px-3 py-3 flex items-center gap-1.5 z-50 animate-in zoom-in-95 duration-200">
           {Object.entries(reactionIcons).map(([type, { label, icon, color }]) => (
             <button 
@@ -301,9 +304,17 @@ export function PostDetailModal({
     </div>
   )
 
-  const ActionBtn = ({ icon: Icon, label, onClick }: { icon: any; label: string; onClick?: () => void }) => (
-    <Button variant="ghost" size="sm" onClick={onClick}
-      className="flex items-center justify-center gap-2 text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 rounded-xl h-10 transition-all duration-300 hover:bg-gray-100 dark:hover:bg-gray-800 flex-1 font-semibold border border-transparent hover:border-gray-200 dark:hover:border-gray-700">
+  const ActionBtn = ({ icon: Icon, label, onClick, disabled }: { icon: any; label: string; onClick?: () => void; disabled?: boolean }) => (
+    <Button 
+      variant="ghost" 
+      size="sm" 
+      onClick={disabled ? undefined : onClick}
+      disabled={disabled}
+      className={`flex items-center justify-center gap-2 rounded-xl h-10 transition-all duration-300 flex-1 font-semibold border border-transparent ${
+        disabled 
+          ? 'text-gray-400 cursor-not-allowed bg-gray-100 dark:bg-gray-800 dark:text-gray-600'
+          : 'text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 hover:border-gray-200 dark:hover:border-gray-700'
+      }`}>
       <Icon className="h-5 w-5" />
       <span className="text-sm">{label}</span>
     </Button>
@@ -520,25 +531,29 @@ export function PostDetailModal({
                 </div>
               )}
 
-              {/* Reactions summary */}
-              {totalReactions > 0 && (
+              {/* Reactions summary - chỉ hiển thị khi đã đăng nhập */}
+              {onReact && (
                 <div className="px-6 py-3 flex items-center justify-between text-sm text-gray-500 dark:text-gray-400 border-t border-gray-200 dark:border-gray-700 mt-3 bg-gray-50/50 dark:bg-gray-800/30">
                   <div className="flex items-center gap-2">
                     {loading ? <span className="text-sm">Loading...</span> : (
-                      <div 
-                        className="flex items-center gap-2 hover:underline cursor-pointer group"
-                        onClick={() => setShowReactionDetails(true)}
-                      >
-                        <div className="flex items-center -space-x-1.5">
-                          {topReactions.map(([type], idx) => (
-                            <div key={type} style={{ zIndex: topReactions.length - idx }}
-                              className="w-6 h-6 rounded-full bg-white dark:bg-gray-900 border-2 border-white dark:border-gray-900 flex items-center justify-center group-hover:scale-110 transition-transform duration-200">
-                              {(() => { const cfg = reactionIcons[(type.toUpperCase() as ReactionType)]; return cfg ? <span className="text-base">{cfg.icon}</span> : null })()}
-                            </div>
-                          ))}
+                      totalReactions > 0 ? (
+                        <div 
+                          className="flex items-center gap-2 hover:underline cursor-pointer group"
+                          onClick={() => setShowReactionDetails(true)}
+                        >
+                          <div className="flex items-center -space-x-1.5">
+                            {topReactions.map(([type], idx) => (
+                              <div key={type} style={{ zIndex: topReactions.length - idx }}
+                                className="w-6 h-6 rounded-full bg-white dark:bg-gray-900 border-2 border-white dark:border-gray-900 flex items-center justify-center group-hover:scale-110 transition-transform duration-200">
+                                {(() => { const cfg = reactionIcons[(type.toUpperCase() as ReactionType)]; return cfg ? <span className="text-base">{cfg.icon}</span> : null })()}
+                              </div>
+                            ))}
+                          </div>
+                          <span className="text-base font-semibold text-gray-700 dark:text-gray-300">{totalReactions}</span>
                         </div>
-                        <span className="text-base font-semibold text-gray-700 dark:text-gray-300">{totalReactions}</span>
-                      </div>
+                      ) : (
+                        <span className="text-sm text-gray-500 dark:text-gray-400">Chưa có reaction</span>
+                      )
                     )}
                   </div>
                   <div className="flex items-center gap-4">
@@ -560,27 +575,45 @@ export function PostDetailModal({
                     icon={MessageCircle} 
                     label={`Comment${localPostStats ? ` (${localPostStats.commentCount || 0})` : ''}`} 
                     onClick={() => {}} 
-                  />
-                  <ActionBtn 
-                    icon={Share} 
-                    label={`Share${localPostStats ? ` (${localPostStats.shareCount || 0})` : ''}`} 
-                    onClick={() => setShowShareModal(true)} 
+                    disabled={!onReact}
                   />
                 </div>
               </div>
             </Card>
 
             {/* Comments Section */}
-            <div className="border-t-4 border-gray-100 dark:border-gray-800">
-              <CommentsSection 
-                key={post.postId} // Force re-render when post changes
-                postId={post.postId} 
-                isOpen={true} 
-                onClose={() => {}} 
-                currentUserId={getUserId() || ''}
-                onCommentSuccess={handleCommentSuccess}
-              />
-            </div>
+            {onReact && (
+              <div className="border-t-4 border-gray-100 dark:border-gray-800">
+                <CommentsSection 
+                  postId={post.postId} 
+                  isOpen={true} 
+                  onClose={() => {}} 
+                  currentUserId={getUserId() || ''}
+                  onCommentSuccess={handleCommentSuccess}
+                />
+              </div>
+            )}
+            
+            {/* Message khi chưa đăng nhập */}
+            {!onReact && (
+              <div className="border-t-4 border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/30">
+                <div className="px-6 py-8 text-center">
+                  <MessageCircle className="w-12 h-12 text-gray-400 dark:text-gray-600 mx-auto mb-4" />
+                  <h3 className="text-lg font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                    Đăng nhập để bình luận
+                  </h3>
+                  <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+                    Bạn cần đăng nhập để có thể bình luận và tương tác với bài viết này.
+                  </p>
+                  <Button 
+                    onClick={() => window.location.href = '/login'}
+                    className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg"
+                  >
+                    Đăng nhập ngay
+                  </Button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>

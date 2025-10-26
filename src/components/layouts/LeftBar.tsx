@@ -257,7 +257,7 @@ function LeftBarComponent() {
               className="flex items-center gap-4 px-4 py-3.5 text-gray-700 hover:text-orange-700 hover:bg-orange-50 rounded-xl transition-all duration-300 font-medium group"
             >
               <UserPlus className="w-6 h-6 group-hover:scale-110 transition-transform" />
-              <span>Gợi ý kết bạn</span>
+              <span>Gợi ý theo dõi</span>
             </Link>
 
             <button

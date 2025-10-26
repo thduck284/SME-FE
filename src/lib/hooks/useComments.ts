@@ -38,7 +38,7 @@ export function useComments(postId: string) {
   }, [postId])
 
   const fetchComments = useCallback(async (limit?: number, cursor?: string) => {
-    if (!isValidPostId()) {
+    if (!postId || typeof postId !== 'string' || postId.trim().length === 0) {
       throw new Error('Invalid post ID')
     }
   
@@ -77,7 +77,7 @@ export function useComments(postId: string) {
     } finally {
       setIsLoading(false)
     }
-  }, [postId, isValidPostId])
+  }, [postId])
 
   const loadMoreComments = useCallback(async () => {
     if (!pagination.hasMore || !pagination.nextCursor) return
@@ -152,7 +152,7 @@ export function useComments(postId: string) {
         authorName: updatedComment.authorName,
         authorId: updatedComment.authorId,
         authorAvatar: updatedComment.authorAvatar || undefined,
-        createdAt: updatedComment.createdAt,
+        createdAt: updatedComment.createdAt || new Date().toISOString(),
         likes: updatedComment.likes || 0,
         isLiked: updatedComment.isLiked || false,
         postId: updatedComment.postId,

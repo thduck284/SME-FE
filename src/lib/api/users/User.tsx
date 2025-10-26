@@ -10,7 +10,7 @@ export interface SearchUsersParams {
 const transformUserData = (user: any) => ({
   ...user,
   displayName: user.username,
-  fullName: `${user.firstName} ${user.lastName}`.trim()
+  fullName: `${user.firstName || ''} ${user.lastName || ''}`.trim()
 })
 
 export const userApi = {

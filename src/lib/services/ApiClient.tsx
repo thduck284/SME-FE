@@ -24,10 +24,13 @@ apiClient.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      // Clear tokens and redirect to login
-      localStorage.removeItem('accessToken')
-      localStorage.removeItem('userId')
-      window.location.href = '/login'
+      // Chỉ redirect nếu không phải đang ở trang login
+      if (window.location.pathname !== '/login') {
+        // Clear tokens and redirect to login
+        localStorage.removeItem('accessToken')
+        localStorage.removeItem('userId')
+        window.location.href = '/login'
+      }
     }
     return Promise.reject(error)
   }

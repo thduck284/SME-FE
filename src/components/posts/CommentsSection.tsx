@@ -142,7 +142,7 @@ export function CommentsSection({ postId, isOpen, currentUserId, onCommentSucces
       setLoadingReplies(new Set())
       fetchComments(10)
     }
-  }, [isOpen, postId])
+  }, [isOpen, postId, fetchComments])
 
   // Fetch user metadata for comments và replies
   useEffect(() => {
@@ -281,6 +281,8 @@ export function CommentsSection({ postId, isOpen, currentUserId, onCommentSucces
         setComment("")
         setFiles([])
         setMentions([])
+        // Reload toàn bộ comments sau khi edit thành công
+        await fetchComments(10)
         onCommentSuccess?.()
       } catch (error: any) {
         console.error('Failed to edit comment:', error)

@@ -4,6 +4,7 @@ import { useLiveness } from '@/lib/context/LivenessSocketContext'
 import { UserService } from '@/lib/api/users/UserService'
 import { userApi } from '@/lib/api/users/User'
 import { useEffect, useState, useRef } from 'react'
+import { Link } from 'react-router-dom'
 import { getUserId } from '@/lib/utils/Jwt'
 import { formatTimeAgo } from '@/lib/utils/PostUtils'
 
@@ -71,11 +72,11 @@ export function RightBar() {
 
   // Hàm lấy avatar URL
   const getAvatarUrl = (userInfo: any): string => {
-    if (!userInfo) return "/image.png"
+    if (!userInfo) return "/assets/images/default.png"
     
     // Truy cập vào thuộc tính data nếu tồn tại
     const userData = userInfo.data || userInfo
-    return userData.avtUrl || "/image.png"
+    return userData.avtUrl || "/assets/images/default.png"
   }
 
   // Hàm lấy username
@@ -122,7 +123,7 @@ export function RightBar() {
               return {
                 id: friendId,
                 name: `User ${friendId}`,
-                avatar: "/image.png",
+                avatar: "/assets/images/default.png",
                 status: status ? convertServerStatus(status.status) : 'offline',
                 lastActiveAt: status?.lastActiveAt
               }
@@ -214,32 +215,35 @@ export function RightBar() {
       <div className="flex-1 overflow-y-auto">
         <ul className="space-y-3 p-5">
           {friends.map((friend) => (
-            <li
+            <Link
               key={friend.id}
-              className="flex items-center gap-3 p-3 hover:bg-gray-300 rounded-lg cursor-pointer transition-colors group"
+              to={`/profile/${friend.id}`}
+              className="block"
             >
-              <div className="relative">
-                <Avatar 
-                  src={friend.avatar} 
-                  alt={friend.name}
-                  fallback={getAvatarFallback(friend.name)}
-                  className="w-12 h-12 group-hover:scale-105 transition-transform duration-200"
-                />
-                <span 
-                  className={`absolute bottom-0 right-0 w-3 h-3 border-2 border-white rounded-full ${getStatusColor(friend.status)}`}
-                  title={friend.status === 'online' ? 'Online' : friend.status === 'away' ? 'Away' : 'Offline'}
-                />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-base font-semibold text-black truncate" title={friend.name}>
-                  {friend.name}
-                </p>
-                <p className="text-sm text-gray-700">{getStatusText(friend)}</p>
-                {friend.username && friend.username !== friend.name && (
-                  <p className="text-xs text-gray-500 truncate">@{friend.username}</p>
-                )}
-              </div>
-            </li>
+              <li className="flex items-center gap-3 p-3 hover:bg-gray-300 rounded-lg cursor-pointer transition-colors group">
+                <div className="relative">
+                  <Avatar 
+                    src={friend.avatar} 
+                    alt={friend.name}
+                    fallback={getAvatarFallback(friend.name)}
+                    className="w-12 h-12 group-hover:scale-105 transition-transform duration-200"
+                  />
+                  <span 
+                    className={`absolute bottom-0 right-0 w-3 h-3 border-2 border-white rounded-full ${getStatusColor(friend.status)}`}
+                    title={friend.status === 'online' ? 'Online' : friend.status === 'away' ? 'Away' : 'Offline'}
+                  />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-base font-semibold text-black truncate" title={friend.name}>
+                    {friend.name}
+                  </p>
+                  <p className="text-sm text-gray-700">{getStatusText(friend)}</p>
+                  {friend.username && friend.username !== friend.name && (
+                    <p className="text-xs text-gray-500 truncate">@{friend.username}</p>
+                  )}
+                </div>
+              </li>
+            </Link>
           ))}
         </ul>
       </div>

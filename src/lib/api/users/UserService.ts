@@ -11,7 +11,7 @@ export class UserService {
    */
   static async getSuggestedUsers(currentUserId: string): Promise<RelationshipSuggestion[]> {
     try {
-      const response = await apiClient.get(`${this.RELATIONSHIPS_BASE_URL}/${currentUserId}/suggestion`)
+      const response = await apiClient.get(`${this.RELATIONSHIPS_BASE_URL}/suggestion`)
       
       const result: RelationshipResponse = response.data
       
@@ -166,11 +166,10 @@ export class UserService {
 
   static async getFriends(userId: string): Promise<string[]> {
     try {
-      const response = await apiClient.get(`${this.RELATIONSHIPS_BASE_URL}/user/${userId}`)
-      
+      const response = await apiClient.get(`${this.RELATIONSHIPS_BASE_URL}/${userId}/friends`)
       const result = response.data
       
-      return result.users.map((user: any) => user.userId)
+      return result.data.users.map((user: any) => user.userId)
     } catch (error) {
       console.error('Error fetching friends:', error)
       return []

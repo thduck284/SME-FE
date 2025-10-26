@@ -66,7 +66,23 @@ export const useAuth = () => {
       setSuccess('Login successful!');
       return { success: true, data: result };
     } catch (err: any) {
-      setError(err?.message || 'Login failed');
+      // Xử lý error message từ backend
+      let errorMessage = 'Login failed';
+      
+      // Kiểm tra response structure từ API
+      if (err?.response?.data?.message) {
+        errorMessage = err.response.data.message;
+      } else if (err?.message) {
+        errorMessage = err.message;
+      }
+      
+      // Kiểm tra nếu là lỗi email chưa verify
+      if (errorMessage.includes('Email not verified') || errorMessage.includes('email not verified') || 
+          errorMessage.includes('Email not verified') || errorMessage.includes('not verified')) {
+        errorMessage = 'Email chưa được xác thực. Vui lòng kiểm tra email và click vào link xác thực.';
+      }
+      
+      setError(errorMessage);
       return { success: false };
     } finally {
       setLoading(false);
@@ -135,6 +151,23 @@ export const useAuth = () => {
     }
   };
 
+  // THÊM RESEND VERIFY EMAIL FUNCTION
+  const resendVerifyEmail = async (email: string) => {
+    setLoading(true);
+    setError(null);
+    setSuccess(null);
+    try {
+      const response = await authService.resendVerifyEmail(email);
+      setSuccess('Verification email sent successfully! Please check your inbox.');
+      return { success: true, data: response };
+    } catch (err: any) {
+      setError(err?.message || 'Failed to resend verification email');
+      return { success: false };
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const isAuthenticated = (): boolean => {
     const token = localStorage.getItem(ACCESS_TOKEN_KEY);
     const expires = localStorage.getItem(TOKEN_EXPIRES_KEY);
@@ -156,7 +189,8 @@ export const useAuth = () => {
     login,
     logout,
     assignRole,
-    forgotPassword, 
+    forgotPassword,
+    resendVerifyEmail,
     isAuthenticated,
     getAccessToken,
     autoRefreshToken,

@@ -9,7 +9,7 @@ import { useAuth } from '@/lib/hooks/useAuth'
 
 export function LoginPage() {
   const navigate = useNavigate();
-  const { loading, error, login, clearError } = useAuth();
+  const { loading, error, login, clearError, resendVerifyEmail } = useAuth();
   
   const [formData, setFormData] = useState({
     email: "",
@@ -32,6 +32,12 @@ export function LoginPage() {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    e.stopPropagation(); // Ngăn event bubbling
+    
+    // Ngăn form submit khi có error
+    if (error) {
+      return;
+    }
 
     const loginData = {
       email: formData.email,
@@ -63,6 +69,23 @@ export function LoginPage() {
     window.open('/forgot-password', '_blank');
   }
 
+  // HÀM MỚI: Resend verify email
+  const handleResendVerifyEmail = async () => {
+    if (!formData.email) {
+      alert('Please enter your email address first');
+      return;
+    }
+    
+    const result = await resendVerifyEmail(formData.email);
+    if (result.success) {
+      // Success message sẽ được hiển thị từ useAuth hook
+      // Clear error để có thể login lại
+      setTimeout(() => {
+        clearError();
+      }, 100); // Delay nhỏ để đảm bảo state được update
+    }
+  }
+
   return (
     <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden bg-gradient-to-tr from-blue-100 via-purple-100 to-pink-100">
       {/* Background Blur Shapes */}
@@ -86,30 +109,96 @@ export function LoginPage() {
 
           {/* Error Message */}
           {error && (
-            <div className="mb-4 p-3 bg-destructive/10 border border-destructive/20 rounded-lg">
-              <p className="text-destructive text-sm flex items-center gap-2 text-red">
-                {error}
-              </p>
-              {loginAttempts > 0 && (
-                <p className="text-destructive/80 text-xs mt-1 text-red">
-                  Failed attempts: {loginAttempts}
-                </p>
+            <div className={`mb-4 p-4 rounded-lg border ${
+              error.includes('Email chưa được xác thực') 
+                ? 'bg-yellow-50 border-yellow-200 dark:bg-yellow-900/20 dark:border-yellow-800' 
+                : 'bg-red-50 border-red-200 dark:bg-red-900/20 dark:border-red-800'
+            }`}>
+              <div className="flex items-start gap-3">
+                {/* Icon */}
+                <div className={`flex-shrink-0 w-5 h-5 rounded-full flex items-center justify-center ${
+                  error.includes('Email chưa được xác thực') 
+                    ? 'bg-yellow-100 dark:bg-yellow-800' 
+                    : 'bg-red-100 dark:bg-red-800'
+                }`}>
+                  {error.includes('Email chưa được xác thực') ? (
+                    <span className="text-yellow-600 dark:text-yellow-400 text-sm">⚠️</span>
+                  ) : (
+                    <span className="text-red-600 dark:text-red-400 text-sm">❌</span>
+                  )}
+                </div>
+                
+                {/* Content */}
+                <div className="flex-1">
+                  <p className={`text-sm font-medium ${
+                    error.includes('Email chưa được xác thực') 
+                      ? 'text-yellow-800 dark:text-yellow-200' 
+                      : 'text-red-800 dark:text-red-200'
+                  }`}>
+                    {error}
+                  </p>
+                  
+                  {/* Failed attempts */}
+                  {loginAttempts > 0 && !error.includes('Email chưa được xác thực') && (
+                    <p className="text-red-600 dark:text-red-400 text-xs mt-1">
+                      Failed attempts: {loginAttempts}
+                    </p>
+                  )}
+                  
+                  {/* Tip for email verification */}
+                  {error.includes('Email chưa được xác thực') && (
+                    <p className="text-yellow-700 dark:text-yellow-300 text-xs mt-2 flex items-center gap-1">
+                      <span>💡</span>
+                      <span>Kiểm tra cả hộp thư spam nếu không thấy email xác thực</span>
+                    </p>
+                  )}
+                </div>
+              </div>
+              
+              {/* Nút Resend Verify Email khi có lỗi email chưa verify */}
+              {error.includes('Email chưa được xác thực') && (
+                <div className="mt-4">
+                  <Button
+                    type="button"
+                    onClick={handleResendVerifyEmail}
+                    disabled={loading}
+                    className="w-full h-9 text-sm bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-medium rounded-lg shadow-sm transition-all duration-200 transform hover:scale-[1.02]"
+                  >
+                    {loading ? (
+                      <div className="flex items-center gap-2">
+                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                        <span>Sending...</span>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        <span>📧</span>
+                        <span>Resend Verify Email</span>
+                      </div>
+                    )}
+                  </Button>
+                </div>
               )}
             </div>
           )}
 
           {/* Success Message */}
           {successMessage && (
-            <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg">
-              <p className="text-green-700 text-sm font-medium flex items-center gap-2">
-                <span>✅</span>
-                {successMessage}
-              </p>
+            <div className="mb-4 p-4 bg-green-50 border border-green-200 dark:bg-green-900/20 dark:border-green-800 rounded-lg">
+              <div className="flex items-start gap-3">
+                <div className="flex-shrink-0 w-5 h-5 rounded-full bg-green-100 dark:bg-green-800 flex items-center justify-center">
+                  <span className="text-green-600 dark:text-green-400 text-sm">✅</span>
+                </div>
+                <div className="flex-1">
+                  <p className="text-green-800 dark:text-green-200 text-sm font-medium">
+                    {successMessage}
+                  </p>
+                </div>
+              </div>
             </div>
           )}
 
           {/* Form */}
-          <form onSubmit={handleLogin} className="space-y-6">
+          <div className="space-y-6">
             {/* Email */}
             <div className="space-y-2">
               <label htmlFor="email" className="block text-sm font-medium text-foreground">
@@ -182,7 +271,8 @@ export function LoginPage() {
 
             {/* Login Button */}
             <Button
-              type="submit"
+              type="button"
+              onClick={handleLogin}
               disabled={loading || loginAttempts >= 3} // Vô hiệu hóa sau 3 lần thất bại
               className="w-full h-11 text-base font-medium bg-primary hover:bg-primary/90"
             >
@@ -208,7 +298,7 @@ export function LoginPage() {
                 </p>
               </div>
             )}
-          </form>
+          </div>
 
           {/* Divider */}
           <div className="relative my-8">

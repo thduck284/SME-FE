@@ -5,6 +5,7 @@ import { ProfilePage } from "./profile/ProfilePage";
 import { EditProfilePage } from "./profile/EditProfilePage";
 import { HashtagPage } from "./hashtag/HashtagPage";
 import { SearchPage } from "./search/SearchPage";
+import { PostDetailPage } from "./post/PostDetailPage";
 
 export const feedRoutes: RouteObject[] = [
   {
@@ -28,11 +29,11 @@ export const feedRoutes: RouteObject[] = [
     element: <ProfilePage />
   },
   {
-    path: "/profile/:userId", 
-    element: <ProfilePage />
-  },
-  {
     path: "/profile/edit", 
     element: <EditProfilePage />
+  },
+  {
+    path: "/post/:postId",
+    element: <PostDetailPage />
   }
 ];
