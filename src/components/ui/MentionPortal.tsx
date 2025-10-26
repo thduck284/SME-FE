@@ -24,19 +24,76 @@ export function MentionPortal({
   inputRef,
   show
 }: MentionPortalProps) {
-  const [position, setPosition] = useState({ top: 300, left: 100, width: 300 }) 
+  const [position, setPosition] = useState({ top: 0, left: 0, width: 300 }) 
   const portalRef = useRef<HTMLDivElement>(null)
 
-  // Giữ fixed position nhưng bỏ màu mè debug
+  // Calculate position based on input element
   useEffect(() => {
-    if (show) {
+    if (!show || !inputRef.current) return
+
+    const updatePosition = () => {
+      const input = inputRef.current
+      if (!input) return
+
+      const rect = input.getBoundingClientRect()
+      
+      const DROPDOWN_HEIGHT = 300 // Approximate max height
+      const DROPDOWN_WIDTH = 350
+      const GAP = 8
+      
+      // Always try to position below input first
+      let top = rect.bottom + GAP
+      let left = rect.left
+
+      // Check if dropdown would go off-screen at the bottom
+      const spaceBelow = window.innerHeight - rect.bottom
+      const spaceAbove = rect.top
+
+      // Only flip to above if there's literally not enough space below AND there's good space above
+      // For comments, we want to avoid flipping up as much as possible
+      const MIN_SPACE_REQUIRED = 100 // Minimum space needed for dropdown
+      if (spaceBelow < MIN_SPACE_REQUIRED && spaceAbove > DROPDOWN_HEIGHT + 20) {
+        top = rect.top - DROPDOWN_HEIGHT - GAP
+      }
+
+      // Ensure it doesn't go off-screen horizontally
+      const maxWidth = Math.min(DROPDOWN_WIDTH, window.innerWidth - 16)
+      const finalWidth = Math.min(DROPDOWN_WIDTH, maxWidth)
+      
+      // Adjust left position to keep dropdown visible
+      let finalLeft = left
+      if (left + finalWidth > window.innerWidth - 8) {
+        finalLeft = window.innerWidth - finalWidth - 8
+      }
+      if (finalLeft < 8) {
+        finalLeft = 8
+      }
+
       setPosition({
-        top: 400,
-        left: 50, 
-        width: 250
+        top,
+        left: finalLeft,
+        width: finalWidth
       })
     }
-  }, [show])
+
+    updatePosition()
+
+    // Recalculate on scroll/resize with throttle
+    let timeoutId: NodeJS.Timeout
+    const throttledUpdate = () => {
+      clearTimeout(timeoutId)
+      timeoutId = setTimeout(updatePosition, 10)
+    }
+
+    window.addEventListener('scroll', throttledUpdate, true)
+    window.addEventListener('resize', throttledUpdate)
+
+    return () => {
+      window.removeEventListener('scroll', throttledUpdate, true)
+      window.removeEventListener('resize', throttledUpdate)
+      clearTimeout(timeoutId)
+    }
+  }, [show, inputRef])
 
   // Handle click outside to close
   useEffect(() => {
