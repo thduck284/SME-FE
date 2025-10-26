@@ -33,7 +33,7 @@ export function MentionPortal({
       setPosition({
         top: 400,
         left: 50, 
-        width: 300
+        width: 250
       })
     }
   }, [show])
