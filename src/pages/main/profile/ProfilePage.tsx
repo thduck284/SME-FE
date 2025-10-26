@@ -118,7 +118,6 @@ export function ProfilePage() {
     loading: loadingRelationships
   } = useUserRelationship(userId || undefined)
 
-  // Lấy userId từ URL params hoặc JWT
   useEffect(() => {
     const currentUserId = getUserId()
     
@@ -326,9 +325,7 @@ export function ProfilePage() {
     if (isOwnProfile || !relationshipData) return null
 
     const { fromUser, toUser, mutualRelationships } = relationshipData
-    console.log("relationshipData", relationshipData)
     
-    // Kiểm tra các relationship types
     const isBlocked = fromUser.relationshipTypes.includes('BLOCKED') || toUser.relationshipTypes.includes('BLOCKED')
     const isFriend = mutualRelationships.includes('FRIEND')
     const isFollowing = fromUser.relationshipTypes.includes('FOLLOWER')
