@@ -5,6 +5,7 @@ import { Send, Loader2, ImageIcon, X } from "lucide-react"
 import { FilePreviewGrid } from "./FilePreviewGrid"
 import type { MentionData } from "@/lib/types/users/MentionDto"
 import type { Comment as CommentType } from "@/lib/types/posts/CommentsDTO"
+import { useEffect } from "react"
 
 interface CommentInputProps {
   comment: string
@@ -69,14 +70,39 @@ export function CommentInput({
   onRemoveFile,
   fileInputRef
 }: CommentInputProps) {
+
+  // DEBUG: Log khi props thay đổi
+  useEffect(() => {
+    console.log('🔍 CommentInput Mention Debug:', {
+      showMentionDropdown,
+      mentionUsersCount: mentionUsers.length,
+      isMentionLoading,
+      mentionSelectedIndex,
+      commentLength: comment.length,
+      mentionsCount: mentions.length
+    })
+  }, [showMentionDropdown, mentionUsers, isMentionLoading, mentionSelectedIndex, comment, mentions])
+
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value
+    const cursorPosition = e.target.selectionStart || 0
+    
+    console.log('⌨️ Input Change:', { 
+      value, 
+      cursorPosition,
+      hasAtSymbol: value.includes('@')
+    })
+    
     onChange(value)
     onClearError()
-    onMentionTextChange(value, e.target.selectionStart || 0)
+    
+    // Gọi mention handler với cursor position
+    onMentionTextChange(value, cursorPosition)
   }
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    console.log('🔑 Key Down:', e.key)
+    
     const input = inputRef.current || (e.currentTarget as HTMLInputElement | null)
     if (!input) {
       onMentionKeyDown(e)
@@ -131,6 +157,7 @@ export function CommentInput({
       if (selectionStart === selectionEnd) {
         const mentionAtCursor = mentions.find(m => selectionStart >= m.startIndex && selectionStart < m.endIndex)
         if (mentionAtCursor) {
+          console.log('🗑️ Deleting mention:', mentionAtCursor)
           deleteRange(mentionAtCursor.startIndex, mentionAtCursor.endIndex)
           return
         }
@@ -138,6 +165,7 @@ export function CommentInput({
         if (pos >= 0) {
           const mentionLeft = mentions.find(m => pos >= m.startIndex && pos < m.endIndex)
           if (mentionLeft) {
+            console.log('🗑️ Deleting mention left:', mentionLeft)
             deleteRange(mentionLeft.startIndex, mentionLeft.endIndex)
             return
           }
@@ -156,6 +184,7 @@ export function CommentInput({
         const pos = selectionStart
         const mention = mentions.find(m => pos >= m.startIndex && pos < m.endIndex)
         if (mention) {
+          console.log('🗑️ Deleting mention with Delete key:', mention)
           deleteRange(mention.startIndex, mention.endIndex)
           return
         }
@@ -168,6 +197,8 @@ export function CommentInput({
       }
     }
 
+    // LUÔN gọi mention keydown handler
+    console.log('🔑 Calling onMentionKeyDown with key:', e.key)
     onMentionKeyDown(e)
   }
 
@@ -257,6 +288,13 @@ export function CommentInput({
           disabled={isAdding || isEditing !== null}
           className="flex-1 px-3 py-2 text-sm bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:opacity-50 transition-colors"
         />
+        
+        {/* DEBUG: Hiển thị trạng thái mention */}
+        {showMentionDropdown && (
+          <div className="absolute bottom-full left-0 mb-2 bg-yellow-100 border border-yellow-400 rounded p-2 text-xs">
+            🔍 Mention dropdown is OPEN - Users: {mentionUsers.length}
+          </div>
+        )}
         
         {/* Mention Portal */}
         <MentionPortal

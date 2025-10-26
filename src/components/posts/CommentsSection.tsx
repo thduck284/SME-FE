@@ -37,7 +37,10 @@ export function CommentsSection({ postId, isOpen, currentUserId, onCommentSucces
   const inputRef = useRef<HTMLInputElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  // Mention functionality
+  // Tạo một textareaRef giả để phù hợp với useMention hook
+  const fakeTextareaRef = useRef<HTMLTextAreaElement>(null)
+
+  // Mention functionality - SỬA QUAN TRỌNG
   const {
     users: mentionUsers,
     isLoading: isMentionLoading,
@@ -49,11 +52,13 @@ export function CommentsSection({ postId, isOpen, currentUserId, onCommentSucces
     closeDropdown: closeMentionDropdown,
     mentions,
     setMentions,
+    textareaRef: mentionTextareaRef,
   } = useMention({
     onMentionAdd: () => {},
     currentText: comment,
     onTextChange: (newText, cursorPosition) => {
       setComment(newText)
+      // Đồng bộ với inputRef thực tế thay vì textareaRef
       setTimeout(() => {
         if (inputRef.current) {
           inputRef.current.setSelectionRange(cursorPosition, cursorPosition)
