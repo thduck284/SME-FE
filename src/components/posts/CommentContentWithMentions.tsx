@@ -9,12 +9,14 @@ interface CommentContentWithMentionsProps {
   content: string
   mentions?: CommentMention[]
   onMentionClick?: (path: string) => void
+  textSize?: string
 }
 
 export function CommentContentWithMentions({ 
   content, 
   mentions, 
-  onMentionClick 
+  onMentionClick,
+  textSize = "text-sm"
 }: CommentContentWithMentionsProps) {
   const [userCache, setUserCache] = useState<Map<string, UserMetadata>>(new Map())
 
@@ -120,7 +122,7 @@ export function CommentContentWithMentions({
   // Render content with highlighted mentions and hashtags
   const renderContent = () => {
     if (!mentions || mentions.length === 0) {
-      return <span className="text-sm text-foreground bg-background rounded-lg p-3 whitespace-pre-wrap break-words block">{renderContentWithHashtags(content)}</span>
+      return <span className={`${textSize} text-foreground bg-background rounded-lg p-3 whitespace-pre-wrap break-words block`}>{renderContentWithHashtags(content)}</span>
     }
 
     // Sort mentions by startIndex to process them in order
@@ -174,7 +176,7 @@ export function CommentContentWithMentions({
     }
 
     return (
-      <span className="text-sm text-foreground bg-background rounded-lg p-3 whitespace-pre-wrap break-words block">
+      <span className={`${textSize} text-foreground bg-background rounded-lg p-3 whitespace-pre-wrap break-words block`}>
         {parts.map((part, index) => {
           if (part.type === 'mention') {
             return (

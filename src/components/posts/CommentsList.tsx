@@ -1,11 +1,11 @@
 "use client"
 
 import { Loader2 } from "lucide-react"
-import type { Comment as CommentType } from "@/lib/types/posts/CommentsDTO"
+import type { CommentWithReactions } from "@/lib/types/posts/CommentsDTO"
 import { CommentItem } from "./CommentItem"
 
 interface CommentsListProps {
-  comments: CommentType[]
+  comments: CommentWithReactions[]
   isLoading: boolean
   isLiking: string | null
   isEditing: string | null
@@ -13,17 +13,19 @@ interface CommentsListProps {
   currentUserId?: string
   onLike: (commentId: string) => void
   onDelete: (commentId: string) => void
-  onEdit: (comment: CommentType) => void
-  onReply: (comment: CommentType) => void
+  onEdit: (comment: CommentWithReactions) => void
+  onReply: (comment: CommentWithReactions) => void
+  onReact?: (commentId: string, reactionType: string) => void
+  onRemoveReaction?: (commentId: string) => void
   onMentionClick?: (path: string) => void
-  getDisplayInfo: (comment: CommentType) => {
+  getDisplayInfo: (comment: CommentWithReactions) => {
     displayName: string
     avatarUrl?: string
     fullName?: string
   }
-  isTempComment: (comment: CommentType) => boolean
-  replies: Map<string, CommentType[]>
-  expandedComments: Set<string>
+  isTempComment: (comment: CommentWithReactions) => boolean
+  replies: Map<string, CommentWithReactions[]>
+  expandedComments: Map<string, boolean>
   loadingReplies: Set<string>
   onToggleReplies: (commentId: string) => void
 }
@@ -39,6 +41,8 @@ export function CommentsList({
   onDelete,
   onEdit,
   onReply,
+  onReact,
+  onRemoveReaction,
   onMentionClick,
   getDisplayInfo,
   isTempComment,
@@ -72,7 +76,7 @@ export function CommentsList({
         const tempComment = isTempComment(comment)
         const { displayName, avatarUrl, fullName } = getDisplayInfo(comment)
         const commentReplies = replies.get(comment.id) || []
-        const isExpanded = expandedComments.has(comment.id)
+        const isExpanded = expandedComments.get(comment.id) || false
         const isLoadingReplies = loadingReplies.has(comment.id)
         
         return (
@@ -90,13 +94,16 @@ export function CommentsList({
               onDelete={onDelete}
               onEdit={onEdit}
               onReply={onReply}
+              onReact={onReact}
+              onRemoveReaction={onRemoveReaction}
               onMentionClick={onMentionClick}
               currentUserId={currentUserId}
               replies={commentReplies}
               isExpanded={isExpanded}
               isLoadingReplies={isLoadingReplies}
-              onToggleReplies={onToggleReplies}
+              onToggleReplies={onToggleReplies} // QUAN TRỌNG: Truyền hook xuống
               getDisplayInfo={getDisplayInfo}
+              level={0}
             />
           </div>
         )
