@@ -54,10 +54,7 @@ export function RelationshipModal({ isOpen, onClose, type, userId }: Relationshi
       const userPromises = response.users.map(async (userRel) => {
         try {
           const userData = await userApi.getUser(userRel.userId)
-          console.log('Fetched user data:', userData)
           
-          // SỬA: Kiểm tra nếu userData có property data (API response format)
-          // hoặc sử dụng trực tiếp userData (User type)
           const userDetails = (userData as any).data || userData
           
           return {
