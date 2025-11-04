@@ -7,6 +7,7 @@ import { useEffect, useState, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import { getUserId } from '@/lib/utils/Jwt'
 import { formatTimeAgo } from '@/lib/utils/PostUtils'
+import { useChatManager } from '@/components/chat/ChatWindowsManager'
 
 interface Friend {
   id: string
@@ -20,6 +21,7 @@ interface Friend {
 
 export function RightBar() {
   const { getFriendStatus, isConnected, sendHeartbeat } = useLiveness()
+  const { openChat } = useChatManager()
   const [friends, setFriends] = useState<Friend[]>([])
   const [loading, setLoading] = useState(true)
   const hasSentInitialHeartbeatRef = useRef(false) 
@@ -94,13 +96,11 @@ export function RightBar() {
     const loadFriends = async () => {
       try {
         const friendIds = await UserService.getFriends(userId)
-        console.log('Loaded friend IDs:', friendIds)
         
         const friendsWithDetails = await Promise.all(
           friendIds.map(async (friendId) => {
             try {
               const userInfo = await userApi.getUser(friendId)
-              console.log("User data:", userInfo)
               const status = getFriendStatus(friendId)
               
               // Sử dụng các hàm helper để lấy thông tin
@@ -242,6 +242,21 @@ export function RightBar() {
                     <p className="text-xs text-gray-500 truncate">@{friend.username}</p>
                   )}
                 </div>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  if (friend.id === userId) return
+                  openChat(friend.id, friend.name, friend.avatar)
+                }}
+                className="p-2 hover:bg-blue-500 hover:text-white rounded-lg transition-colors opacity-0 group-hover:opacity-100"
+                title="Start chat"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                </svg>
+              </button>
               </li>
             </Link>
           ))}
