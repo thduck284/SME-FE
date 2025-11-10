@@ -2,7 +2,8 @@ import apiClient from '@/lib/services/ApiClient'
 
 export interface Conversation {
   conversationId: string
-  conversationType: string
+  conversationType?: string
+  type?: string  // Backend returns 'type', frontend uses 'conversationType'
   title?: string
   lastMessage?: string
   lastMessageSender?: string
@@ -13,10 +14,8 @@ export interface Conversation {
 }
 
 export interface Participant {
-  id: string
-  name: string
-  avatar?: string
-  username?: string
+  userId: string
+  role: string
 }
 
 export interface Message {
@@ -28,6 +27,7 @@ export interface Message {
   status?: string
   action?: string
   userStatus?: 'SENT' | 'DELIVERED' | 'READ' // Status of message for the current user
+  readByUserIds?: string[] // List of user IDs who have read this message
   createdAt: Date
   updatedAt?: Date
 }
@@ -51,6 +51,11 @@ export interface CreateConversationDto {
 }
 
 export interface SendMessageDto {
+  content?: string
+  attachments?: string[]
+}
+
+export interface EditMessageDto {
   content?: string
   attachments?: string[]
 }
@@ -158,6 +163,12 @@ export class ChatService {
         conversations = response.data.conversations
         nextCursor = response.data.nextCursor
       }
+
+      // Map backend field 'type' to frontend 'conversationType'
+      conversations = conversations.map(conv => ({
+        ...conv,
+        conversationType: conv.conversationType || conv.type || 'direct'
+      }))
 
       return {
         conversations,
@@ -338,6 +349,145 @@ export class ChatService {
     } catch (e) {
       console.warn('getMessageReactions failed', e)
       return []
+    }
+  }
+
+  // Add participant to group conversation
+  static async addParticipant(conversationId: string, userId: string): Promise<void> {
+    try {
+      const response = await apiClient.post(`${this.BASE_URL}/${conversationId}/participants`, {
+        userId
+      })
+      
+      // Handle ApiResponse wrapper (success: true/false)
+      // If response has success field, it's wrapped in ApiResponse format
+      if (response.data && typeof response.data === 'object' && 'success' in response.data) {
+        // ApiResponse format: { success: true, data: {...}, message: '...' }
+        if (response.data.success === false) {
+          throw new Error(response.data.message || 'Failed to add participant')
+        }
+        // Success case, just return
+        return
+      }
+      
+      // Direct response (no wrapper)
+      return
+    } catch (error: any) {
+      console.error('ChatService.addParticipant error:', error)
+      // Re-throw with better error message
+      if (error?.response?.data?.message) {
+        throw new Error(error.response.data.message)
+      }
+      if (error?.message) {
+        throw error
+      }
+      throw new Error('Failed to add participant')
+    }
+  }
+
+  // Remove participant from group conversation
+  static async removeParticipant(conversationId: string, userId: string): Promise<void> {
+    try {
+      const response = await apiClient.delete(`${this.BASE_URL}/${conversationId}/participants/${userId}`)
+      
+      // Handle ApiResponse wrapper (success: true/false)
+      if (response.data && typeof response.data === 'object' && 'success' in response.data) {
+        if (response.data.success === false) {
+          throw new Error(response.data.message || 'Failed to remove participant')
+        }
+        return
+      }
+      
+      return
+    } catch (error: any) {
+      console.error('ChatService.removeParticipant error:', error)
+      if (error?.response?.data?.message) {
+        throw new Error(error.response.data.message)
+      }
+      if (error?.message) {
+        throw error
+      }
+      throw new Error('Failed to remove participant')
+    }
+  }
+
+  // Assign admin role to participant
+  static async assignAdmin(conversationId: string, userId: string): Promise<void> {
+    try {
+      const response = await apiClient.post(`${this.BASE_URL}/${conversationId}/participants/${userId}/admin`)
+      
+      // Handle ApiResponse wrapper (success: true/false)
+      if (response.data && typeof response.data === 'object' && 'success' in response.data) {
+        if (response.data.success === false) {
+          throw new Error(response.data.message || 'Failed to assign admin role')
+        }
+        return
+      }
+      
+      return
+    } catch (error: any) {
+      console.error('ChatService.assignAdmin error:', error)
+      if (error?.response?.data?.message) {
+        throw new Error(error.response.data.message)
+      }
+      if (error?.message) {
+        throw error
+      }
+      throw new Error('Failed to assign admin role')
+    }
+  }
+
+  // Delete message (only unread messages)
+  static async deleteMessage(conversationId: string, messageId: string): Promise<void> {
+    try {
+      const response = await apiClient.delete(`${this.BASE_URL}/${conversationId}/messages/${messageId}`)
+      
+      // Handle ApiResponse wrapper
+      if (response.data && typeof response.data === 'object' && 'success' in response.data) {
+        if (response.data.success === false) {
+          throw new Error(response.data.message || 'Failed to delete message')
+        }
+        return
+      }
+      
+      return
+    } catch (error: any) {
+      console.error('ChatService.deleteMessage error:', error)
+      if (error?.response?.data?.message) {
+        throw new Error(error.response.data.message)
+      }
+      if (error?.message) {
+        throw error
+      }
+      throw new Error('Failed to delete message')
+    }
+  }
+
+  // Edit message (only unread messages)
+  static async editMessage(conversationId: string, messageId: string, dto: EditMessageDto): Promise<Message> {
+    try {
+      const response = await apiClient.put(`${this.BASE_URL}/${conversationId}/messages/${messageId}`, dto)
+      
+      // Handle ApiResponse wrapper
+      if (response.data && typeof response.data === 'object' && 'success' in response.data) {
+        if (response.data.success === false) {
+          throw new Error(response.data.message || 'Failed to edit message')
+        }
+        // Return the updated message
+        return response.data.data?.message || response.data.data
+      }
+      
+      // Direct response
+      return response.data?.message || response.data
+    } catch (error: any) {
+      console.error('ChatService.editMessage error:', error)
+      if (error?.response?.data?.message) {
+        throw new Error(error.response.data.message)
+      }
+      if (error?.message) {
+        throw error
+      }
+      throw new Error('Failed to edit message')
     }
   }
 }

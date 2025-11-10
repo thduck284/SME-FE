@@ -20,6 +20,27 @@ interface NewMessageEvent {
   message: Message
 }
 
+interface ParticipantEvent {
+  conversationId: string
+  userId: string
+  addedBy?: string
+  removedBy?: string
+  assignedBy?: string
+}
+
+interface MessageDeletedEvent {
+  conversationId: string
+  messageId: string
+  deletedBy: string
+}
+
+interface MessageEditedEvent {
+  conversationId: string
+  messageId: string
+  message: Message
+  editedBy: string
+}
+
 interface ChatContextType {
   socket: Socket | null
   isConnected: boolean
@@ -30,6 +51,16 @@ interface ChatContextType {
   removeReaction: (conversationId: string, messageId: string, reaction: string) => Promise<Record<string, number>>
   onReactionUpdated: (callback: (event: { conversationId: string; messageId: string; reaction: string; counts: Record<string, number>; userId: string; action: 'added' | 'removed' }) => void) => void
   offReactionUpdated: (callback: (event: { conversationId: string; messageId: string; reaction: string; counts: Record<string, number>; userId: string; action: 'added' | 'removed' }) => void) => void
+  onParticipantAdded: (callback: (event: ParticipantEvent) => void) => void
+  offParticipantAdded: (callback: (event: ParticipantEvent) => void) => void
+  onParticipantRemoved: (callback: (event: ParticipantEvent) => void) => void
+  offParticipantRemoved: (callback: (event: ParticipantEvent) => void) => void
+  onAdminAssigned: (callback: (event: ParticipantEvent) => void) => void
+  offAdminAssigned: (callback: (event: ParticipantEvent) => void) => void
+  onMessageDeleted: (callback: (event: MessageDeletedEvent) => void) => void
+  offMessageDeleted: (callback: (event: MessageDeletedEvent) => void) => void
+  onMessageEdited: (callback: (event: MessageEditedEvent) => void) => void
+  offMessageEdited: (callback: (event: MessageEditedEvent) => void) => void
 }
 
 const ChatContext = createContext<ChatContextType | undefined>(undefined)
@@ -204,6 +235,46 @@ export function ChatProvider({ children }: ChatProviderProps) {
     if (socket) socket.off('reaction-updated', callback)
   }, [socket])
 
+  const onParticipantAdded = useCallback((callback: (event: ParticipantEvent) => void) => {
+    if (socket) socket.on('participant-added', callback)
+  }, [socket])
+
+  const offParticipantAdded = useCallback((callback: (event: ParticipantEvent) => void) => {
+    if (socket) socket.off('participant-added', callback)
+  }, [socket])
+
+  const onParticipantRemoved = useCallback((callback: (event: ParticipantEvent) => void) => {
+    if (socket) socket.on('participant-removed', callback)
+  }, [socket])
+
+  const offParticipantRemoved = useCallback((callback: (event: ParticipantEvent) => void) => {
+    if (socket) socket.off('participant-removed', callback)
+  }, [socket])
+
+  const onAdminAssigned = useCallback((callback: (event: ParticipantEvent) => void) => {
+    if (socket) socket.on('admin-assigned', callback)
+  }, [socket])
+
+  const offAdminAssigned = useCallback((callback: (event: ParticipantEvent) => void) => {
+    if (socket) socket.off('admin-assigned', callback)
+  }, [socket])
+
+  const onMessageDeleted = useCallback((callback: (event: MessageDeletedEvent) => void) => {
+    if (socket) socket.on('message-deleted', callback)
+  }, [socket])
+
+  const offMessageDeleted = useCallback((callback: (event: MessageDeletedEvent) => void) => {
+    if (socket) socket.off('message-deleted', callback)
+  }, [socket])
+
+  const onMessageEdited = useCallback((callback: (event: MessageEditedEvent) => void) => {
+    if (socket) socket.on('message-edited', callback)
+  }, [socket])
+
+  const offMessageEdited = useCallback((callback: (event: MessageEditedEvent) => void) => {
+    if (socket) socket.off('message-edited', callback)
+  }, [socket])
+
   const value: ChatContextType = {
     socket,
     isConnected,
@@ -213,7 +284,17 @@ export function ChatProvider({ children }: ChatProviderProps) {
     addReaction,
     removeReaction,
     onReactionUpdated,
-    offReactionUpdated
+    offReactionUpdated,
+    onParticipantAdded,
+    offParticipantAdded,
+    onParticipantRemoved,
+    offParticipantRemoved,
+    onAdminAssigned,
+    offAdminAssigned,
+    onMessageDeleted,
+    offMessageDeleted,
+    onMessageEdited,
+    offMessageEdited
   }
 
   return (

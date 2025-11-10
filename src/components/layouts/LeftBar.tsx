@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useState, useEffect, useCallback, useMemo } from "react"
-import { Home, Search, Bell, PlusSquare, User, UserPlus, LogOut } from "lucide-react"
+import { Home, Search, Bell, PlusSquare, User, UserPlus, LogOut, MessageCircle } from "lucide-react"
 import { CreatePostModal } from "@/components/posts/CreatePostModal"
 import { SearchModal } from "@/components/search/SearchModal"
 import { NotificationModal } from "@/components/notifications"
@@ -218,6 +218,14 @@ function LeftBarComponent() {
               <span>Search</span>
             </button>
 
+            <Link
+              to="/messages"
+              className="flex items-center gap-4 px-4 py-3.5 text-gray-700 hover:text-orange-700 hover:bg-orange-50 rounded-xl transition-all duration-300 font-medium group"
+            >
+              <MessageCircle className="w-6 h-6 group-hover:scale-110 transition-transform" />
+              <span>Message</span>
+            </Link>
+
             <button
               onClick={handleNotificationClick}
               className="flex items-center gap-4 px-4 py-3.5 text-gray-700 hover:text-orange-700 hover:bg-orange-50 rounded-xl transition-all duration-300 font-medium group w-full relative"
@@ -296,6 +304,7 @@ function LeftBarComponent() {
         onSocketNotificationRead={handleSocketNotificationRead}
         processedSocketNotifications={processedSocketNotifications}
       />
+
     </>
   )
 }

@@ -6,6 +6,7 @@ import { EditProfilePage } from "./profile/EditProfilePage";
 import { HashtagPage } from "./hashtag/HashtagPage";
 import { SearchPage } from "./search/SearchPage";
 import { PostDetailPage } from "./post/PostDetailPage";
+import { ChatPage } from "./chat/ChatPage";
 
 export const feedRoutes: RouteObject[] = [
   {
@@ -35,5 +36,9 @@ export const feedRoutes: RouteObject[] = [
   {
     path: "/post/:postId",
     element: <PostDetailPage />
+  },
+  {
+    path: "/messages",
+    element: <ChatPage />
   }
 ];

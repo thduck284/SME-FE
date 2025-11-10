@@ -6,15 +6,19 @@ import { Avatar } from '@/components/ui'
 import { useChat } from '@/lib/context/ChatSocketContext'
 import { ChatService, Message } from '@/lib/api/chat/ChatService'
 import { getUserId } from '@/lib/utils/Jwt'
-import { formatTimeAgo } from '@/lib/utils/PostUtils'
+import { formatMessageTime, formatDateDivider } from '@/lib/utils/PostUtils'
 import { ReactionType, reactionIcons } from '@/lib/constants/reactions'
 import { ChatReactionDetailsModal } from '@/components/chat/ChatReactionDetailsModal'
+import { EmojiPicker } from '@/components/ui/EmojiPicker'
+import { UserService } from '@/lib/api/users/UserService'
+import { UserMetadata } from '@/lib/types/User'
 
 interface ChatWindowProps {
   conversationId: string
   recipientId: string
   recipientName: string
   recipientAvatar?: string
+  conversationType?: 'direct' | 'group'
   onClose: () => void
   onMinimize: () => void
   position?: { x: number; y: number }
@@ -24,7 +28,8 @@ export function ChatWindow({
   conversationId, 
   recipientId,
   recipientName, 
-  recipientAvatar, 
+  recipientAvatar,
+  conversationType = 'direct',
   onClose,
   onMinimize,
   position = { x: 0, y: 0 }
@@ -61,6 +66,10 @@ export function ChatWindow({
   const [hoveredMessageId, setHoveredMessageId] = useState<string | null>(null)
   const hoverHideTimerRef = useRef<number | null>(null)
   const [detailsMessageId, setDetailsMessageId] = useState<string | null>(null)
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false)
+  const emojiPickerRef = useRef<HTMLDivElement>(null)
+  const [userMetadataCache, setUserMetadataCache] = useState<Map<string, UserMetadata>>(new Map())
+  const isGroup = conversationType === 'group'
 
   const isVideoUrl = (url: string) => {
     if (url.startsWith('data:video/')) return true
@@ -154,8 +163,19 @@ export function ChatWindow({
   }, [conversationId, onReactionUpdated, offReactionUpdated, userId])
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages])
+    // Chỉ scroll xuống dưới khi không đang load older messages
+    // và khi có tin nhắn mới được thêm vào cuối
+    if (!loadingOlder && !isLoadingTriggerRef.current) {
+      const c = scrollContainerRef.current
+      if (c) {
+        // Kiểm tra xem có đang ở gần cuối không (trong vòng 100px)
+        const isNearBottom = c.scrollHeight - c.scrollTop - c.clientHeight < 100
+        if (isNearBottom) {
+          messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+        }
+      }
+    }
+  }, [messages, loadingOlder])
 
   const loadInitial = async () => {
     try {
@@ -233,8 +253,14 @@ export function ChatWindow({
         })
       })
       
+      // Đợi DOM update và giữ nguyên vị trí scroll
       requestAnimationFrame(() => {
-        if (c) c.scrollTop = (c.scrollHeight - prevH)
+        requestAnimationFrame(() => {
+          if (c) {
+            const newH = c.scrollHeight
+            c.scrollTop = newH - prevH
+          }
+        })
       })
     } catch (e) {
       console.error('Failed to load older messages:', e)
@@ -349,6 +375,27 @@ export function ChatWindow({
     }
   }
 
+  const handleSelectEmoji = (emoji: string) => {
+    setInputMessage(prev => prev + emoji)
+    setShowEmojiPicker(false)
+  }
+
+  // Close emoji picker when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (emojiPickerRef.current && !emojiPickerRef.current.contains(event.target as Node)) {
+        setShowEmojiPicker(false)
+      }
+    }
+
+    if (showEmojiPicker) {
+      document.addEventListener('mousedown', handleClickOutside)
+      return () => {
+        document.removeEventListener('mousedown', handleClickOutside)
+      }
+    }
+  }, [showEmojiPicker])
+
   const updateOptimistic = (messageId: string, next: { type: 'add' | 'remove'; reaction: ReactionType }) => {
     setMessageReactions(prev => {
       const current = prev[messageId] || { counters: {}, userReaction: undefined }
@@ -446,6 +493,65 @@ export function ChatWindow({
       .toUpperCase()
   }
 
+  const getFullName = (userMetadata: UserMetadata | undefined): string => {
+    if (!userMetadata) return 'User'
+    return `${userMetadata.firstName || ''} ${userMetadata.lastName || ''}`.trim() || 'User'
+  }
+
+  const getAvatarUrl = (userMetadata: UserMetadata | undefined): string => {
+    if (!userMetadata) return "/assets/images/default.png"
+    return userMetadata.avtUrl || "/assets/images/default.png"
+  }
+
+  const isDifferentDay = (date1: Date, date2: Date | null): boolean => {
+    if (!date2) return true
+    return (
+      date1.getDate() !== date2.getDate() ||
+      date1.getMonth() !== date2.getMonth() ||
+      date1.getFullYear() !== date2.getFullYear()
+    )
+  }
+
+  // Fetch user metadata for group messages
+  useEffect(() => {
+    if (!isGroup || messages.length === 0) return
+
+    const fetchUserMetadata = async () => {
+      // Get unique sender IDs (excluding current user)
+      const senderIds = Array.from(new Set(
+        messages
+          .map(m => m.senderId)
+          .filter(id => id && id !== userId)
+      ))
+
+      // Filter out already cached users
+      setUserMetadataCache(prev => {
+        const uncachedIds = senderIds.filter(id => !prev.has(id))
+        
+        if (uncachedIds.length === 0) return prev
+
+        // Fetch uncached users
+        UserService.getMultipleUsersMetadata(uncachedIds)
+          .then(metadata => {
+            setUserMetadataCache(current => {
+              const next = new Map(current)
+              metadata.forEach(user => {
+                next.set(user.userId, user)
+              })
+              return next
+            })
+          })
+          .catch(error => {
+            console.error('Error fetching user metadata for messages:', error)
+          })
+
+        return prev
+      })
+    }
+
+    fetchUserMetadata()
+  }, [messages, isGroup, userId])
+
   return (
     <div 
       className="fixed bg-white rounded-lg shadow-2xl flex flex-col border border-gray-200 z-[9999]"
@@ -489,7 +595,7 @@ export function ChatWindow({
       </div>
 
       {/* Messages */}
-      <div ref={scrollContainerRef} onScroll={onScroll} className="flex-1 overflow-y-auto p-3 bg-gray-50">
+      <div ref={scrollContainerRef} onScroll={onScroll} className="flex-1 overflow-y-auto overflow-x-hidden p-3 bg-gray-50">
         {loading ? (
           <div className="flex justify-center items-center h-full">
             <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500"></div>
@@ -504,7 +610,7 @@ export function ChatWindow({
             {loadingOlder && (
               <div className="flex justify-center items-center py-2 text-xs text-gray-500">Loading older messages...</div>
             )}
-            {messages.map((message) => {
+            {messages.map((message, index) => {
               const isOwn = message.senderId === userId
               const isSending = message.status === 'sending'
               const reactions = messageReactions[message.messageId]
@@ -513,19 +619,36 @@ export function ChatWindow({
               const hasReactions = totalReactions > 0
               const reactionTypes = Object.keys(counters).filter(key => (counters[key] || 0) > 0)
               
+              const currentDate = new Date(message.createdAt)
+              const previousMessage = index > 0 ? messages[index - 1] : null
+              const previousDate = previousMessage ? new Date(previousMessage.createdAt) : null
+              const showDateDivider = isDifferentDay(currentDate, previousDate)
+              
               return (
-                <div
-                  key={message.messageId}
-                  className={`flex ${isOwn ? 'justify-end' : 'justify-start'}`}
-                >
+                <div key={message.messageId}>
+                  {showDateDivider && (
+                    <div className="flex items-center justify-center my-4">
+                      <div className="flex items-center gap-2 w-full">
+                        <div className="flex-1 h-px bg-gray-300"></div>
+                        <span className="text-xs text-gray-500 px-2 bg-gray-50 rounded">
+                          {formatDateDivider(message.createdAt.toString())}
+                        </span>
+                        <div className="flex-1 h-px bg-gray-300"></div>
+                      </div>
+                    </div>
+                  )}
+                  <div className={`flex w-full items-end gap-2 ${isOwn ? 'justify-end' : 'justify-start'}`}>
+                    {/* Avatar for group messages - only show for other users' messages */}
+                    {!isOwn && isGroup && (
+                      <Avatar
+                        src={getAvatarUrl(userMetadataCache.get(message.senderId))}
+                        alt={getFullName(userMetadataCache.get(message.senderId))}
+                        fallback={getAvatarFallback(getFullName(userMetadataCache.get(message.senderId)))}
+                        className="w-8 h-8 flex-shrink-0"
+                      />
+                    )}
                   <div
-                    className={`relative group max-w-[75%] rounded-lg px-3 py-2 ${hasReactions ? 'mb-3' : ''} ${
-                      isSending ? 'opacity-60' : ''
-                    } ${
-                      isOwn
-                        ? 'bg-blue-500 text-white'
-                        : 'bg-white text-gray-900 border border-gray-200'
-                    }`}
+                    className={`relative flex flex-col ${isOwn ? 'items-end' : 'items-start'} max-w-[75%] min-w-0 ${hasReactions ? 'mb-6' : ''}`}
                     onMouseEnter={() => {
                       if (hoverHideTimerRef.current) window.clearTimeout(hoverHideTimerRef.current)
                       setHoveredMessageId(message.messageId)
@@ -537,27 +660,72 @@ export function ChatWindow({
                     onTouchStart={() => onBubbleTouchStart(message.messageId)}
                     onTouchEnd={onBubbleTouchEnd}
                   >
-                    {message.content && (
-                      <p className="text-sm whitespace-pre-wrap break-words">{message.content}</p>
+                    {/* Sender name for group messages - only show for other users' messages */}
+                    {!isOwn && isGroup && (
+                      <p className="text-xs text-gray-600 mb-1 px-1">
+                        {getFullName(userMetadataCache.get(message.senderId))}
+                      </p>
                     )}
+                    {/* Text Bubble và Time Bubble - cùng dòng */}
+                    <div className={`flex items-end gap-2 ${isOwn ? 'flex-row-reverse' : ''} ${hasReactions ? 'mb-1' : ''}`}>
+                      {/* Text Bubble - chỉ khi có content */}
+                      {message.content && (
+                        <div
+                          className={`relative group min-w-0 rounded-lg px-3 py-2 ${
+                            isSending ? 'opacity-60' : ''
+                          } ${
+                            isOwn
+                              ? 'bg-blue-500 text-white'
+                              : 'bg-white text-gray-900 border border-gray-200'
+                          }`}
+                        >
+                          <p className="text-sm whitespace-pre-wrap break-words">{message.content}</p>
+                        </div>
+                      )}
+
+                      {/* Time, Status Bubble - ngang hàng với text */}
+                      {hoveredMessageId === message.messageId && (
+                        <div className={`flex items-center gap-1.5 bg-gray-200/60 text-gray-700 rounded-full px-2.5 py-1 text-xs backdrop-blur-sm flex-shrink-0 ${isOwn ? 'order-2' : ''}`}>
+                          <p>{formatMessageTime(message.createdAt.toString())}</p>
+                          {isSending && (
+                            <span className="opacity-70 italic">Sending...</span>
+                          )}
+                          {isOwn && !isSending && message.userStatus && (
+                            <div className="flex items-center">
+                              {message.userStatus === 'SENT' && (
+                                <Check className="w-3 h-3 text-gray-700" />
+                              )}
+                              {message.userStatus === 'DELIVERED' && (
+                                <CheckCheck className="w-3 h-3 text-gray-700" />
+                              )}
+                              {message.userStatus === 'READ' && (
+                                <CheckCheck className="w-3 h-3 text-blue-600" />
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Attachments - hiển thị bên dưới text, không có background */}
                     {message.attachments && message.attachments.length > 0 && (
-                      <div className={`mt-2 grid gap-2 ${message.attachments.length === 1 ? 'grid-cols-1' : message.attachments.length === 2 ? 'grid-cols-2' : 'grid-cols-2'}`}>
+                      <div className={`${message.content ? 'mt-2' : ''} grid gap-2 w-full ${message.attachments.length === 1 ? 'grid-cols-1' : message.attachments.length === 2 ? 'grid-cols-2' : 'grid-cols-2'}`}>
                         {message.attachments.map((att, idx) => {
                           const video = isVideoUrl(att)
                           return (
-                            <div key={idx} className="relative group overflow-hidden rounded-lg bg-black/5">
+                            <div key={idx} className="relative group overflow-hidden rounded-lg bg-black/5 w-full aspect-square min-w-0">
                               {video ? (
                                 <video
                                   src={att}
                                   controls
-                                  className="w-full h-auto max-h-48 rounded-lg"
+                                  className="w-full h-full object-cover rounded-lg"
                                   onClick={(e) => { e.stopPropagation(); openPreview(message.attachments!, idx) }}
                                 />
                               ) : (
                                 <img
                                   src={att}
                                   alt="attachment"
-                                  className="w-full h-40 object-cover rounded-lg cursor-zoom-in"
+                                  className="w-full h-full object-cover rounded-lg cursor-zoom-in"
                                   onClick={() => openPreview(message.attachments!, idx)}
                                   loading="lazy"
                                 />
@@ -571,57 +739,39 @@ export function ChatWindow({
                       </div>
                     )}
 
-                    <div className="flex items-center gap-2 mt-1">
-                      <p className={`text-xs ${isOwn ? 'text-blue-100' : 'text-gray-500'}`}>
-                        {formatTimeAgo(message.createdAt.toString())}
-                      </p>
-                      {isSending && (
-                        <span className={`text-xs opacity-70 italic ${isOwn ? 'text-blue-100' : 'text-gray-500'}`}>Sending...</span>
-                      )}
-                      {isOwn && !isSending && message.userStatus && (
-                        <div className="flex items-center">
-                          {message.userStatus === 'SENT' && (
-                            <Check className="w-3 h-3 text-blue-100" />
-                          )}
-                          {message.userStatus === 'DELIVERED' && (
-                            <CheckCheck className="w-3 h-3 text-blue-100" />
-                          )}
-                          {message.userStatus === 'READ' && (
-                            <CheckCheck className="w-3 h-3 text-blue-200" />
-                          )}
-                        </div>
-                      )}
-                    </div>
-
+                    {/* Reaction button - ở góc dưới của message, không dính vào time bubble */}
                     {hasReactions && (
-                      <button
-                        type="button"
-                        className={`absolute -bottom-3 ${isOwn ? 'left-2' : 'right-2'} flex items-center gap-0.5 bg-white border border-gray-200 rounded-full px-1.5 py-0.5 shadow-sm hover:shadow-md transition-shadow cursor-pointer`}
-                        onClick={() => setDetailsMessageId(message.messageId)}
-                        title="View reactions"
-                      >
-                        <div className="flex items-center -space-x-0.5">
-                          {reactionTypes.slice(0, 3).map((type) => {
-                            const reactionType = type.toUpperCase() as ReactionType
-                            const reactionConfig = reactionIcons[reactionType]
-                            if (!reactionConfig) return null
-                            
-                            return (
-                              <span key={type} className="text-xs leading-none">
-                                {reactionConfig.icon}
-                              </span>
-                            )
-                          })}
-                        </div>
-                        <span className="text-[10px] font-medium text-gray-700 ml-0.5">
-                          {totalReactions}
-                        </span>
-                      </button>
+                      <div className={`flex ${isOwn ? 'justify-start' : 'justify-end'}`}>
+                        <button
+                          type="button"
+                          className="flex items-center gap-0.5 bg-white border border-gray-200 rounded-full px-1.5 py-0.5 shadow-sm hover:shadow-md transition-shadow cursor-pointer"
+                          onClick={() => setDetailsMessageId(message.messageId)}
+                          title="View reactions"
+                        >
+                          <div className="flex items-center -space-x-0.5">
+                            {reactionTypes.slice(0, 3).map((type) => {
+                              const reactionType = type.toUpperCase() as ReactionType
+                              const reactionConfig = reactionIcons[reactionType]
+                              if (!reactionConfig) return null
+                              
+                              return (
+                                <span key={type} className="text-xs leading-none">
+                                  {reactionConfig.icon}
+                                </span>
+                              )
+                            })}
+                          </div>
+                          <span className="text-[10px] font-medium text-gray-700 ml-0.5">
+                            {totalReactions}
+                          </span>
+                        </button>
+                      </div>
                     )}
 
+                    {/* Smile button - ở cạnh message */}
                     <button
                       type="button"
-                      className={`absolute bottom-2 ${isOwn ? 'left-0 -translate-x-full -ml-2' : 'right-0 translate-x-full -mr-2'} transform p-1 rounded-full border border-gray-300 text-gray-600 bg-white/80 backdrop-blur hover:bg-white transition ${hoveredMessageId === message.messageId || showPickerFor === message.messageId ? 'opacity-100' : 'opacity-0'} ${hoveredMessageId === message.messageId || showPickerFor === message.messageId ? 'pointer-events-auto' : 'pointer-events-none'}`}
+                      className={`absolute bottom-2 ${isOwn ? 'left-0 -translate-x-full -ml-2' : 'right-0 translate-x-full -mr-2'} transform p-1 rounded-full border border-gray-300 text-gray-600 bg-white/80 backdrop-blur hover:bg-white transition ${hoveredMessageId === message.messageId || showPickerFor === message.messageId ? 'opacity-100' : 'opacity-0'} ${hoveredMessageId === message.messageId || showPickerFor === message.messageId ? 'pointer-events-auto' : 'pointer-events-none'} z-10`}
                       title="React"
                       onClick={() => onTogglePickerClick(message.messageId)}
                       onMouseEnter={() => {
@@ -637,7 +787,7 @@ export function ChatWindow({
                     </button>
 
                     {showPickerFor === message.messageId && (
-                      <div className={`absolute -top-12 ${isOwn ? 'right-0' : 'left-0'} bg-white border border-gray-200 shadow-lg rounded-xl px-2 py-1 flex items-center gap-1 z-[10000]`}
+                      <div className={`absolute ${isOwn ? 'right-0' : 'left-0'} top-full mt-2 bg-white border border-gray-200 shadow-lg rounded-xl px-2 py-1 flex items-center gap-1 z-[10000]`}
                       >
                         {Object.entries(reactionIcons).map(([type, cfg]) => {
                           const disabled = reactingMessageIds.has(message.messageId)
@@ -657,6 +807,7 @@ export function ChatWindow({
                     )}
                   </div>
                 </div>
+              </div>
               )
             })}
             <div ref={messagesEndRef} />
@@ -698,11 +849,24 @@ export function ChatWindow({
             </div>
           </div>
         )}
-        <div className="flex gap-2 items-center">
+        <div className="flex gap-2 items-center relative">
           <input ref={fileInputRef} type="file" accept="image/*,video/*" multiple className="hidden" onChange={onFilesSelected} />
           <button onClick={onPickFiles} className="p-2 border border-gray-300 rounded hover:bg-gray-100" title="Attach files" disabled={sending}>
             <Paperclip className="w-4 h-4" />
           </button>
+          <button 
+            onClick={() => setShowEmojiPicker(!showEmojiPicker)} 
+            className={`p-2 border border-gray-300 rounded hover:bg-gray-100 ${showEmojiPicker ? 'bg-blue-100' : ''}`} 
+            title="Add emoji" 
+            disabled={sending}
+          >
+            <Smile className="w-4 h-4" />
+          </button>
+          {showEmojiPicker && (
+            <div ref={emojiPickerRef} className="absolute bottom-full left-0 mb-2 z-50">
+              <EmojiPicker onSelect={handleSelectEmoji} />
+            </div>
+          )}
           <input
             type="text"
             value={inputMessage}

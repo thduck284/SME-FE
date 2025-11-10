@@ -68,6 +68,66 @@ export const formatTimeAgo = (dateString: string): string => {
   }
 }
 
+export const formatMessageTime = (dateString: string): string => {
+  if (!dateString) return ""
+  
+  const date = new Date(dateString)
+  
+  // Kiểm tra nếu date không hợp lệ
+  if (isNaN(date.getTime())) {
+    console.warn('Invalid date string:', dateString)
+    return ""
+  }
+  
+  const now = new Date()
+  const hours = date.getHours().toString().padStart(2, '0')
+  const minutes = date.getMinutes().toString().padStart(2, '0')
+  const day = date.getDate().toString().padStart(2, '0')
+  const month = (date.getMonth() + 1).toString().padStart(2, '0')
+  const year = date.getFullYear()
+  
+  // Same day
+  if (date.getDate() === now.getDate() && 
+      date.getMonth() === now.getMonth() && 
+      date.getFullYear() === now.getFullYear()) {
+    return `${hours}:${minutes}`
+  }
+  
+  // Different day, same month
+  if (date.getMonth() === now.getMonth() && 
+      date.getFullYear() === now.getFullYear()) {
+    return `${hours}:${minutes} ${day}/${month}`
+  }
+  
+  // Different month
+  return `${hours}:${minutes} ${day}/${month}/${year}`
+}
+
+export const formatDateDivider = (dateString: string): string => {
+  if (!dateString) return ""
+  
+  const date = new Date(dateString)
+  
+  // Kiểm tra nếu date không hợp lệ
+  if (isNaN(date.getTime())) {
+    console.warn('Invalid date string:', dateString)
+    return ""
+  }
+  
+  const monthNames = [
+    'Tháng 1', 'Tháng 2', 'Tháng 3', 'Tháng 4', 'Tháng 5', 'Tháng 6',
+    'Tháng 7', 'Tháng 8', 'Tháng 9', 'Tháng 10', 'Tháng 11', 'Tháng 12'
+  ]
+  
+  const day = date.getDate()
+  const month = monthNames[date.getMonth()]
+  const year = date.getFullYear()
+  const hours = date.getHours().toString().padStart(2, '0')
+  const minutes = date.getMinutes().toString().padStart(2, '0')
+  
+  return `${hours}:${minutes} ${day} ${month}, ${year}`
+}
+
 export const getTypeIcon = (type: string) => {
   switch (type) {
     case "IMAGE":
